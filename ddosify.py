@@ -21,13 +21,6 @@ import ipaddress
 CURRENT_DIR = os.getcwd()
 DATA_DIR = os.path.join(CURRENT_DIR, "data")
 
-# Paths for the individual IP blocks
-FIREHOL_PATH = os.path.join(DATA_DIR, "fireholipset.json")
-IPDENY_PATH = os.path.join(DATA_DIR, "ipdenyipset.json")
-EMERGINGTHREATS_PATH = os.path.join(DATA_DIR, "emergingthreatsipset.json")
-MYIPMS_PATH = os.path.join(DATA_DIR, "myipmsipset.json")
-TOREXITNODES_PATH = os.path.join(DATA_DIR, "torexitnodes.json")
-
 # Paths for cache files, and IP log files
 SEENIPS_PATH = os.path.join(DATA_DIR, "seenips.json")
 CAPTCHASOLVED_PATH = os.path.join(DATA_DIR, "captchasolved.json")
@@ -51,7 +44,7 @@ else:
         CAPTCHASECRET = file.read()
 
 # Check if the "fireholipset.json" file is not present
-if not os.path.isfile(FIREHOL_PATH):
+if not os.path.isfile(os.path.join(DATA_DIR, "fireholipset.json")):
     # List of URLs to the FireHOL IP lists
     firehol_urls = [
         "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level1.netset",
@@ -77,14 +70,14 @@ if not os.path.isfile(FIREHOL_PATH):
     FIREHOL_IPS = list(set(firehol_ips))
     
     # Open the JSON file in write mode and save the collected IP addresses
-    with open(FIREHOL_PATH, "w") as file:
+    with open(os.path.join(DATA_DIR, "fireholipset.json"), "w") as file:
         json.dump(FIREHOL_IPS, file)
 else:
-    with open(FIREHOL_PATH, "r") as file:
+    with open(os.path.join(DATA_DIR, "fireholipset.json"), "r") as file:
         FIREHOL_IPS = json.load(file)
 
 # Check if the "ipdenyipset.json" file is not present
-if not os.path.isfile(IPDENY_PATH):
+if not os.path.isfile(os.path.join(DATA_DIR, "ipdenyipset.json")):
     # List of URLs to the IP deny IP lists (for IPv4 and IPv6).
     ipdeny_urls = [
         "https://www.ipdeny.com/ipblocks/data/countries/all-zones.tar.gz",
@@ -116,14 +109,14 @@ if not os.path.isfile(IPDENY_PATH):
     IPDENY_IPS = list(set(ipdeny_ips))
     
     # Open the JSON file in write mode and save the collected IP addresses
-    with open(IPDENY_PATH, "w") as file:
+    with open(os.path.join(DATA_DIR, "ipdenyipset.json"), "w") as file:
         json.dump(IPDENY_IPS, file)
 else:
-    with open(IPDENY_PATH, "r") as file:
+    with open(os.path.join(DATA_DIR, "ipdenyipset.json"), "r") as file:
         IPDENY_IPS = json.load(file)
 
 # Check if the "emergingthreatsipset.json" file is not present
-if not os.path.isfile(EMERGINGTHREATS_PATH):
+if not os.path.isfile(os.path.join(DATA_DIR, "emergingthreatsipset.json")):
     # URL to get the list of IP's
     emergingthreats_url = "https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt"
     
@@ -137,16 +130,16 @@ if not os.path.isfile(EMERGINGTHREATS_PATH):
         EMERGINGTHREATS_IPS = list(set(emergingthreats_ips))
         
         # Open the JSON file in write mode and save the list of Ips.
-        with open(EMERGINGTHREATS_PATH, "w") as file:
+        with open(os.path.join(DATA_DIR, "emergingthreatsipset.json"), "w") as file:
             json.dump(EMERGINGTHREATS_IPS, file)
     else:
         response.raise_for_status()
 else:
-    with open(EMERGINGTHREATS_PATH, "r") as file:
+    with open(os.path.join(DATA_DIR, "emergingthreatsipset.json"), "r") as file:
         EMERGINGTHREATS_IPS = json.load(file)
 
 # Check if the "myipmsipset.json" file is not present
-if not os.path.isfile(MYIPMS_PATH):
+if not os.path.isfile(os.path.join(DATA_DIR, "myipmsipset.json")):
     # URL to get the list of IP's
     myipms_url = "https://myip.ms/files/blacklist/general/full_blacklist_database.zip"
     
@@ -164,16 +157,16 @@ if not os.path.isfile(MYIPMS_PATH):
                     MYIPMS_IPS = list(set(myipms_ips))
         
         # Open the JSON file in write mode and save the list of Ips.
-        with open(MYIPMS_PATH, "w") as file:
+        with open(os.path.join(DATA_DIR, "myipmsipset.json"), "w") as file:
             json.dump(MYIPMS_IPS, file)
     else:
         response.raise_for_status()
 else:
-    with open(MYIPMS_PATH, "r") as file:
+    with open(os.path.join(DATA_DIR, "myipmsipset.json"), "r") as file:
         MYIPMS_IPS = json.load(file)
 
 # Check if the "torexitnodes.json" file is not present
-if not os.path.isfile(TOREXITNODES_PATH):
+if not os.path.isfile(os.path.join(DATA_DIR, "torexitnodes.json")):
     # URL to get the list of Tor exit nodes
     torbulkexitlist_url = "https://check.torproject.org/torbulkexitlist"
     
@@ -187,12 +180,12 @@ if not os.path.isfile(TOREXITNODES_PATH):
         TOREXITNODES_IPS = list(set(torexitnodes_ip))
         
         # Open the JSON file in write mode and save the list of Tor exit nodes.
-        with open(TOREXITNODES_PATH, "w") as file:
+        with open(os.path.join(DATA_DIR, "torexitnodes.json"), "w") as file:
             json.dump(TOREXITNODES_IPS, file)
     else:
         response.raise_for_status()
 else:
-    with open(TOREXITNODES_PATH, "r") as file:
+    with open(os.path.join(DATA_DIR, "torexitnodes.json"), "r") as file:
         TOREXITNODES_IPS = json.load(file)
 
 class SymmetricCrypto:
