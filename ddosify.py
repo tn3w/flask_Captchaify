@@ -755,3 +755,86 @@ class DDoSify:
                 else:
                     # If the request to the API fails, block the request
                     criteria.append(True) 
+
+        # If any of the criteria are met and the action is not "let," block or show captcha
+        if any(criteria):
+            if action == "block":
+                # Show block page
+                return self.show_block(template)
+
+            # Load the list of previously seen IPs from a file
+            if os.path.isfile(SEENIPS_PATH):
+                with open(SEENIPS_PATH, "r") as file:
+                    seenips = json.load(file)
+            else:
+                seenips = []
+
+            if not clientip is None:
+                # Compare the client's IP with the seen IPs to determine if it's a repeated visit
+                for hashed_ip, records in seenips:
+                    # Compare the client's IP with each hashed IP stored in the "seenips" list
+                    comparison = Hashing.compare(clientip, hashed_ip)
+                    if comparison:
+                        records_length = 0
+                        for record in records:
+                            # Calculate the number of records (visits) within the last 4 hours (14400 seconds)
+                            if not int(time()) - int(record) > 14400:
+                                records_length += 1
+                        # If the application is in botfightmode or the action is set to "hard," apply stricter rules
+                        if self.botfightmode or action == "hard":
+                            if records_length > 1:
+                                # If there have been more than one record (two or more false captchas) within the last 2 hours, block the request
+                                return self.show_block(template)
+                        else:
+                             # If the application is not in botfightmode and the action is not "hard," apply normal rules
+                            if records_length > 2:
+                                # If there have been more than two records (three or more false captchas) within the last 2 hours, block the request
+                                return self.show_block(template)
+                        break
+            
+            captcha_token = None
+            if not request.args.get("captcha") is None:
+                captcha_token = request.args.get("captcha")
+            elif not request.cookies.get("captcha") is None:
+                captcha_token = request.cookies.get("captcha")
+
+            if captcha_token is None:
+                # Show captcha challenge if no captcha token is found
+                return self.show_captcha(template)
+
+            # Validate the captcha token
+            if len(captcha_token) != 56:
+                return self.show_captcha(template)
+                
+            id, token = captcha_token[:16], captcha_token[16:]
+
+            # Load the list of captcha verifications from a file
+            with open(CAPTCHASOLVED_PATH, "r") as file:
+                captchasolved = json.load(file)
+            
+            for hashed_id, data in captchasolved:
+                # Compare the captcha ID with the stored IDs to find a match
+                comparison = Hashing.compare(id, hashed_id)
+                if comparison:
+                    crypto = SymmetricCrypto(token)
+                    datatime = data["time"]
+                    try:
+                        # Decrypt IP, user agent and hardness of solved captcha from the stored data
+                        ip = crypto.decrypt(data["ip"])
+                        useragent = crypto.decrypt(data["user_agent"])
+                        hardness = int(crypto.decrypt(data["hardness"]))
+                    except:
+                        pass
+                    else:
+                        # If the captcha is still valid, check for botfightmode and match with client's IP and user agent
+                        if not int(time()) - int(datatime) > self.verificationage and hardness >= self.hardness:
+                            if not self.botfightmode and not action == "hard":
+                                if ip == clientip or useragent == clientuseragent:
+                                    return
+                            else:
+                                if ip == clientip and useragent == clientuseragent:
+                                    return
+                    break
+                    
+            # Show captcha challenge if no valid captcha verification is found
+            return self.show_captcha(template)
