@@ -26,21 +26,18 @@ SEENIPS_PATH = os.path.join(DATA_DIR, "seenips.json")
 CAPTCHASOLVED_PATH = os.path.join(DATA_DIR, "captchasolved.json")
 STOPFORUMSPAM_PATH = os.path.join(DATA_DIR, "stopforumspamcache.json")
 
-# Path to the captcha secret
-CAPTCHASECRET_PATH = os.path.join(DATA_DIR, "captchasecret.txt")
-
 def generate_random_string(length):
     characters = string.ascii_letters + string.digits + string.punctuation
     random_string = ''.join(secrets.choice(characters) for _ in range(length))
     return random_string
 
 # The captcha secret is used to check the captcha of the user
-if not os.path.isfile(CAPTCHASECRET_PATH):
+if not os.path.isfile(os.path.join(DATA_DIR, "captchasecret.txt")):
     CAPTCHASECRET = generate_random_string(1024)
-    with open(CAPTCHASECRET_PATH, "w") as file:
+    with open(os.path.join(DATA_DIR, "captchasecret.txt"), "w") as file:
         file.write(CAPTCHASECRET)
 else:
-    with open(CAPTCHASECRET_PATH, "r") as file:
+    with open(os.path.join(DATA_DIR, "captchasecret.txt"), "r") as file:
         CAPTCHASECRET = file.read()
 
 # Check if the "fireholipset.json" file is not present
