@@ -13,10 +13,11 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from base64 import urlsafe_b64encode, urlsafe_b64decode
-from flask import request
+from flask import request, send_file
 from googletrans import Translator # Version: 3.1.0a0
 from bs4 import BeautifulSoup
 import ipaddress
+from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
 from urllib.parse import urlparse
 from time import time
 
@@ -572,6 +573,46 @@ def get_client_ip() -> str:
 
 CRAWLER_USER_AGENTS = ["Googlebot", "bingbot", "Yahoo! Slurp", "YandexBot", "Baiduspider", "DuckDuckGo-Favicons-Bot", "AhrefsBot", "SemrushBot", "MJ12bot", "BLEXBot", "SeznamBot", "Exabot", "AhrefsBot", "archive.org_bot", "Applebot", "spbot", "Genieo", "linkdexbot", "Lipperhey Link Explorer", "SISTRIX Crawler", "MojeekBot", "CCBot", "Uptimebot", "XoviBot", "Neevabot", "SEOkicks-Robot", "meanpathbot", "MojeekBot", "RankActiveLinkBot", "CrawlomaticBot", "sentibot", "ExtLinksBot", "Superfeedr bot", "LinkfluenceBot", "Plerdybot", "Statbot", "Brainity", "Slurp", "Barkrowler", "RanksonicSiteAuditor", "rogerbot", "BomboraBot", "RankActiveLinkBot", "mail.ru", "AI Crawler", "Xenu Link Sleuth", "SEMrushBot", "Baiduspider-render", "coccocbot", "Sogou web spider", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler", "CodiBot", "libwww-perl", "Purebot", "Statbot", "iCjobs", "Cliqzbot", "SafeDNSBot", "AhrefsBot", "MetaURI API", "meanpathbot", "ADmantX Platform Semantic Analyzer", "CrawlomaticBot", "moget", "meanpathbot", "FPT-Aibot", "Domains Project", "SimpleCrawler", "YoudaoBot", "SafeDNSBot", "Slurp", "XoviBot", "Baiduspider", "FPT-Aibot", "SiteExplorer", "Lipperhey Link Explorer", "CrawlomaticBot", "SISTRIX Crawler", "SEMrushBot", "meanpathbot", "sentibot", "Dataprovider.com", "BLEXBot", "YoudaoBot", "Superfeedr bot", "moget", "Genieo", "sentibot", "AI Crawler", "Xenu Link Sleuth", "Barkrowler", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler"]
 
+with open(os.path.join(DATA_DIR, "emojis.json"), "r") as file:
+    EMOJIS = json.load(file)
+
+# So that no Jinja Undefined errors come
+class SilentUndefined(Undefined):
+    def _fail_with_undefined_error(self, *args, **kwargs):
+        return None
+
+def render_template(filepath: str, **args) -> str:
+    """
+    Function to load an HTML file and perform optional string replacements.
+
+    :params filepath: The path of the file
+    :params args: Jinja2 Args
+
+    :returns html: The HTML page
+
+    :raises FileNotFoundError: If the file does not exist
+    """
+    
+    # Raise a FileNotFoundError if the file does not exist
+    if not os.path.isfile(filepath):
+        raise FileNotFoundError(filepath)
+        
+    # Configuration of the Jinja2 environment
+    env = Environment(
+        loader=FileSystemLoader(os.path.dirname(filepath)),
+        autoescape=select_autoescape(['html', 'xml']),
+        undefined=SilentUndefined
+    )
+    
+    # Load the template file
+    template = env.get_template(os.path.basename(filepath))
+    
+    # Render the template with the passed variables
+    html = template.render(**args)
+    
+    # Return the HTML content
+    return html
+
 class DDoSify:
     """
     Shows the user/bot a captcha before the request first if the request comes from a dangerous IP
@@ -842,3 +883,82 @@ class DDoSify:
                     
             # Show captcha challenge if no valid captcha verification is found
             return self.show_captcha(template)
+
+    def show_block(self, template: Optional[str] = None):
+        """
+        This function generates a block page to be shown in case of blocking a request.
+        
+        :param template: Path to a custom template file or directory (Optional).
+        
+        :return: The content of the block page (HTML, JSON, TXT, or XML).
+
+        :raises Exception: If the built-in template directory or the block.html in it does not exist
+        """
+
+        pagepath = None
+        
+        # Check if a custom template is provided and set the pagepath accordingly
+        if not template is None:
+            if os.path.isfile(template):
+                # If the template is a file, use it as the pagepath
+                pagepath = os.path.isfile(template)
+            elif os.path.isdir(template):
+                # If the template is a directory, find the block template file inside it
+                for file in os.path.listdir(template):
+                    filewithoutext = file.replace("." + file.split('.')[-1], "")
+                    if filewithoutext.lower() == "block":
+                        pagepath = os.path.join(template, file)
+                    break
+
+        # If no custom template is found, check for a default template
+        if pagepath is None:
+            template_dir = self.template_dir
+            if not template_dir is None:
+                for file in os.path.listdir(template_dir):
+                    filewithoutext = file.replace("." + file.split('.')[-1], "")
+                    if filewithoutext.lower() == "block":
+                        pagepath = os.path.join(template_dir, file)
+                    break
+                if pagepath is None:
+                    print("[INFO-DDoSify] The specified template_dir does not contain a block template, the built-in one is used.")
+
+            # If still no template is found, use the built-in block template
+            if pagepath is None:
+                pagepath = os.path.join(os.path.join(CURRENT_DIR, "templates"), "block.html")
+                if not os.path.isfile(pagepath):
+                    raise Exception("The module does not seem to be installed correctly, either the built-in template_dir is missing or the block.html file in it.")
+
+        # Determine the file extension of the template
+        pageext = pagepath.split('.')[-1]
+        
+        if pageext == "html":
+            # If the template is an HTML file, process and translate the page content
+
+            # Get the language based on the user's preference
+            language = Language.speak()
+
+            # Render the HTML template, adding an emoji to it using a random choice from the emojis list
+            page = render_template(pagepath, language = language, emoji = secrets.choice(EMOJIS))
+
+            try:
+                # Translate the page content from English to the user's preferred language
+                translated_page = Language.translate_page(page, "en", language)
+            except:
+                # If translation fails, use the original page content
+                translated_page = page
+
+            return translated_page
+            
+        elif pageext == "json":
+            # If the template is a JSON file, load and return its content
+            with open(pagepath, "r") as file:
+                return json.load(file)
+                
+        elif pageext in ["txt", "xml"]:
+            # If the template is a TXT or XML file, read and return its content
+            with open(pagepath, "r") as file:
+                return file.read()
+        
+        else:
+            # If the template file has an unsupported extension, serve it as a file download
+            return send_file(pagepath)
