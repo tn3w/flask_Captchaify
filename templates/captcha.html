@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="{{ language }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beep beop Boop?</title>
+    <style>
+        body, h1, form {
+          margin: 0;
+          padding: 0;
+        }
+        
+        body {
+          font-family: Arial, sans-serif;
+          background-color: #f7f7f7;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 100vh;
+          text-align: center;
+        }
+        
+        .captcha-container {
+          background-color: #fff;
+          border-radius: 5px;
+          box-shadow: 5px 5px 5px 5px;
+          padding: 20px;
+          max-width: 400px;
+          width: 100%;
+        }
+        
+        h1 {
+          text-align: center;
+          margin-bottom: 20px;
+        }
+        
+        form {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+        
+        .captcha-image,
+        .captcha-audio {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          margin-bottom: 20px;
+        }
+        
+        img {
+          max-width: 100%;
+          margin-bottom: 10px;
+        }
+        
+        audio {
+          width: 100%;
+          margin-bottom: 10px;
+        }
+        
+        input {
+          padding: 8px 12px;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          margin-bottom: 10px;
+          width: 300px;
+        }
+        
+        button {
+          padding: 10px 20px;
+          background-color: #0078FF;
+          color: #fff;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        
+        button:hover {
+          background-color: #005ED3;
+        }
+        
+        @media screen and (max-width: 600px) {
+          .captcha-container {
+            max-width: 80%;
+          }
+        }
+  
+        .ddosify-text {
+            font-size: 12px;
+            margin-top: 10px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="captcha-container">
+        <h2>Beep beop Boop?</h2>
+        <p>Before you can see the page you have to prove that you are not a robot!</p>
+        <form action="/" method="POST">
+            <div class="captcha-image">
+                <img src="{{ textCaptcha }}" alt="Captcha Image">
+                <input type="text" name="textCaptcha" placeholder="Enter what you see in the picture." required>
+            </div>
+            {% if audioCaptcha|default %}
+            <div class="captcha-audio">
+                <audio controls>
+                      <source src="captcha_audio.mp3" type="audio/mpeg">
+                      Your browser does not support the audio element.
+                </audio>
+                <input type="text" name="audioCaptcha" placeholder="Enter what you hear." required>
+            </div>
+            {% endif %}
+            <input type="hidden" name="captchatoken" value="{{ captchatoken }}">
+            <button type="submit">Check</button>
+        </form>
+        <div class="ddosify-text">DDoS protection from DDoSify</div>
+    </div>
+</body>
+</html>
