@@ -667,7 +667,7 @@ class DDoSify:
 
         try:
             # Get the client's IP address
-            clientip = WebTools.get_client_ip()
+            clientip = get_client_ip()
         except:
             # If an error occurs while fetching the client's IP, set the error flag
             error = True
