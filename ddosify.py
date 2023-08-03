@@ -686,22 +686,41 @@ class DDoSify:
         # Initialize the template variable to None
         template = None
 
-        # Iterate through the defined actions to find a matching action for the current request
-        for _urlpath, _action in self.actions.items():
-            # Check if the current URL path matches the defined action's URL path, the endpoint or action's URL path is set to "all"
-            if _urlpath == urlpath or _urlpath == request.endpoint or _urlpath == "all":
-                # If the action is defined as a tuple (template, action), extract the template and action
-                if isinstance(_action, tuple):
-                    _template, _action = _action
-                    # Check if the specified template file or directory exists
-                    if os.path.isfile(_template) or os.path.isdir(_template):
-                        # If the template exists, set the template variable to its value
-                        template = _template
+        # Find a matching action for the current request
+        if not self.actions.get(urlpath) is None or not self.actions.get(request.endpoint) == None:
+            if not self.actions.get(urlpath) is None:
+                _action = self.actions.get(urlpath)
+            else:
+                _action = self.actions.get(request.endpoint)
 
-                # Check if the action is a valid one among ["block", "let", "hard", "normal", "easy"]
-                if _action in ["block", "let", "hard", "normal", "easy"]:
-                    # Set the action variable to the defined action for the current request
-                    action = _action
+            # If the action is defined as a tuple (template, action), extract the template and action
+            if isinstance(_action, tuple):
+                _template, _action = _action
+                # Check if the specified template file or directory exists
+                if os.path.isfile(_template) or os.path.isdir(_template):
+                    # If the template exists, set the template variable to its value
+                    template = _template
+
+            # Check if the action is a valid one among ["block", "let", "hard", "normal", "easy"]
+            if _action in ["block", "let", "hard", "normal", "easy"]:
+                # Set the action variable to the defined action for the current request
+                action = _action
+
+        elif not self.actions.get("all") == None:
+            _action = self.actions.get("all")
+            
+            # If the action is defined as a tuple (template, action), extract the template and action
+            if isinstance(_action, tuple):
+                _template, _action = _action
+                # Check if the specified template file or directory exists
+                if os.path.isfile(_template) or os.path.isdir(_template):
+                    # If the template exists, set the template variable to its value
+                    template = _template
+
+            # Check if the action is a valid one among ["block", "let", "hard", "normal", "easy"]
+            if _action in ["block", "let", "hard", "normal", "easy"]:
+                # Set the action variable to the defined action for the current request
+                action = _action
 
         # If the action is 'let' nothing more is executed
         if action == "let":
