@@ -20,6 +20,8 @@ import ipaddress
 from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
 from urllib.parse import urlparse
 from time import time
+from captcha.image import ImageCaptcha
+from captcha.audio import AudioCaptcha
 
 CURRENT_DIR = os.getcwd()
 DATA_DIR = os.path.join(CURRENT_DIR, "data")
@@ -1001,4 +1003,178 @@ class DDoSify:
         
         else:
             # If the template file has an unsupported extension, serve it as a file download
+            return send_file(pagepath)
+
+    def show_captcha(self, template: Optional[str] = None, error: bool = False):
+        """
+        This function generates a captcha page for the user.
+        
+        :param template: Path to a custom template file or directory (Optional).
+        :param error: If there is a need to show error notifications to the user.
+        
+        :return: The content of the captcha page (HTML, JSON, TXT, or XML).
+
+        :raises Exception: If the built-in template directory or the captcha.html in it does not exist
+        """
+
+        # Get the URL path of the current request
+        urlpath = urlparse(request.url).path
+
+        # Set the hardness based on the normal hardness level of the application
+        hardness = self.hardness
+
+        # Find a matching action for the current request
+        if not self.actions.get(urlpath) is None or not self.actions.get(request.endpoint) == None:
+            if not self.actions.get(urlpath) is None:
+                _action = self.actions.get(urlpath)
+            else:
+                _action = self.actions.get(request.endpoint)
+
+            # If the action is defined as a tuple (template, action), extract the action
+            if isinstance(_action, tuple):
+                _, _action = _action
+
+            # Check if the action is a valid one among ["block", "let", "hard", "normal", "easy"]
+            if _action == "block":
+                return self.show_block(template=template)
+            elif _action == "let":
+                return
+            else:
+                hardness = 3 if self.hardness == "hard" else 2 if self.hardness == "normal" else 1
+
+        elif not self.actions.get("all") == None:
+            _action = self.actions.get("all")
+
+            # If the action is defined as a tuple (template, action), extract the action
+            if isinstance(_action, tuple):
+                _, _action = _action
+
+            # Check if the action is a valid one among ["block", "let", "hard", "normal", "easy"]
+            if _action == "block":
+                return self.show_block(template=template)
+            elif _action == "let":
+                return
+            else:
+                hardness = 3 if self.hardness == "hard" else 2 if self.hardness == "normal" else 1
+
+        pagepath = None
+        
+        # Check if a custom template is provided and set the pagepath accordingly
+        if not template is None:
+            if os.path.isfile(template):
+                # If the template is a file, use it as the pagepath
+                pagepath = os.path.isfile(template)
+            elif os.path.isdir(template):
+                # If the template is a directory, find the captcha template file inside it
+                for file in os.path.listdir(template):
+                    filewithoutext = file.replace("." + file.split('.')[-1], "")
+                    if filewithoutext.lower() == "captcha":
+                        pagepath = os.path.join(template, file)
+                    break
+
+        # If no custom template is found, check for a default template
+        if pagepath is None:
+            template_dir = self.template_dir
+            if not template_dir is None:
+                for file in os.path.listdir(template_dir):
+                    filewithoutext = file.replace("." + file.split('.')[-1], "")
+                    if filewithoutext.lower() == "captcha":
+                        pagepath = os.path.join(template_dir, file)
+                    break
+                if pagepath is None:
+                    print("[INFO-DDoSify] The specified template_dir does not contain a captcha template, the built-in one is used.")
+
+            # If still no template is found, use the built-in captcha template
+            if pagepath is None:
+                pagepath = os.path.join(os.path.join(CURRENT_DIR, "templates"), "captcha.html")
+                if not os.path.isfile(pagepath):
+                    raise Exception("The module does not seem to be installed correctly, either the built-in template_dir is missing or the captcha.html file in it.")
+        
+        try:
+            # Get the client's IP address
+            clientip = get_client_ip()
+        except:
+            # If an error occurs while fetching the client's IP, set the error flag
+            clientip = None
+
+        try:
+            # Get the client's user agent string from the request
+            clientuseragent = request.user_agent.string
+        except:
+            clientuseragent = None
+        
+        if clientip is None and clientuseragent is None:
+            return self.show_block(template)
+        
+        captcha_token = Hashing().hash(pagepath) + "-//-" + str(int(time())) + "-//-" + str(hardness) + "-//-" + Hashing().hash(clientip) + "-//-" + Hashing().hash(clientuseragent) + "-//-"
+
+        # Calculate the length of the random string based on the hardness level
+        string_length = (5 if hardness == 1 else 8 if hardness == 2 else 9) + secrets.choice([1, 1, 2, 3])
+        
+        # Generate the random string
+        image_captcha_code = generate_random_string(string_length, with_punctuation=False)
+
+        # Create the ImageCaptcha instance with specified width, height, and fonts
+        image_captcha = ImageCaptcha(width=320, height=120, fonts=[
+            os.path.join(DATA_DIR, "Comic_Sans_MS.ttf"),
+            os.path.join(DATA_DIR, "DroidSansMono.ttf"),
+            os.path.join(DATA_DIR, "Helvetica.ttf")
+        ])
+
+        # Generate the captcha image
+        captcha_image = image_captcha.generate(image_captcha_code)
+
+        # Convert the captcha_image to base64-encoded string with "data:image/png;base64," prefix
+        captcha_image_data = b64encode(captcha_image.getvalue()).decode('utf-8')
+        captcha_image_data = "data:image/png;base64," + captcha_image_data
+
+        captcha_token += image_captcha_code
+
+        captcha_audio_data = None
+
+        if hardness == 3:
+            # Calculate the length of the random int code based on the hardness level
+            int_length = 8 + secrets.choice([1, 2, 3, 4, 5, 6])
+
+            # Generate the random int code
+            audio_captcha_code = generate_random_string(int_length, with_punctuation=False, with_letters=False)
+
+            # Create the AudioCaptcha instance
+            audio_captcha = AudioCaptcha()
+
+            # Generate the captcha audio
+            captcha_audio = audio_captcha.generate(audio_captcha_code)
+
+            # Convert the captcha_audio to base64-encoded string with "data:audio/wav;base64," prefix
+            captcha_audio_data = b64encode(captcha_audio).decode('utf-8')
+            captcha_audio_data = "data:audio/wav;base64," + captcha_audio_data
+
+            captcha_token += audio_captcha_code
+        
+        coded_captcha_token = SymmetricCrypto(CAPTCHASECRET).encrypt(captcha_token)
+
+        errormessage = None
+        if error:
+            errormessage = "That was not right, try again!"
+            
+        # Determine the file extension of the template
+        pageext = pagepath.split('.')[-1]
+        
+        if pageext == "html":
+            # Get the language based on the user's preference
+            language = Language.speak()
+
+            # Render the HTML template, adding an emoji to it using a random choice from the emojis list
+            page = render_template(pagepath, language = language, errormessage = errormessage, textCaptcha=captcha_image_data, audioCaptcha = captcha_audio_data, captchatoken=coded_captcha_token)
+
+            try:
+                # Translate the page content from English to the user's preferred language
+                translated_page = Language.translate_page(page, "en", language)
+            except:
+                # If translation fails, use the original page content
+                translated_page = page
+
+            return translated_page
+            
+        else:
             return send_file(pagepath)
