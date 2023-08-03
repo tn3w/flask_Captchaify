@@ -29,10 +29,29 @@ SEENIPS_PATH = os.path.join(DATA_DIR, "seenips.json")
 CAPTCHASOLVED_PATH = os.path.join(DATA_DIR, "captchasolved.json")
 STOPFORUMSPAM_PATH = os.path.join(DATA_DIR, "stopforumspamcache.json")
 
-def generate_random_string(length: int, with_punctuation: bool = True):
-    characters = string.ascii_letters + string.digits
+def generate_random_string(length: int, with_punctuation: bool = True, with_letters: bool = True):
+    """
+    Generates a random string of the specified length with optional character types
+
+    :param length: The desired length of the random string
+    :param with_punctuation: Specifies whether special characters should be included in the string (default: True)
+    :param with_letters: Specifies whether letters should be included in the string (default: True)
+
+    :return: A random string of the given length with the given characters.
+    """
+
+    # Define a basic string of digits (0-9)
+    characters = string.digits
+    
+    # Add special characters if the option 'with_punctuation' is activated.
     if with_punctuation:
         characters += string.punctuation
+
+    # Add letters if the option 'with_letters' is activated.
+    if with_letters:
+        characters += string.ascii_letters
+
+    # Create a random string of the desired length by dragging characters from the 'characters' string and returns it
     random_string = ''.join(secrets.choice(characters) for _ in range(length))
     return random_string
 
