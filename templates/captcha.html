@@ -96,6 +96,11 @@
     <div class="captcha-container">
         <h2>Beep beop Boop?</h2>
         <p>Before you can see the page you have to prove that you are not a robot!</p>
+        {% if errormessage|default %}
+        <p style="color: #ff0000;margin:10px;">
+            {{ errormessage }}
+        </p>
+        {% endif %}
         <form action="/" method="POST">
             <div class="captcha-image">
                 <img src="{{ textCaptcha }}" alt="Captcha Image">
@@ -104,7 +109,7 @@
             {% if audioCaptcha|default %}
             <div class="captcha-audio">
                 <audio controls>
-                      <source src="captcha_audio.mp3" type="audio/mpeg">
+                      <source src="{{ audioCaptcha }}" type="audio/wav">
                       Your browser does not support the audio element.
                 </audio>
                 <input type="text" name="audioCaptcha" placeholder="Enter what you hear." required>
