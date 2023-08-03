@@ -29,8 +29,10 @@ SEENIPS_PATH = os.path.join(DATA_DIR, "seenips.json")
 CAPTCHASOLVED_PATH = os.path.join(DATA_DIR, "captchasolved.json")
 STOPFORUMSPAM_PATH = os.path.join(DATA_DIR, "stopforumspamcache.json")
 
-def generate_random_string(length):
-    characters = string.ascii_letters + string.digits + string.punctuation
+def generate_random_string(length: int, with_punctuation: bool = True):
+    characters = string.ascii_letters + string.digits
+    if with_punctuation:
+        characters += string.punctuation
     random_string = ''.join(secrets.choice(characters) for _ in range(length))
     return random_string
 
