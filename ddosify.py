@@ -29,6 +29,7 @@ DATA_DIR = os.path.join(CURRENT_DIR, "data")
 # Paths for cache files, and IP log files
 SEENIPS_PATH = os.path.join(DATA_DIR, "seenips.json")
 CAPTCHASOLVED_PATH = os.path.join(DATA_DIR, "captchasolved.json")
+ONETIME_PATH = os.path.join(DATA_DIR, "onetime.json")
 STOPFORUMSPAM_PATH = os.path.join(DATA_DIR, "stopforumspamcache.json")
 
 def generate_random_string(length: int, with_punctuation: bool = True, with_letters: bool = True):
