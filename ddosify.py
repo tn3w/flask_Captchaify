@@ -1105,14 +1105,15 @@ class DDoSify:
         
         if clientip is None and clientuseragent is None:
             return self.show_block(template)
-        
-        captcha_token = Hashing().hash(pagepath) + "-//-" + str(int(time())) + "-//-" + str(hardness) + "-//-" + Hashing().hash(clientip) + "-//-" + Hashing().hash(clientuseragent) + "-//-"
+    
+        # Create basic data of the captcha_token
+        captcha_token = Hashing().hash(urlpath) + "-//-" + str(int(time())) + "-//-" + str(hardness) + "-//-" + Hashing().hash(clientip) + "-//-" + Hashing().hash(clientuseragent) + "-//-"
 
         # Calculate the length of the random string based on the hardness level
         string_length = (5 if hardness == 1 else 8 if hardness == 2 else 9) + secrets.choice([1, 1, 2, 3])
         
         # Generate the random string
-        image_captcha_code = generate_random_string(string_length, with_punctuation=False)
+        image_captcha_code = generate_random_string(string_length, with_punctuation=False).replace("v", "V").replace("s", "S")
 
         # Create the ImageCaptcha instance with specified width, height, and fonts
         image_captcha = ImageCaptcha(width=320, height=120, fonts=[
@@ -1149,7 +1150,7 @@ class DDoSify:
             captcha_audio_data = b64encode(captcha_audio).decode('utf-8')
             captcha_audio_data = "data:audio/wav;base64," + captcha_audio_data
 
-            captcha_token += audio_captcha_code
+            captcha_token += "-//-" + audio_captcha_code
         
         coded_captcha_token = SymmetricCrypto(CAPTCHASECRET).encrypt(captcha_token)
 
