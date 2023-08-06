@@ -879,6 +879,145 @@ class DDoSify:
                                 # If there have been more than two records (three or more false captchas) within the last 2 hours, block the request
                                 return self.show_block(template)
                         break
+
+            # If the request method is POST
+            if request.method == "POST":
+                text_captcha = request.form.get("textCaptcha")
+                audio_captcha = request.form.get("audioCaptcha")
+                captcha_token = request.form.get("captchatoken")
+
+                # If the text_captcha and the captcha_token is None, a captcha has to be solved
+                if None in [text_captcha, captcha_token]:
+                    return self.show_captcha(template, error=True)
+
+                # Decrypt the captcha token and split it at "-//-"
+                captcha_token_decrypted = SymmetricCrypto(CAPTCHASECRET).decrypt(captcha_token)
+                ct = captcha_token_decrypted.split('-//-')
+
+                # Get the url path, time, hardness, ip, user agent and text captcha code from the captcha token
+                ct_path, ct_time, ct_hardness, ct_ip, ct_useragent, ct_text = ct[0], ct[1], int(ct[2]), ct[3], ct[4], ct[5]
+
+                # The hardness of the current web page is set
+                this_page_hardness = (3 if action == "hard" else 2 if action == "normal" else 1 if action == "easy" else self.hardness)
+
+                # If the difficulty of the solved captcha is high (= audio captcha is also required)
+                if ct_hardness == 3:
+
+                    # The audio captcha token is obtained from the captcha token
+                    ct_audio = ct[6]
+
+                    # If the current page also has one of three, getting the audio captcha wrong will cause the check to fail.
+                    if this_page_hardness == 3:
+                        if audio_captcha is None:
+                            return self.show_captcha(template, error=True)
+                        else:
+                            if str(audio_captcha) != str(ct_audio):
+                                return self.show_captcha(template, error=True)
+                    else:
+                        # If the current page does not actually require an audio captcha, the check is still accepted if the audio captcha is incorrect, but the solved difficulty is set to the hardness of the current page
+                        if not audio_captcha is None:
+                            if not str(audio_captcha) != str(ct_audio):
+                                ct_hardness = this_page_hardness
+                        else:
+                            ct_hardness = this_page_hardness
+
+                # However, if the required hardness of this side is greater than that of the solved captcha, then the check is invalid
+                if this_page_hardness < ct_hardness:
+                    return self.show_captcha(template, error=True)
+                
+                # Compare the hash of the data contained in the captcha token with the data of the current web page
+                comparison_path = Hashing().compare(urlpath, ct_path)
+                comparison_ip = Hashing().compare(clientip, ct_ip)
+                comparison_useragent = Hashing().compare(clientuseragent, ct_useragent)
+
+                # If the comparisons are not valid or the time has expired, or the text_captcha is not valid, then a captcha is displayed
+                if not comparison_path or int(time()) - int(ct_time) > 180 or (not comparison_ip and not comparison_useragent) or str(text_captcha) != str(ct_text):
+                    return self.show_captcha(template, error=True)
+                
+                # Get the scheme
+                scheme = request.headers.get('X-Forwarded-Proto', 'http' if request.environ.get('HTTPS') is None else 'https')
+                
+                # Create the response
+                if not self.withoutcookies:
+                    print(scheme)
+                    resp = make_response(redirect(request.url.replace("http", scheme)))
+                else:
+                    resp_url = request.url.replace("http", scheme)
+                
+                # If the Ip or the user agent does not match, no captcha solve token is created, but only a one-time token intended for one-time verification
+                if comparison_ip and comparison_useragent:
+                    # Generate ID and token
+                    id = generate_random_string(16, with_punctuation=False)
+                    token = generate_random_string(40)
+
+                    # If captcha have already been solved, they will be loaded
+                    if os.path.isfile(CAPTCHASOLVED_PATH):
+                        with open(CAPTCHASOLVED_PATH, "r") as file:
+                            captchasolved = json.load(file)
+                    else:
+                        captchasolved = {}
+                    
+                    # It is checked whether the generated ID already exists
+                    while any([Hashing().compare(id, hashed_id) for hashed_id, _ in captchasolved.items()]):
+                        id = generate_random_string(with_punctuation=False)
+
+                    # Initialise the SymetricCrypto Class with the generated encryption token
+                    symcrypto = SymmetricCrypto(token)
+
+                    # Creates a data model with the ID and encrypted data
+                    data = {
+                        "time": time(),
+                        "ip": symcrypto.encrypt(clientip),
+                        "user_agent": symcrypto.encrypt(clientuseragent),
+                        "hardness": symcrypto.encrypt(str(ct_hardness))
+                    }
+
+                    # The solved captchas are loaded again
+                    if os.path.isfile(CAPTCHASOLVED_PATH):
+                        with open(CAPTCHASOLVED_PATH, "r") as file:
+                            captchasolved = json.load(file)
+                    else:
+                        captchasolved = {}
+                    
+                    # The generated ID is added to the dict
+                    captchasolved[Hashing().hash(id)] = data
+
+                    # The solved captchas are saved
+                    with open(CAPTCHASOLVED_PATH, "w") as file:
+                        json.dump(captchasolved, file)
+
+                    # Add the created data to the response
+                    if self.withoutcookies:
+                        resp_url += "?" if not "?" in request.url else "&" + "captcha=" + quote(id+token)
+                    else:
+                        resp.set_cookie("captcha", id+token, max_age=self.verificationage)
+                
+                # Create and Hashe a One Time Token
+                onetime_token = generate_random_string(30)
+                hashed_onetime_token = Hashing().hash(onetime_token, 64) + "-//-" + str(int(time()))
+
+                # If there are already One Time Tokens stored, load them, otherwise []
+                if os.path.isfile(ONETIME_PATH):
+                    with open(ONETIME_PATH, "r") as file:
+                        onetime = json.load(file)
+                else:
+                    onetime = []
+                
+                # Add the hash of the created token to the list
+                onetime.append(hashed_onetime_token)
+
+                # Save the One Time Tokens
+                with open(ONETIME_PATH, "w") as file:
+                    json.dump(onetime, file)
+                
+                # Add the created One Time Token to the response
+                if self.withoutcookies:
+                    resp_url += "&captcha_onetime=" + quote(onetime)
+                    resp = redirect(resp_url)
+                else:
+                    resp.set_cookie("captcha_onetime", onetime_token, max_age=60)
+
+                return resp
             
             captcha_token = None
             if not request.args.get("captcha") is None:
