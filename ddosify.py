@@ -691,7 +691,6 @@ class DDoSify:
         self.verificationage = verificationage
         self.withoutcookies = withoutcookies
         self.block_crawler = block_crawler
-        self.setup_executed = False
 
         app.before_request(self.show_ddosify)
         app.after_request(self.handle_after_request)
