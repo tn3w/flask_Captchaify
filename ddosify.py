@@ -880,6 +880,44 @@ class DDoSify:
                                 return self.show_block(template)
                         break
 
+            # Get the One Time Token from the url or from the cookies
+            onetime_token = request.args.get("captcha_onetime")
+            if not self.withoutcookies:
+                onetime_token = request.cookies.get("captcha_onetime")
+
+            if not onetime_token is None:
+                # If there are already One Time Tokens stored, load them, otherwise []
+                if os.path.isfile(ONETIME_PATH):
+                    with open(ONETIME_PATH, "r") as file:
+                        onetime = json.load(file)
+                else:
+                    onetime = []
+                
+                edited = False
+                time_valid = False
+                
+                # Compares each One Time Token with the stored one and deletes it if a match is found, also edited becomes True
+                for onetime_hash in onetime:
+                    onetime_hashed, time_of_hash = onetime_hash.split("-//-")
+                    comparison = Hashing().compare(onetime_token, onetime_hashed)
+
+                    if comparison:
+                        onetime.remove(onetime_hash)
+                        edited = True
+
+                        if not int(time()) - int(time_of_hash) > 60:
+                            time_valid = True
+
+                        break
+                                
+                if edited:
+                    # Save the One Time Tokens
+                    with open(ONETIME_PATH, "w") as file:
+                        json.dump(onetime, file)
+                    
+                    if time_valid:
+                        return
+
             # If the request method is POST
             if request.method == "POST":
                 text_captcha = request.form.get("textCaptcha")
