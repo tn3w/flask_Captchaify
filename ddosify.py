@@ -12,13 +12,13 @@ from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from base64 import urlsafe_b64encode, urlsafe_b64decode
-from flask import request, send_file
+from base64 import urlsafe_b64encode, urlsafe_b64decode, b64encode
+from flask import request, send_file, make_response, redirect
 from googletrans import Translator # Version: 3.1.0a0
 from bs4 import BeautifulSoup
 import ipaddress
 from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 from time import time
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
@@ -1254,6 +1254,10 @@ class DDoSify:
         
         # Generate the random string
         image_captcha_code = generate_random_string(string_length, with_punctuation=False).replace("v", "V").replace("s", "S")
+
+        # Change the captcha to uppercase letters only to make it not too difficult
+        if string_length > 6:
+            image_captcha_code = image_captcha_code.upper()
 
         # Create the ImageCaptcha instance with specified width, height, and fonts
         image_captcha = ImageCaptcha(width=320, height=120, fonts=[
