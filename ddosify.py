@@ -1039,7 +1039,7 @@ class DDoSify:
             with open(CAPTCHASOLVED_PATH, "r") as file:
                 captchasolved = json.load(file)
             
-            for hashed_id, data in captchasolved:
+            for hashed_id, data in captchasolved.items():
                 # Compare the captcha ID with the stored IDs to find a match
                 comparison = Hashing.compare(id, hashed_id)
                 if comparison:
