@@ -101,7 +101,7 @@
             {{ errormessage }}
         </p>
         {% endif %}
-        <form action="/" method="POST">
+        <form action="/" method="GET">
             <div class="captcha-image">
                 <img src="{{ textCaptcha }}" alt="Captcha Image">
                 <input type="text" name="textCaptcha" placeholder="Enter what you see in the picture." required>
@@ -116,6 +116,7 @@
             </div>
             {% endif %}
             <input type="hidden" name="captchatoken" value="{{ captchatoken }}">
+            <input type="hidden" name="captchasolved" value="1">
             <button type="submit">Check</button>
         </form>
         <div class="ddosify-text">DDoS protection from DDoSify</div>
