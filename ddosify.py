@@ -13,13 +13,14 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from base64 import urlsafe_b64encode, urlsafe_b64decode, b64encode
-from flask import request, send_file, make_response, redirect
+from flask import request, send_file, g
 from googletrans import Translator # Version: 3.1.0a0
 from bs4 import BeautifulSoup
 import ipaddress
 from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
 from urllib.parse import urlparse, quote
 from time import time
+from threading import Thread
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
 
@@ -29,7 +30,6 @@ DATA_DIR = os.path.join(CURRENT_DIR, "data")
 # Paths for cache files, and IP log files
 SEENIPS_PATH = os.path.join(DATA_DIR, "seenips.json")
 CAPTCHASOLVED_PATH = os.path.join(DATA_DIR, "captchasolved.json")
-ONETIME_PATH = os.path.join(DATA_DIR, "onetime.json")
 STOPFORUMSPAM_PATH = os.path.join(DATA_DIR, "stopforumspamcache.json")
 
 def generate_random_string(length: int, with_punctuation: bool = True, with_letters: bool = True):
@@ -692,14 +692,18 @@ class DDoSify:
         self.verificationage = verificationage
         self.withoutcookies = withoutcookies
         self.block_crawler = block_crawler
+        self.setup_executed = False
 
         app.before_request(self.show_ddosify)
-        # app.after_request(self.add_args) FIXME: Function so that all links on a HTML response page get the captcha args
+        app.after_request(self.handle_after_request)
 
     def show_ddosify(self):
         """
         This function displays different DDoSify pages e.g. Captcha and Block if needed
         """
+
+        g.ddosify_captcha = None
+        g.ddosify_method = request.method
 
         # Get the URL path of the current request
         urlpath = urlparse(request.url).path
@@ -880,49 +884,13 @@ class DDoSify:
                                 return self.show_block(template)
                         break
 
-            # Get the One Time Token from the url or from the cookies
-            onetime_token = request.args.get("captcha_onetime")
-            if not self.withoutcookies:
-                onetime_token = request.cookies.get("captcha_onetime")
+            # If the request args contains captchasolved
+            if request.args.get("captchasolved") == "1":
+                g.ddosify_method = "GET"
 
-            if not onetime_token is None:
-                # If there are already One Time Tokens stored, load them, otherwise []
-                if os.path.isfile(ONETIME_PATH):
-                    with open(ONETIME_PATH, "r") as file:
-                        onetime = json.load(file)
-                else:
-                    onetime = []
-                
-                edited = False
-                time_valid = False
-                
-                # Compares each One Time Token with the stored one and deletes it if a match is found, also edited becomes True
-                for onetime_hash in onetime:
-                    onetime_hashed, time_of_hash = onetime_hash.split("-//-")
-                    comparison = Hashing().compare(onetime_token, onetime_hashed)
-
-                    if comparison:
-                        onetime.remove(onetime_hash)
-                        edited = True
-
-                        if not int(time()) - int(time_of_hash) > 60:
-                            time_valid = True
-
-                        break
-                                
-                if edited:
-                    # Save the One Time Tokens
-                    with open(ONETIME_PATH, "w") as file:
-                        json.dump(onetime, file)
-                    
-                    if time_valid:
-                        return
-
-            # If the request method is POST
-            if request.method == "POST":
-                text_captcha = request.form.get("textCaptcha")
-                audio_captcha = request.form.get("audioCaptcha")
-                captcha_token = request.form.get("captchatoken")
+                text_captcha = request.args.get("textCaptcha")
+                audio_captcha = request.args.get("audioCaptcha")
+                captcha_token = request.args.get("captchatoken")
 
                 # If the text_captcha and the captcha_token is None, a captcha has to be solved
                 if None in [text_captcha, captcha_token]:
@@ -971,16 +939,7 @@ class DDoSify:
                 # If the comparisons are not valid or the time has expired, or the text_captcha is not valid, then a captcha is displayed
                 if not comparison_path or int(time()) - int(ct_time) > 180 or (not comparison_ip and not comparison_useragent) or str(text_captcha) != str(ct_text):
                     return self.show_captcha(template, error=True)
-                
-                # Get the scheme
-                scheme = request.headers.get('X-Forwarded-Proto', 'http' if request.environ.get('HTTPS') is None else 'https')
-                
-                # Create the response
-                if not self.withoutcookies:
-                    resp = make_response(redirect(request.url.replace("http", scheme)))
-                else:
-                    resp_url = request.url.replace("http", scheme)
-                
+
                 # If the Ip or the user agent does not match, no captcha solve token is created, but only a one-time token intended for one-time verification
                 if comparison_ip and comparison_useragent:
                     # Generate ID and token
@@ -1024,37 +983,9 @@ class DDoSify:
                         json.dump(captchasolved, file)
 
                     # Add the created data to the response
-                    if self.withoutcookies:
-                        resp_url += "?" if not "?" in request.url else "&" + "captcha=" + quote(id+token)
-                    else:
-                        resp.set_cookie("captcha", id+token, max_age=self.verificationage)
-                
-                # Create and Hashe a One Time Token
-                onetime_token = generate_random_string(30)
-                hashed_onetime_token = Hashing().hash(onetime_token, 64) + "-//-" + str(int(time()))
+                    g.ddosify_captcha = id+token
 
-                # If there are already One Time Tokens stored, load them, otherwise []
-                if os.path.isfile(ONETIME_PATH):
-                    with open(ONETIME_PATH, "r") as file:
-                        onetime = json.load(file)
-                else:
-                    onetime = []
-                
-                # Add the hash of the created token to the list
-                onetime.append(hashed_onetime_token)
-
-                # Save the One Time Tokens
-                with open(ONETIME_PATH, "w") as file:
-                    json.dump(onetime, file)
-                
-                # Add the created One Time Token to the response
-                if self.withoutcookies:
-                    resp_url += "&captcha_onetime=" + quote(onetime)
-                    resp = redirect(resp_url)
-                else:
-                    resp.set_cookie("captcha_onetime", onetime_token, max_age=60)
-
-                return resp
+                return
             
             captcha_token = None
             if not request.args.get("captcha") is None:
@@ -1102,6 +1033,82 @@ class DDoSify:
                     
             # Show captcha challenge if no valid captcha verification is found
             return self.show_captcha(template)
+    
+    def handle_after_request(self, response):
+        """
+        This function creates cookies, stores args in the HTML code
+        """
+        if response.content_type == "text/html; charset=utf-8" and response.status_code == 200 and g.ddosify_method == "GET":        
+            html = response.data
+
+            # Add required url args to any url on the page
+            soup = BeautifulSoup(html, 'html.parser')
+
+            required_url_args = ""
+
+            if self.withoutcookies:
+                if not g.ddosify_captcha is None:
+                    required_url_args = "captcha=" + quote(g.ddosify_captcha)
+                elif not request.args.get("captcha") is None:
+                    required_url_args = "captcha=" + quote(request.args.get("captcha"))
+            else:
+                if not g.ddosify_captcha is None:
+                    response.set_cookie("captcha", g.ddosify_captcha, max_age=self.verificationage)
+
+            # Iterate over <a> and <button> tags in the parsed HTML
+            for href_tag in soup.find_all('a') + soup.find_all('button'):
+                try:
+                    # Buttons/a objects without href tag will be skipped
+                    if not href_tag['href']:
+                        continue
+                except:
+                    continue
+
+                # Links that do not lead to the page again are skipped
+                if not href_tag['href'].startswith('/') and not href_tag['href'].startswith('?'):
+                    continue
+                
+                special_character = "?"
+                
+                # Check if the href attribute contains a '?'
+                if "?" in href_tag['href']:
+                    special_character = "&"
+                
+                # Append the required URL arguments to the href attribute
+                if href_tag['href']:
+                    href_tag['href'] = href_tag['href'] + special_character + required_url_args
+            
+            # Iterate over <form> tags in the parsed HTML
+            for form_tag in soup.find_all('form'):
+                # Append the required URL arguments to the form tag
+                if required_url_args != "":
+                    input_tag = f'<input type="hidden" name="{required_url_args.split("=")[0]}" value="{required_url_args.split("=")[1]}">'
+                else:
+                    input_tag = ""
+                button_tag = form_tag.find('button')  # Find the first <button> tag inside the form
+                if button_tag:
+                    # Insert the input tag before the button tag
+                    button_tag.insert_before(input_tag)
+                else:
+                    # If no <button> tag is found, simply append the input tag to the form
+                    form_tag.append(input_tag)
+
+                # Check if the form has an "action" attribute
+                if 'action' in form_tag.attrs:
+                    action_text = form_tag['action']
+
+                    special_character = "?"
+                
+                    # Check if the href attribute contains a '?'
+                    if "?" in action_text:
+                        special_character = "&"
+                        
+                    edited_action_text = action_text + special_character + required_url_args
+                    form_tag['action'] = edited_action_text
+            
+            response.data = str(soup).replace("&lt;", "<").replace("&gt;", ">")
+        
+        return response
 
     def show_block(self, template: Optional[str] = None):
         """
