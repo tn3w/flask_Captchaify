@@ -1,0 +1,9 @@
+cryptography
+Flask
+googletrans==3.1.0a0
+beautifulsoup4
+ipaddress
+Jinja2
+Pillow
+requests
+bs4
