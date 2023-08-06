@@ -939,7 +939,6 @@ class DDoSify:
                 
                 # Create the response
                 if not self.withoutcookies:
-                    print(scheme)
                     resp = make_response(redirect(request.url.replace("http", scheme)))
                 else:
                     resp_url = request.url.replace("http", scheme)
