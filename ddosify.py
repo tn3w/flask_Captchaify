@@ -861,7 +861,7 @@ class DDoSify:
                 # Compare the client's IP with the seen IPs to determine if it's a repeated visit
                 for hashed_ip, records in seenips:
                     # Compare the client's IP with each hashed IP stored in the "seenips" list
-                    comparison = Hashing.compare(clientip, hashed_ip)
+                    comparison = Hashing().compare(clientip, hashed_ip)
                     if comparison:
                         records_length = 0
                         for record in records:
@@ -1041,7 +1041,7 @@ class DDoSify:
             
             for hashed_id, data in captchasolved.items():
                 # Compare the captcha ID with the stored IDs to find a match
-                comparison = Hashing.compare(id, hashed_id)
+                comparison = Hashing().compare(id, hashed_id)
                 if comparison:
                     crypto = SymmetricCrypto(token)
                     datatime = data["time"]
