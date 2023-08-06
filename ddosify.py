@@ -20,7 +20,6 @@ import ipaddress
 from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
 from urllib.parse import urlparse, quote
 from time import time
-from threading import Thread
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
 
