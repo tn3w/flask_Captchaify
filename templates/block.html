@@ -1,61 +1,81 @@
 <!DOCTYPE html>
 <html lang="{{ language }}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Access blocked</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f2f2f2;
-        }
-        
-        .container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-        }
-        
-        .emoji {
-            height: 100px;
-        }
-        
-        .error-text {
-            font-size: 24px;
-            margin-top: 20px;
-            text-align: center;
-        }
-        
-        .main-link {
-            font-size: 18px;
-            margin-top: 20px;
-            text-align: center;
-        }
-        
-        p {
-            text-align:center;
-            max-width: 800px;
-        }
-        
-        .ddosify-text {
-            font-size: 12px;
-            margin-top: 10px;
-            text-align: center;
-            font-weight: lighter;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <img class="emoji" src="{{ emoji }}">
-        <h1 class="error-text">Sorry, but you can't see the requested page.</h1>
-        <p>Automated scripts are likely attempting to request this page while you were browsing; you might consider trying to go back to the main page. Try disconnecting from your VPN/proxy.</p>
-        <div class="main-link">
-            <a href="/">Back to the main page</a>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Access blocked</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background-color: #181818;
+                color: #f2f2f2;
+            }
+    
+            .container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+            }
+    
+            .emoji {
+                height: 100px;
+            }
+    
+            .error-text {
+                font-size: 24px;
+                margin-top: 20px;
+                text-align: center;
+            }
+    
+            .main-link {
+                font-size: 18px;
+                margin-top: 20px;
+                text-align: center;
+            }
+    
+            p {
+                text-align: center;
+                max-width: 800px;
+            }
+    
+            .ddosify-text {
+                font-size: 12px;
+                margin-top: 10px;
+                text-align: center;
+                font-weight: lighter;
+            }
+    
+            @media (prefers-color-scheme: dark) {
+                body {
+                    background-color: #121212;
+                    color: #f2f2f2;
+                }
+    
+                .error-text {
+                    color: #f2f2f2;
+                }
+    
+                .main-link a {
+                    color: #00BFFF;
+                }
+    
+                .ddosify-text {
+                    color: #999;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <img class="emoji" src="{{ emoji }}">
+            <h1 class="error-text">Sorry, but you can't see the requested page.</h1>
+            <p>Automated scripts are likely attempting to request this page while you were browsing; you might consider trying to go back to the main page. Try disconnecting from your VPN/proxy.</p>
+            <div class="main-link">
+                <a href="/">Back to the main page</a>
+            </div>
+            <h1 class="ddosify-text">DDoS protection from DDoSify</h1>
         </div>
-        <h1 class="ddosify-text">DDoS protection from DDoSify</h1>
-    </div>
-</body>
+    </body>
 </html>
