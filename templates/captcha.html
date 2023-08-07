@@ -89,11 +89,16 @@
                 }
             }
 
-            .ddosify-text {
+            .ddosify-text, a {
                 font-size: 12px;
                 margin-top: 10px;
                 text-align: center;
                 color: #999;
+                text-decoration: none;
+            }
+            
+            a:hover {
+                text-decoration: underline;
             }
 
             @media (prefers-color-scheme: dark) {
@@ -139,7 +144,10 @@
                 <input type="hidden" name="captchasolved" value="1">
                 <button type="submit">Check</button>
             </form>
-            <div class="ddosify-text">DDoS protection from DDoSify</div>
+            <div class="ddosify-text">
+                <a href="?ddosify_changelanguage=1">Change Language</a> - 
+                <a href="https://github.com/tn3w/flask_DDoSify" target="_blank">About DDoSify</a>
+            </div>
         </div>
     </body>
 </html>
