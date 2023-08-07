@@ -857,11 +857,11 @@ class DDoSify:
                 with open(SEENIPS_PATH, "r") as file:
                     seenips = json.load(file)
             else:
-                seenips = []
+                seenips = {}
 
             if not clientip is None:
                 # Compare the client's IP with the seen IPs to determine if it's a repeated visit
-                for hashed_ip, records in seenips:
+                for hashed_ip, records in seenips.items():
                     # Compare the client's IP with each hashed IP stored in the "seenips" list
                     comparison = Hashing().compare(clientip, hashed_ip)
                     if comparison:
@@ -872,12 +872,12 @@ class DDoSify:
                                 records_length += 1
                         # If the application is in botfightmode or the action is set to "hard," apply stricter rules
                         if self.botfightmode or action == "hard":
-                            if records_length > 1:
+                            if records_length > 2:
                                 # If there have been more than one record (two or more false captchas) within the last 2 hours, block the request
                                 return self.show_block(template)
                         else:
                              # If the application is not in botfightmode and the action is not "hard," apply normal rules
-                            if records_length > 2:
+                            if records_length > 3:
                                 # If there have been more than two records (three or more false captchas) within the last 2 hours, block the request
                                 return self.show_block(template)
                         break
@@ -1238,6 +1238,62 @@ class DDoSify:
                 return
             else:
                 hardness = 3 if self.hardness == "hard" else 2 if self.hardness == "normal" else 1
+        
+        if error:
+            clientip = get_client_ip()
+
+            # Load the list of previously seen IPs from a file
+            if os.path.isfile(SEENIPS_PATH):
+                with open(SEENIPS_PATH, "r") as file:
+                    seenips = json.load(file)
+            else:
+                seenips = {}
+            
+            if not clientip is None:
+                is_found = False
+
+                # Compare the client's IP with the seen IPs to determine if it's a repeated visit
+                for hashed_ip, records in seenips.items():
+                    # Compare the client's IP with each hashed IP stored in the "seenips" list
+                    comparison = Hashing().compare(clientip, hashed_ip)
+                    if comparison:
+                        is_found = True
+
+                        records_length = 0
+                        for record in records:
+                            # Calculate the number of records (visits) within the last 2 hours (7200 seconds)
+                            if not int(time()) - int(record) > 7200:
+                                records_length += 1
+                        # Adding an extra for the error
+                        records_length += 1
+
+                        # A new error record is created and added
+                        records.append(str(int(time())))
+                        seenips[hashed_ip] = records
+
+                        # The dict is saved
+                        with open(SEENIPS_PATH, "w") as file:
+                            json.dump(seenips, file)
+
+                        # If the application is in botfightmode or the action is set to "hard," apply stricter rules
+                        if self.botfightmode or hardness == 3:
+                            if records_length > 2:
+                                # If there have been more than one record (two or more false captchas) within the last 2 hours, block the request
+                                return self.show_block(template)
+                        else:
+                             # If the application is not in botfightmode and the action is not "hard," apply normal rules
+                            if records_length > 3:
+                                # If there have been more than two records (three or more false captchas) within the last 2 hours, block the request
+                                return self.show_block(template)
+                        break
+
+                if not is_found:
+                    hashed_ip = Hashing().hash(clientip)
+                    seenips[hashed_ip] = [str(int(time()))]
+
+                    # The dict is saved
+                    with open(SEENIPS_PATH, "w") as file:
+                        json.dump(seenips, file)
 
         pagepath = None
         
