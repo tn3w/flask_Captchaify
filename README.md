@@ -41,7 +41,7 @@ A quick and easy implementation allows even small websites or a small team of de
 1. Make sure you have the latest version of Python and Pip installed, you also need git installed.
 2. Clone the repository to your computer with `git clone https://github.com/tn3w/flask_DDoSify` or download the ZIP file and unzip it.
 3. Make sure the folder that was created is called `flask_DDoSify`.
-4. Now use the following command to install all required packages: `python -m pip install -r requirements.txt`.
+4. Now use the following command to install all required packages: `python -m pip install -r flask_DDoSify/requirements.txt`.
 5. Now create your flask script in the folder where the subfolder `flask_DDoSify` was installed.
 6. Make sure that after:
    ```python
@@ -53,7 +53,7 @@ A quick and easy implementation allows even small websites or a small team of de
    ```
    And at the beginning of the file add the import:
    ```python
-   from flask_DDoSify import DDoSify
+   from flask_DDoSify.ddosify import DDoSify
    ```
 For more information, see the sample code above.
 
