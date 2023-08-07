@@ -408,7 +408,7 @@ class Language:
     """
 
     @staticmethod
-    def speak(default: str = "en") -> str:
+    def language(default: str = "en") -> str:
         """
         Function to get the language of a user
 
@@ -416,6 +416,13 @@ class Language:
 
         :return: The language preferred by the user
         """
+
+        if request.args.get("ddosify_language") in LANGUAGE_LIST:
+            return request.args.get("ddosify_language")
+        elif request.args.get("language") in LANGUAGE_LIST:
+            return request.args.get("language")
+        elif request.cookies.get("language") in LANGUAGE_LIST:
+            return request.cookies.get("language")
         
         # Get the preferred language of the user
         preferred_language = request.accept_languages.best_match(LANGUAGE_LIST)
@@ -751,6 +758,9 @@ class DDoSify:
         # If the action is 'let' nothing more is executed
         if action == "let":
             return
+        
+        if request.args.get("ddosify_changelanguage") == "1":
+            return self.show_changelanguage()
 
         # When an error occurs a captcha is displayed
         error = False
@@ -1052,6 +1062,20 @@ class DDoSify:
             else:
                 if not g.ddosify_captcha is None:
                     response.set_cookie("captcha", g.ddosify_captcha, max_age=self.verificationage)
+            
+            language_edit = ""
+            if request.args.get("ddosify_language") in LANGUAGE_LIST:
+                language_edit = request.args.get("ddosify_language")
+                if not self.withoutcookies:
+                    response.set_cookie("language", language_edit, max_age=60*60*24*30*12*3)
+            elif request.args.get("language") in LANGUAGE_LIST:
+                language_edit = request.args.get("language")
+                if not self.withoutcookies:
+                    response.set_cookie("language", language_edit, max_age=60*60*24*30*12*3)
+            elif request.cookies.get("language") in LANGUAGE_LIST:
+                language_edit = request.cookies.get("language")
+                if not self.withoutcookies:
+                    response.set_cookie("language", language_edit, max_age=60*60*24*30*12*3)
 
             # Iterate over <a> and <button> tags in the parsed HTML
             for href_tag in soup.find_all('a') + soup.find_all('button'):
@@ -1066,15 +1090,25 @@ class DDoSify:
                 if not href_tag['href'].startswith('/') and not href_tag['href'].startswith('?'):
                     continue
                 
-                special_character = "?"
+                special_character1 = "?"
                 
                 # Check if the href attribute contains a '?'
                 if "?" in href_tag['href']:
-                    special_character = "&"
+                    special_character1 = "&"
+                
+                if required_url_args == "":
+                    special_character1 = ""
+
+                special_character2 = "?"
+
+                if "?" in href_tag['href'] or "?" in special_character1:
+                    special_character2 = "&"
                 
                 # Append the required URL arguments to the href attribute
                 if href_tag['href']:
-                    href_tag['href'] = href_tag['href'] + special_character + required_url_args
+                    href_tag['href'] = href_tag['href'] + special_character1 + required_url_args
+                    if not language_edit == "":
+                        href_tag['href'] = href_tag['href'] + special_character2 + "language=" + language_edit
             
             # Iterate over <form> tags in the parsed HTML
             for form_tag in soup.find_all('form'):
@@ -1083,6 +1117,10 @@ class DDoSify:
                     input_tag = f'<input type="hidden" name="{required_url_args.split("=")[0]}" value="{required_url_args.split("=")[1]}">'
                 else:
                     input_tag = ""
+                
+                if not language_edit == "":
+                    input_tag += f'<input type="hidden" name="language" value="{language_edit}">'
+
                 button_tag = form_tag.find('button')  # Find the first <button> tag inside the form
                 if button_tag:
                     # Insert the input tag before the button tag
@@ -1095,18 +1133,71 @@ class DDoSify:
                 if 'action' in form_tag.attrs:
                     action_text = form_tag['action']
 
-                    special_character = "?"
+                    special_character1 = "?"
                 
                     # Check if the href attribute contains a '?'
                     if "?" in action_text:
-                        special_character = "&"
+                        special_character1 = "&"
+                    
+                    if required_url_args == "":
+                        special_character1 = ""
+                    
+                    special_character2 = "?"
+
+                    if "?" in action_text or "?" in special_character1:
+                        special_character2 = "&"
                         
-                    edited_action_text = action_text + special_character + required_url_args
+                    edited_action_text = action_text + special_character1 + required_url_args
+                    if not language_edit == "":
+                        edited_action_text += special_character2 + "language=" + language_edit
                     form_tag['action'] = edited_action_text
             
             response.data = str(soup).replace("&lt;", "<").replace("&gt;", ">")
         
         return response
+
+    def show_changelanguage(self):
+        """
+        This function generates a page where you can change your language.
+
+        :return: The content of the changelanguage page (HTML, JSON, TXT, or XML).
+        """
+        pagepath = os.path.join(os.path.join(CURRENT_DIR, "templates"), "changelanguage.html")
+
+        languages = LANGUAGES
+
+        search = None
+        if not request.args.get("ddosify_search") is None:
+            searchlanguages = []
+
+            # If the search term is in the language, the languages are added to the list according to the language priority
+            for lang in languages:
+                if request.args.get("ddosify_search").lower() in lang["name"].lower():
+                    searchlanguages.append(lang)
+
+            # The variables are updated
+            languages = searchlanguages
+            search = request.args.get("ddosify_search")
+        
+        # If no language was found/exists languages = None
+        if languages == []:
+            languages = None
+
+        # Get the language based on the user's preference
+        language = Language.language()
+
+        # Render the HTML template, adding an emoji to it using a random choice from the emojis list
+        page = render_template(pagepath, language = language, search=search, languages=languages)
+
+        try:
+            # Translate the page content from English to the user's preferred language
+            translated_page = Language.translate_page(page, "en", language)
+        except:
+            # If translation fails, use the original page content
+            translated_page = page
+
+        return translated_page
+
 
     def show_block(self, template: Optional[str] = None):
         """
@@ -1159,7 +1250,7 @@ class DDoSify:
             # If the template is an HTML file, process and translate the page content
 
             # Get the language based on the user's preference
-            language = Language.speak()
+            language = Language.language()
 
             # Render the HTML template, adding an emoji to it using a random choice from the emojis list
             page = render_template(pagepath, language = language, emoji = secrets.choice(EMOJIS))
@@ -1405,7 +1496,7 @@ class DDoSify:
         
         if pageext == "html":
             # Get the language based on the user's preference
-            language = Language.speak()
+            language = Language.language()
 
             # Render the HTML template, adding an emoji to it using a random choice from the emojis list
             page = render_template(pagepath, language = language, errormessage = errormessage, textCaptcha=captcha_image_data, audioCaptcha = captcha_audio_data, captchatoken=coded_captcha_token)
