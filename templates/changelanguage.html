@@ -10,9 +10,6 @@
                 background-color: #181818;
                 color: #fff;
                 font-family: Arial, sans-serif;
-                margin: 0;
-                padding: 0;
-                overflow: hidden;
             }
 
             .back-button {
@@ -220,6 +217,7 @@
     <body>
         <a class="back-button" href="/" ntr="1">
             <img class="icon" src="" alt="Back">
+        </a>
         <h1>Change Language</h1>
         <div class="search-form">
             <form class="search-form" action="#" method="GET">
@@ -234,7 +232,7 @@
         <div class="container">
             {% for language in languages %}
             <div class="item">
-                <a href="?ddosify_speak={{ language['code'] }}" ntr="1">
+                <a href="?ddosify_language={{ language['code'] }}" ntr="1">
                     <img src="{{ language['flag'] }}" alt="{{ language['name'] }} Flag">
                     <div class="language">{{ language['name'] }}</div>
                 </a>
