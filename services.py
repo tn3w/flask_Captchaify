@@ -203,7 +203,7 @@ class Services:
             return
         
         # Open/Read the file
-        with open(os.path.join(DATA_DIR, "seenips.json"), "w") as file:
+        with open(os.path.join(DATA_DIR, "seenips.json"), "r") as file:
             seenips = json.load(file)
 
         # Create a copy and delete expired items
