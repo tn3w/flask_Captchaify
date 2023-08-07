@@ -41,11 +41,17 @@
                 max-width: 800px;
             }
     
-            .ddosify-text {
+            .ddosify-text, .ddosify-link {
                 font-size: 12px;
                 margin-top: 10px;
                 text-align: center;
                 font-weight: lighter;
+                color: #999;
+                text-decoration: none;
+            }
+            
+            .ddosify-link:hover {
+                text-decoration: underline;
             }
     
             @media (prefers-color-scheme: dark) {
@@ -76,7 +82,7 @@
             <div class="main-link">
                 <a href="/">Back to the main page</a>
             </div>
-            <h1 class="ddosify-text">DDoS protection from DDoSify</h1>
+            <h1 class="ddosify-text" ntr="1">DDoS protection from <a class="ddosify-link" href="https://github.com/tn3w/flask_DDoSify" target="_blank">DDoSify</a></h1>
         </div>
     </body>
 </html>
