@@ -13,8 +13,8 @@
 
             body {
                 font-family: Arial, sans-serif;
-                background-color: #121212;
-                color: #f2f2f2;
+                background-color: #f2f2f2;
+                color: #1f1f1f;
                 display: flex;
                 justify-content: center;
                 align-items: center;
@@ -23,9 +23,9 @@
             }
 
             .captcha-container {
-                background-color: #1f1f1f;
+                background-color: #c0c0c0;
                 border-radius: 5px;
-                box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.3);
+                box-shadow: 5px 5px 5px #e2e2e2;
                 padding: 20px;
                 max-width: 400px;
                 width: 100%;
@@ -66,8 +66,8 @@
                 border-radius: 4px;
                 margin-bottom: 10px;
                 width: 300px;
-                background-color: #1f1f1f;
-                color: #f2f2f2;
+                background-color: #f2f2f2;
+                color: #181818;
             }
 
             button {
@@ -93,7 +93,7 @@
                 font-size: 12px;
                 margin-top: 10px;
                 text-align: center;
-                color: #999;
+                color: #141414;
                 text-decoration: none;
             }
             
@@ -108,18 +108,24 @@
                 }
 
                 .captcha-container {
+                    box-shadow: 5px 5px 5px #000000;
                     background-color: #1f1f1f;
                 }
 
                 input {
                     background-color: #1f1f1f;
+                    color: #f2f2f2;
+                }
+
+                .ddosify-text, a {
+                    color: #999;
                 }
             }
         </style>
     </head>
     <body>
         <div class="captcha-container">
-            <h2>Beep beop Boop?</h2>
+            <h2 ntr="1">Beep beop Boop?</h2>
             <p>Before you can see the page you have to prove that you are not a robot!</p>
             {% if errormessage|default %}
             <p style="color: #ff0000;margin:10px;">
