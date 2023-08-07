@@ -3,9 +3,6 @@ import string
 import secrets
 import requests
 import json
-from io import BytesIO
-import tarfile
-from zipfile import ZipFile
 from typing import Optional, Tuple
 from cryptography.hazmat.primitives import hashes, padding
 from cryptography.hazmat.primitives import padding
@@ -22,6 +19,8 @@ from urllib.parse import urlparse, quote
 from time import time
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
+from threading import Thread
+from services import Services
 
 CURRENT_DIR = os.getcwd()
 DATA_DIR = os.path.join(CURRENT_DIR, "data")
@@ -30,6 +29,8 @@ DATA_DIR = os.path.join(CURRENT_DIR, "data")
 SEENIPS_PATH = os.path.join(DATA_DIR, "seenips.json")
 CAPTCHASOLVED_PATH = os.path.join(DATA_DIR, "captchasolved.json")
 STOPFORUMSPAM_PATH = os.path.join(DATA_DIR, "stopforumspamcache.json")
+
+Services.update_all_ipsets()
 
 def generate_random_string(length: int, with_punctuation: bool = True, with_letters: bool = True):
     """
@@ -65,151 +66,6 @@ if not os.path.isfile(os.path.join(DATA_DIR, "captchasecret.txt")):
 else:
     with open(os.path.join(DATA_DIR, "captchasecret.txt"), "r") as file:
         CAPTCHASECRET = file.read()
-
-# Check if the "fireholipset.json" file is not present
-if not os.path.isfile(os.path.join(DATA_DIR, "fireholipset.json")):
-    # List of URLs to the FireHOL IP lists
-    firehol_urls = [
-        "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level1.netset",
-        "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level2.netset",
-        "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level3.netset",
-        "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level4.netset"
-    ]
-
-    # Empty list for the collected IP addresses
-    firehol_ips = []
-
-    # Loop to retrieve and process the IP lists.
-    for firehol_url in firehol_urls:
-        response = requests.get(firehol_url)
-        if response.ok:
-            # Extract the IP addresses from the response and add them to the list
-            ips = [line.strip().split('/')[0] for line in response.text.splitlines() if line.strip() and not line.startswith("#")]
-            firehol_ips.extend(ips)
-        else:
-            response.raise_for_status()
-
-    # Remove duplicates from the list of collected IP addresses
-    FIREHOL_IPS = list(set(firehol_ips))
-    
-    # Open the JSON file in write mode and save the collected IP addresses
-    with open(os.path.join(DATA_DIR, "fireholipset.json"), "w") as file:
-        json.dump(FIREHOL_IPS, file)
-else:
-    with open(os.path.join(DATA_DIR, "fireholipset.json"), "r") as file:
-        FIREHOL_IPS = json.load(file)
-
-# Check if the "ipdenyipset.json" file is not present
-if not os.path.isfile(os.path.join(DATA_DIR, "ipdenyipset.json")):
-    # List of URLs to the IP deny IP lists (for IPv4 and IPv6).
-    ipdeny_urls = [
-        "https://www.ipdeny.com/ipblocks/data/countries/all-zones.tar.gz",
-        "https://www.ipdeny.com/ipv6/ipaddresses/blocks/ipv6-all-zones.tar.gz"
-    ]
-
-    # Empty list for the collected IP addresses
-    ipdeny_ips = []
-
-    # Loop to retrieve and process the IP lists.
-    for ipdeny_url in ipdeny_urls:
-        response = requests.get(ipdeny_url)
-        if response.ok:
-            # Load the TAR-GZ file and extract its contents
-            tar_file = BytesIO(response.content)
-            with tarfile.open(fileobj=tar_file, mode="r:gz") as tar:
-                members = tar.getmembers()
-                for member in members:
-                    # Check if the member is a file and has the extension ".zone".
-                    if member.isfile() and member.name.endswith('.zone'):
-                        # Read the contents of the file, decode it as UTF-8 and extract the IP addresses
-                        file_content = tar.extractfile(member).read().decode("utf-8")
-                        ips = [line.strip().split('/')[0] for line in file_content.splitlines() if line.strip() and not line.startswith("#")]
-                        ipdeny_ips.extend(ips)
-        else:
-            response.raise_for_status()
-    
-    # Remove duplicates from the list of collected IP addresses
-    IPDENY_IPS = list(set(ipdeny_ips))
-    
-    # Open the JSON file in write mode and save the collected IP addresses
-    with open(os.path.join(DATA_DIR, "ipdenyipset.json"), "w") as file:
-        json.dump(IPDENY_IPS, file)
-else:
-    with open(os.path.join(DATA_DIR, "ipdenyipset.json"), "r") as file:
-        IPDENY_IPS = json.load(file)
-
-# Check if the "emergingthreatsipset.json" file is not present
-if not os.path.isfile(os.path.join(DATA_DIR, "emergingthreatsipset.json")):
-    # URL to get the list of IP's
-    emergingthreats_url = "https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt"
-    
-    # Request the list of IP's
-    response = requests.get(emergingthreats_url)
-    
-    # Check if the request was successful
-    if response.ok:
-        # Extract the IP addresses from the response and remove duplicates
-        emergingthreats_ips = [line.strip().split('/')[0] for line in response.text.splitlines() if line.strip() and not line.startswith("#")]
-        EMERGINGTHREATS_IPS = list(set(emergingthreats_ips))
-        
-        # Open the JSON file in write mode and save the list of Ips.
-        with open(os.path.join(DATA_DIR, "emergingthreatsipset.json"), "w") as file:
-            json.dump(EMERGINGTHREATS_IPS, file)
-    else:
-        response.raise_for_status()
-else:
-    with open(os.path.join(DATA_DIR, "emergingthreatsipset.json"), "r") as file:
-        EMERGINGTHREATS_IPS = json.load(file)
-
-# Check if the "myipmsipset.json" file is not present
-if not os.path.isfile(os.path.join(DATA_DIR, "myipmsipset.json")):
-    # URL to get the list of IP's
-    myipms_url = "https://myip.ms/files/blacklist/general/full_blacklist_database.zip"
-    
-    # Request the zip file
-    response = requests.get(myipms_url)
-    
-    # Check if the request was successful
-    if response.ok:
-        with BytesIO(response.content) as zip_file:
-            # Load the ZIP file and extract its contents
-            with ZipFile(zip_file, "r") as z:
-                with z.open("full_blacklist_database.txt", "r") as txt_file:
-                    content = txt_file.read().decode('utf-8')
-                    myipms_ips = [line.strip().split('/')[0].split('#')[0].replace('\t', '') for line in content.splitlines() if line.strip() and not line.startswith("#")]
-                    MYIPMS_IPS = list(set(myipms_ips))
-        
-        # Open the JSON file in write mode and save the list of Ips.
-        with open(os.path.join(DATA_DIR, "myipmsipset.json"), "w") as file:
-            json.dump(MYIPMS_IPS, file)
-    else:
-        response.raise_for_status()
-else:
-    with open(os.path.join(DATA_DIR, "myipmsipset.json"), "r") as file:
-        MYIPMS_IPS = json.load(file)
-
-# Check if the "torexitnodes.json" file is not present
-if not os.path.isfile(os.path.join(DATA_DIR, "torexitnodes.json")):
-    # URL to get the list of Tor exit nodes
-    torbulkexitlist_url = "https://check.torproject.org/torbulkexitlist"
-    
-    # Request the list of Tor exit nodes
-    response = requests.get(torbulkexitlist_url)
-    
-    # Check if the request was successful
-    if response.ok:
-        # Extract the IP addresses from the response and remove duplicates
-        torexitnodes_ip = [line.strip() for line in response.text.splitlines() if line.strip() and not line.startswith("#")]
-        TOREXITNODES_IPS = list(set(torexitnodes_ip))
-        
-        # Open the JSON file in write mode and save the list of Tor exit nodes.
-        with open(os.path.join(DATA_DIR, "torexitnodes.json"), "w") as file:
-            json.dump(TOREXITNODES_IPS, file)
-    else:
-        response.raise_for_status()
-else:
-    with open(os.path.join(DATA_DIR, "torexitnodes.json"), "r") as file:
-        TOREXITNODES_IPS = json.load(file)
 
 class SymmetricCrypto:
     """
@@ -791,6 +647,24 @@ class DDoSify:
             for crawlername in CRAWLER_USER_AGENTS:
                 if crawlername.lower() in clientuseragent.lower():
                     is_crawler = True
+        
+        t = Thread(target=Services.update_all_ipsets)
+        t.start()
+        
+        with open(os.path.join(DATA_DIR, "fireholipset.json"), "r") as file:
+            FIREHOL_IPS = json.load(file)["ips"]
+        
+        with open(os.path.join(DATA_DIR, "ipdenyipset.json"), "r") as file:
+            IPDENY_IPS = json.load(file)["ips"]
+        
+        with open(os.path.join(DATA_DIR, "emergingthreatsipset.json"), "r") as file:
+            EMERGINGTHREATS_IPS = json.load(file)["ips"]
+        
+        with open(os.path.join(DATA_DIR, "myipmsipset.json"), "r") as file:
+            MYIPMS_IPS = json.load(file)["ips"]
+        
+        with open(os.path.join(DATA_DIR, "torexitnodes.json"), "r") as file:
+            TOREXITNODES_IPS = json.load(file)["ips"]
 
         # Define the criteria for blocking or showing captcha
         criteria = [
@@ -806,6 +680,9 @@ class DDoSify:
 
         # If none of the criteria is True and the action is not "let" proceed to check StopForumSpam API
         if not any(criteria):
+            t3 = Thread(target=Services.remove_stopforumspam)
+            t3.start()
+
             # Check if the StopForumSpam cache file exists and load its content
             if os.path.isfile(STOPFORUMSPAM_PATH):
                 with open(STOPFORUMSPAM_PATH, "r") as file:
@@ -861,6 +738,9 @@ class DDoSify:
             if action == "block":
                 # Show block page
                 return self.show_block(template)
+
+            t1 = Thread(target=Services.remove_seenips)
+            t1.start()
 
             # Load the list of previously seen IPs from a file
             if os.path.isfile(SEENIPS_PATH):
@@ -1010,6 +890,9 @@ class DDoSify:
                 return self.show_captcha(template)
                 
             id, token = captcha_token[:16], captcha_token[16:]
+
+            t2 = Thread(target=Services.remove_captchasolved, args=(self.verificationage, ))
+            t2.start()
 
             # Load the list of captcha verifications from a file
             with open(CAPTCHASOLVED_PATH, "r") as file:
