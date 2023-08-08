@@ -966,6 +966,162 @@ class DDoSify:
         
         return template_dir
 
+    def threat_score(self: Optional["DDoSify"] = None):
+        """
+        Function to get the threat score of a request
+        """
+        error = False
+
+        try:
+            clientip = get_client_ip()
+        except:
+            error = True
+            clientip = None
+
+        try:
+            clientuseragent = request.user_agent.string
+        except:
+            error = True
+            clientuseragent = None
+        else:
+            if clientuseragent is None:
+                error = True
+
+        is_crawler = False
+        if not error:
+            for crawlername in CRAWLER_USER_AGENTS:
+                if crawlername.lower() in clientuseragent.lower():
+                    is_crawler = True
+        
+        score = 0
+
+        t4 = Thread(target=Services.update_all_ipsets)
+        t4.start()
+        
+        with open(os.path.join(DATA_DIR, "fireholipset.json"), "r") as file:
+            FIREHOL_IPS = json.load(file)["ips"]
+        
+        with open(os.path.join(DATA_DIR, "ipdenyipset.json"), "r") as file:
+            IPDENY_IPS = json.load(file)["ips"]
+        
+        with open(os.path.join(DATA_DIR, "emergingthreatsipset.json"), "r") as file:
+            EMERGINGTHREATS_IPS = json.load(file)["ips"]
+        
+        with open(os.path.join(DATA_DIR, "myipmsipset.json"), "r") as file:
+            MYIPMS_IPS = json.load(file)["ips"]
+        
+        with open(os.path.join(DATA_DIR, "torexitnodes.json"), "r") as file:
+            TOREXITNODES_IPS = json.load(file)["ips"]
+
+        # Define the criteria for blocking or showing captcha
+        criteria = [
+            (error, 0.5),
+            (clientip in FIREHOL_IPS, 0.3),
+            (clientip in IPDENY_IPS, 0.3),
+            (clientip in EMERGINGTHREATS_IPS, 0.3),
+            (clientip in MYIPMS_IPS, 0.3),
+            (clientip in TOREXITNODES_IPS, 0.3),
+            (is_crawler, 0.2)
+        ]
+
+        for scorecriteria, scorepoints in criteria:
+            if scorecriteria:
+                score += scorepoints
+        
+        t5 = Thread(target=Services.remove_stopforumspam)
+        t5.start()
+
+        # Check if the StopForumSpam cache file exists and load its content
+        if os.path.isfile(STOPFORUMSPAM_PATH):
+            with open(STOPFORUMSPAM_PATH, "r") as file:
+                stopforumspamcache = json.load(file)
+        else:
+            # If the cache file doesn't exist, create an empty dictionary
+            stopforumspamcache = {}
+
+        # Variable indicating whether the IP was found in the cache
+        found = False
+        
+        # Check if the client's IP exists in the StopForumSpam cache
+        for hashed_ip, content in stopforumspamcache.items():
+            comparison = Hashing().compare(clientip, hashed_ip)
+            if comparison:
+                # The IP was found in the cache
+                found = True
+                
+                # If the IP is flagged as a spammer and the time since last check is less than 7 days (604800 seconds), block the request
+                if content["spammer"] and not int(time()) - int(content["time"]) > 604800:
+                    score += 0.5
+                if int(time()) - int(content["time"]) > 604800:
+                    found = False
+                break
+
+        if not found:
+            # If the IP is not found in the cache, make a request to the StopForumSpam API
+            response = requests.get(f"https://api.stopforumspam.org/api?ip={clientip}&json")
+            if response.ok:
+                try:
+                    content = response.json()
+                except:
+                    # If an error occurs while parsing the API response, block the request
+                    criteria.append(True)
+                else:
+                    spammer = False
+                    # Check if the IP appears in the StopForumSpam database and set the spammer flag accordingly
+                    if content["ip"]["appears"] > 0:
+                        spammer = True
+                        score += 0.5
+
+                    # The clientip is hashed and stored like this
+                    hashed_clientip = Hashing().hash(clientip)
+
+                    # Update the StopForumSpam cache with the result and current timestamp
+                    stopforumspamcache[hashed_clientip] = {"spammer": spammer, "time": int(time())}
+                    with open(STOPFORUMSPAM_PATH, "w") as file:
+                        json.dump(stopforumspamcache, file)
+            else:
+                # If the request to the API fails, block the request
+                criteria.append(True)
+            
+        captcha_token = None
+        if not request.args.get("captcha") is None:
+            captcha_token = request.args.get("captcha")
+        elif not request.cookies.get("captcha") is None:
+            captcha_token = request.cookies.get("captcha")
+
+        if not captcha_token is None:
+            if len(captcha_token) == 56:
+                
+                id, token = captcha_token[:16], captcha_token[16:]
+
+                # Load the list of captcha verifications from a file
+                with open(CAPTCHASOLVED_PATH, "r") as file:
+                    captchasolved = json.load(file)
+                
+                for hashed_id, data in captchasolved.items():
+                    # Compare the captcha ID with the stored IDs to find a match
+                    comparison = Hashing().compare(id, hashed_id)
+                    if comparison:
+                        crypto = SymmetricCrypto(token)
+                        datatime = data["time"]
+                        try:
+                            # Decrypt IP, user agent and hardness of solved captcha from the stored data
+                            ip = crypto.decrypt(data["ip"])
+                            useragent = crypto.decrypt(data["user_agent"])
+                        except:
+                            pass
+                        else:
+                            # If the captcha is still valid, check for botfightmode and match with client's IP and user agent
+                            if not int(time()) - int(datatime) > 3600:
+                                if ip == clientip or useragent == clientuseragent:
+                                    score -= 0.6
+                        break
+        
+        if score > 1:
+            score = 1
+        
+        return score
+
     def show_ddosify(self):
         """
         This function displays different DDoSify pages e.g. Captcha and Block if needed
