@@ -1074,6 +1074,8 @@ class DDoSify:
                     # If the IP is flagged as a spammer and the time since last check is less than 7 days (604800 seconds), block the request
                     if content["spammer"] and not int(time()) - int(content["time"]) > 604800:
                         criteria.append(True)
+                    if int(time()) - int(content["time"]) > 604800:
+                        found = False
                     break
 
             if not found:
