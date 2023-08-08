@@ -8,7 +8,7 @@
 A DDoS defense system for flask applications, first sends users to a captcha page without a javascript script and creates a confirmation cookie/url arg after the captcha.
 
 > [!WARNING]
-> The syntax was changed with the latest version [0.7](https://github.com/tn3w/flask_DDoSify/releases/tag/v0.7). See [Personalization](#personalization) and [Changelog](https://github.com/tn3w/flask_DDoSify/compare/v0.6...v0.7)
+> The syntax was changed with the version [0.7](https://github.com/tn3w/flask_DDoSify/releases/tag/v0.7). See [Personalization](#personalization) and [Changelog](https://github.com/tn3w/flask_DDoSify/compare/v0.6...v0.7)
 
 ## How does flask_DDoSify work?
 Downloads public IP block lists[^1] and compares this data with the user, for more security the API of [Stop Forum Spam](https://www.stopforumspam.com/) is also used. If needed, a captcha is displayed to the user (or the robot) based on the strength set.[^2] Javascript is not needed for this, as the content is rendered on the server.[^3]
