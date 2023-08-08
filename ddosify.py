@@ -505,22 +505,25 @@ class DDoSify:
     """
 
     def __init__ (
-        self, app, actions: dict = {}, template_dir: Optional[str] = None, hardness: int = 2,
-        botfightmode: bool = False, verificationage: int = 3600, withoutcookies: bool = False, 
-        block_crawler: bool = False
-    ):
+        self, app, actions: dict = {},
+        hardness: dict = {}, template_dirs: dict = {}, default_action: str = "captcha",
+        default_hardness: int = 2, default_template_dir: Optional[str] = None, verificationage: int = 3600,
+        withoutcookies: bool = False, block_crawler: bool = False
+        ):
 
         """
         Initialize the DDoSify object
 
         :param app: Your Flask App
-        :param actions: Define what happens on certain routes/endpoint in the following format: {"/my_special_route": "let"}, where the first is the route and the action follows. The following actions are available: 'block' (blocks all requests that look suspicious, without captcha), 'let' (lets all requests through without action), 'hard' (sets the hardness for this route to 3), 'normal' (sets the hardness for this route to 2), 'easy' (sets the hardness for this route to 1). The action for each page can also be set as a tuple like here {"/my_special_route": ("/path/to/my/custom/template": 'action')}, where you can set a different captcha/block template for each page.
-        :param template_dir: Where the program should use templates, the file should have "captcha.html" and "block.html" for the respective actions.
-        :param hardness: The hardness of the captcha, value 1-3, where 3 is high (default = 2)
-        :param botfightmode: If true a captcha is displayed to all connections, True or False (default = False)
-        :param verificationage: How long the captcha verification is valid, in seconds (default = 3600 [1 hour])
-        :param withoutcookies: If True, no cookie is created after the captcha is fulfilled, but only an Arg is appended to the URL
-        :param block_crawler: If True, known crawlers based on their user agent will also need to solve a captcha
+        :param actions: Dict with actions for different routes like here: {"urlpath": "fight", "endpoint": "block"}, e.g. {"/": "block", "*/api/*": "let", "/login": "fight"} which blocks all suspicious traffic to "/", allows all traffic to /api/ routes e. e.g. "/api/cats" or "/dogs/api/" if they contain "/api/", and where to "/login" any traffic whether suspicious or not has to solve a captcha. (Default = {})
+        :param hardness: Dict with hardness for different routes like here: {"urlpath": 1, "endpoint": 2}, e.g. {"/": 3, "*/api/*": 1, "/login": 3}. The urlpaths have the same structure as for actions. (Default = {})
+        :param template_dirs: Dict with template folder for different routes like here: {"urlpath": "/path/to/template/dir", "endpoint": "/path/to/template/dir2"}, e.g. {"/": "/path/to/template/dir", "*/api/*": "/path/to/myapi/template/dir", "/login": "/path/to/login/template/dir"}. The urlpaths have the same structure as for actions. (Default = {})
+        :param default_action: The default value of all pages if no special action is given in actions. (Default = "captcha")
+        :param default_hardness: The default value of all pages if no special hardness is given in hardness. (Default = 2)
+        :param default_template_dir: The default value of all pages if no special template_dir is given in template_dirs. (Default = None)
+        :param verificationage: How long the captcha verification is valid, in seconds (Default = 3600 [1 hour])
+        :param withoutcookies: If True, no cookie is created after the captcha is fulfilled, but only an Arg is appended to the URL (Default = False)
+        :param block_crawler: If True, known crawlers based on their user agent will also need to solve a captcha (Default = False)
 
         :raises ValueError: If the flask app is None
         """
@@ -529,34 +532,174 @@ class DDoSify:
             raise ValueError("The Flask app cannot be None")
 
         if not isinstance(actions, dict):
-            actions = {}
-
-        if not hardness in [1,2,3]:
-            hardness = 2
-
-        if not isinstance(botfightmode, bool):
-            botfightmode = False
+            actions = dict()
+        
+        if not isinstance(hardness, dict):
+            hardness = dict()
+        
+        if not isinstance(template_dirs, dict):
+            template_dirs = dict()
+        
+        if not default_action in ["let", "block", "fight", "captcha"]:
+            default_action = "captcha"
+        
+        if not default_hardness in [1, 2, 3]:
+            default_hardness = 2
+        
+        if default_template_dir is None:
+            default_template_dir = os.path.join(CURRENT_DIR, "templates")
 
         if not isinstance(verificationage, int):
             verificationage = 3600
-
+        
         if not isinstance(withoutcookies, bool):
             withoutcookies = False
-
+        
         if not isinstance(block_crawler, bool):
             block_crawler = False
 
         self.app = app
+
         self.actions = actions
-        self.template_dir = template_dir
         self.hardness = hardness
-        self.botfightmode = botfightmode
+        self.template_dirs = template_dirs
+
+        self.default_action = default_action
+        self.default_hardness = default_hardness
+        self.default_template_dir = default_template_dir
+
         self.verificationage = verificationage
         self.withoutcookies = withoutcookies
         self.block_crawler = block_crawler
 
         app.before_request(self.show_ddosify)
         app.after_request(self.handle_after_request)
+    
+    @property
+    def current_action(self):
+        """
+        The action of the current route
+        """
+
+        # Get urlpath and endpoint
+        urlpath = urlparse(request.url).path
+        urlendpoint = request.endpoint
+
+        action = None
+
+        for path, path_action in self.actions.items():
+
+            # If "/" is in the path the urlpath is used otherwise the endpoint is used
+            url = urlpath
+            if not "/" in path:
+                url = urlendpoint
+
+            # The path is validated
+            if path.startswith("*") or path.endswith("*"):
+                if path.startswith("*") and not path.endswith("*"):
+                    if url.endswith(path.replace("*", "")):
+                        action = path_action
+                elif path.endswith("*") and not path.startswith("*"):
+                    if url.startswith(path.replace("*", "")):
+                        action = path_action
+                else:
+                    if path.replace("*", "") in url:
+                        action = path_action
+            else:
+                if path == url:
+                    action = path_action
+            
+            if action in ["let", "block", "fight", "captcha"]:
+                break
+        
+        if not action in ["let", "block", "fight", "captcha"]:
+            action = self.default_action
+        
+        return action
+
+    @property
+    def current_hardness(self):
+        """
+        The hardness of the current route
+        """
+        
+        # Get urlpath and endpoint
+        urlpath = urlparse(request.url).path
+        urlendpoint = request.endpoint
+
+        hardness = None
+
+        for path, path_hardness in self.hardness.items():
+
+            # If "/" is in the path the urlpath is used otherwise the endpoint is used
+            url = urlpath
+            if not "/" in path:
+                url = urlendpoint
+            
+            # The path is validated
+            if path.startswith("*") or path.endswith("*"):
+                if path.startswith("*") and not path.endswith("*"):
+                    if url.endswith(path.replace("*", "")):
+                        hardness = path_hardness
+                elif path.endswith("*") and not path.startswith("*"):
+                    if url.startswith(path.replace("*", "")):
+                        hardness = path_hardness
+                else:
+                    if path.replace("*", "") in url:
+                        hardness = path_hardness
+            else:
+                if path == url:
+                    hardness = path_hardness
+            
+            if hardness in [1, 2, 3]:
+                break
+        
+        if not hardness in [1, 2, 3]:
+            hardness = self.default_hardness
+        
+        return hardness
+        
+    @property
+    def current_template_dir(self):
+        """
+        The template of the current route
+        """
+
+        # Get urlpath and endpoint
+        urlpath = urlparse(request.url).path
+        urlendpoint = request.endpoint
+
+        template_dir = None
+
+        for path, path_template_dir in self.template_dirs.items():
+
+            # If "/" is in the path the urlpath is used otherwise the endpoint is used
+            url = urlpath
+            if not "/" in path:
+                url = urlendpoint
+
+            # The path is validated
+            if path.startswith("*") or path.endswith("*"):
+                if path.startswith("*") and not path.endswith("*"):
+                    if url.endswith(path.replace("*", "")):
+                        template_dir = path_template_dir
+                elif path.endswith("*") and not path.startswith("*"):
+                    if url.startswith(path.replace("*", "")):
+                        template_dir = path_template_dir
+                else:
+                    if path.replace("*", "") in url:
+                        template_dir = path_template_dir
+            else:
+                if path == url:
+                    template_dir = path_template_dir
+            
+            if isinstance(template_dir, str):
+                break
+        
+        if not isinstance(template_dir, str):
+            template_dir = self.default_template_dir
+        
+        return template_dir
 
     def show_ddosify(self):
         """
@@ -566,58 +709,21 @@ class DDoSify:
         g.ddosify_captcha = None
         g.ddosify_method = request.method
 
-        # Get the URL path of the current request
-        urlpath = urlparse(request.url).path
+        action = self.current_action
+        hardness = self.current_hardness
 
-        # Set a default action based on the hardness level of the application
-        action = "hard" if self.hardness == 3 else "normal" if self.hardness == 2 else "easy"
-
-        # Initialize the template variable to None
-        template = None
-
-        # Find a matching action for the current request
-        if not self.actions.get(urlpath) is None or not self.actions.get(request.endpoint) == None:
-            if not self.actions.get(urlpath) is None:
-                _action = self.actions.get(urlpath)
-            else:
-                _action = self.actions.get(request.endpoint)
-
-            # If the action is defined as a tuple (template, action), extract the template and action
-            if isinstance(_action, tuple):
-                _template, _action = _action
-                # Check if the specified template file or directory exists
-                if os.path.isfile(_template) or os.path.isdir(_template):
-                    # If the template exists, set the template variable to its value
-                    template = _template
-
-            # Check if the action is a valid one among ["block", "let", "hard", "normal", "easy"]
-            if _action in ["block", "let", "hard", "normal", "easy"]:
-                # Set the action variable to the defined action for the current request
-                action = _action
-
-        elif not self.actions.get("all") == None:
-            _action = self.actions.get("all")
-            
-            # If the action is defined as a tuple (template, action), extract the template and action
-            if isinstance(_action, tuple):
-                _template, _action = _action
-                # Check if the specified template file or directory exists
-                if os.path.isfile(_template) or os.path.isdir(_template):
-                    # If the template exists, set the template variable to its value
-                    template = _template
-
-            # Check if the action is a valid one among ["block", "let", "hard", "normal", "easy"]
-            if _action in ["block", "let", "hard", "normal", "easy"]:
-                # Set the action variable to the defined action for the current request
-                action = _action
-
-        # If the action is 'let' nothing more is executed
+        # If the action let is given, return
         if action == "let":
             return
-        
+
+        # When the action fight is given, a captcha is displayed
+        if action == "fight":
+            return self.show_captchavalidate()
+
+        # If the parameter ddosify_changelanguage is given, the language change page is displayed
         if request.args.get("ddosify_changelanguage") == "1":
             return self.show_changelanguage()
-
+        
         # When an error occurs a captcha is displayed
         error = False
 
@@ -674,11 +780,10 @@ class DDoSify:
             clientip in EMERGINGTHREATS_IPS,
             clientip in MYIPMS_IPS,
             clientip in TOREXITNODES_IPS,
-            self.botfightmode,
-            is_crawler and self.block_crawler,
+            is_crawler and self.block_crawler
         ]
 
-        # If none of the criteria is True and the action is not "let" proceed to check StopForumSpam API
+        # If none of the criteria is True, proceed to check StopForumSpam API
         if not any(criteria):
             t3 = Thread(target=Services.remove_stopforumspam)
             t3.start()
@@ -731,13 +836,12 @@ class DDoSify:
                             json.dump(stopforumspamcache, file)
                 else:
                     # If the request to the API fails, block the request
-                    criteria.append(True) 
-
-        # If any of the criteria are met and the action is not "let," block or show captcha
+                    criteria.append(True)
+        
         if any(criteria):
+            # Show block page
             if action == "block":
-                # Show block page
-                return self.show_block(template)
+                return self.show_block()
 
             t1 = Thread(target=Services.remove_seenips)
             t1.start()
@@ -761,169 +865,18 @@ class DDoSify:
                             if not int(time()) - int(record) > 14400:
                                 records_length += 1
                         # If the application is in botfightmode or the action is set to "hard," apply stricter rules
-                        if self.botfightmode or action == "hard":
+                        if action == "fight" or hardness == 3:
                             if records_length > 2:
                                 # If there have been more than one record (two or more false captchas) within the last 2 hours, block the request
-                                return self.show_block(template)
+                                return self.show_block()
                         else:
-                             # If the application is not in botfightmode and the action is not "hard," apply normal rules
+                            # If the application is not in botfightmode and the action is not "hard," apply normal rules
                             if records_length > 3:
                                 # If there have been more than two records (three or more false captchas) within the last 2 hours, block the request
-                                return self.show_block(template)
+                                return self.show_block()
                         break
-
-            # If the request args contains captchasolved
-            if request.args.get("captchasolved") == "1":
-                g.ddosify_method = "GET"
-
-                text_captcha = request.args.get("textCaptcha")
-                audio_captcha = request.args.get("audioCaptcha")
-                captcha_token = request.args.get("captchatoken")
-
-                # If the text_captcha and the captcha_token is None, a captcha has to be solved
-                if None in [text_captcha, captcha_token]:
-                    return self.show_captcha(template, error=True)
-
-                # Decrypt the captcha token and split it at "-//-"
-                captcha_token_decrypted = SymmetricCrypto(CAPTCHASECRET).decrypt(captcha_token)
-                ct = captcha_token_decrypted.split('-//-')
-
-                # Get the url path, time, hardness, ip, user agent and text captcha code from the captcha token
-                ct_path, ct_time, ct_hardness, ct_ip, ct_useragent, ct_text = ct[0], ct[1], int(ct[2]), ct[3], ct[4], ct[5]
-
-                # The hardness of the current web page is set
-                this_page_hardness = (3 if action == "hard" else 2 if action == "normal" else 1 if action == "easy" else self.hardness)
-
-                # If the difficulty of the solved captcha is high (= audio captcha is also required)
-                if ct_hardness == 3:
-
-                    # The audio captcha token is obtained from the captcha token
-                    ct_audio = ct[6]
-
-                    # If the current page also has one of three, getting the audio captcha wrong will cause the check to fail.
-                    if this_page_hardness == 3:
-                        if audio_captcha is None:
-                            return self.show_captcha(template, error=True)
-                        else:
-                            if str(audio_captcha) != str(ct_audio):
-                                return self.show_captcha(template, error=True)
-                    else:
-                        # If the current page does not actually require an audio captcha, the check is still accepted if the audio captcha is incorrect, but the solved difficulty is set to the hardness of the current page
-                        if not audio_captcha is None:
-                            if not str(audio_captcha) != str(ct_audio):
-                                ct_hardness = this_page_hardness
-                        else:
-                            ct_hardness = this_page_hardness
-
-                # However, if the required hardness of this side is greater than that of the solved captcha, then the check is invalid
-                if this_page_hardness < ct_hardness:
-                    return self.show_captcha(template, error=True)
-                
-                # Compare the hash of the data contained in the captcha token with the data of the current web page
-                comparison_path = Hashing().compare(urlpath, ct_path)
-                comparison_ip = Hashing().compare(clientip, ct_ip)
-                comparison_useragent = Hashing().compare(clientuseragent, ct_useragent)
-
-                # If the comparisons are not valid or the time has expired, or the text_captcha is not valid, then a captcha is displayed
-                if not comparison_path or int(time()) - int(ct_time) > 180 or (not comparison_ip and not comparison_useragent) or str(text_captcha) != str(ct_text):
-                    return self.show_captcha(template, error=True)
-
-                # If the Ip or the user agent does not match, no captcha solve token is created, but only a one-time token intended for one-time verification
-                if comparison_ip and comparison_useragent:
-                    # Generate ID and token
-                    id = generate_random_string(16, with_punctuation=False)
-                    token = generate_random_string(40)
-
-                    # If captcha have already been solved, they will be loaded
-                    if os.path.isfile(CAPTCHASOLVED_PATH):
-                        with open(CAPTCHASOLVED_PATH, "r") as file:
-                            captchasolved = json.load(file)
-                    else:
-                        captchasolved = {}
-                    
-                    # It is checked whether the generated ID already exists
-                    while any([Hashing().compare(id, hashed_id) for hashed_id, _ in captchasolved.items()]):
-                        id = generate_random_string(with_punctuation=False)
-
-                    # Initialise the SymetricCrypto Class with the generated encryption token
-                    symcrypto = SymmetricCrypto(token)
-
-                    # Creates a data model with the ID and encrypted data
-                    data = {
-                        "time": time(),
-                        "ip": symcrypto.encrypt(clientip),
-                        "user_agent": symcrypto.encrypt(clientuseragent),
-                        "hardness": symcrypto.encrypt(str(ct_hardness))
-                    }
-
-                    # The solved captchas are loaded again
-                    if os.path.isfile(CAPTCHASOLVED_PATH):
-                        with open(CAPTCHASOLVED_PATH, "r") as file:
-                            captchasolved = json.load(file)
-                    else:
-                        captchasolved = {}
-                    
-                    # The generated ID is added to the dict
-                    captchasolved[Hashing().hash(id)] = data
-
-                    # The solved captchas are saved
-                    with open(CAPTCHASOLVED_PATH, "w") as file:
-                        json.dump(captchasolved, file)
-
-                    # Add the created data to the response
-                    g.ddosify_captcha = id+token
-
-                return
             
-            captcha_token = None
-            if not request.args.get("captcha") is None:
-                captcha_token = request.args.get("captcha")
-            elif not request.cookies.get("captcha") is None:
-                captcha_token = request.cookies.get("captcha")
-
-            if captcha_token is None:
-                # Show captcha challenge if no captcha token is found
-                return self.show_captcha(template)
-
-            # Validate the captcha token
-            if len(captcha_token) != 56:
-                return self.show_captcha(template)
-                
-            id, token = captcha_token[:16], captcha_token[16:]
-
-            t2 = Thread(target=Services.remove_captchasolved, args=(self.verificationage, ))
-            t2.start()
-
-            # Load the list of captcha verifications from a file
-            with open(CAPTCHASOLVED_PATH, "r") as file:
-                captchasolved = json.load(file)
-            
-            for hashed_id, data in captchasolved.items():
-                # Compare the captcha ID with the stored IDs to find a match
-                comparison = Hashing().compare(id, hashed_id)
-                if comparison:
-                    crypto = SymmetricCrypto(token)
-                    datatime = data["time"]
-                    try:
-                        # Decrypt IP, user agent and hardness of solved captcha from the stored data
-                        ip = crypto.decrypt(data["ip"])
-                        useragent = crypto.decrypt(data["user_agent"])
-                        hardness = int(crypto.decrypt(data["hardness"]))
-                    except:
-                        pass
-                    else:
-                        # If the captcha is still valid, check for botfightmode and match with client's IP and user agent
-                        if not int(time()) - int(datatime) > self.verificationage and hardness >= self.hardness:
-                            if not self.botfightmode and not action == "hard":
-                                if ip == clientip or useragent == clientuseragent:
-                                    return
-                            else:
-                                if ip == clientip and useragent == clientuseragent:
-                                    return
-                    break
-                    
-            # Show captcha challenge if no valid captcha verification is found
-            return self.show_captcha(template)
+            return self.show_captchavalidate()
     
     def handle_after_request(self, response):
         """
@@ -1038,14 +991,187 @@ class DDoSify:
             response.data = str(soup).replace("&lt;", "<").replace("&gt;", ">")
         
         return response
+    
+    def show_captchavalidate(self):
+        """
+        Function to validate a captcha request, returns None if a captcha was already solved
+        """
 
+        action = self.current_action
+        hardness = self.current_hardness
+        urlpath = urlparse(request.url).path
+
+        try:
+            # Get the client's IP address
+            clientip = get_client_ip()
+        except:
+            clientip = None
+
+        try:
+            # Get the client's user agent string from the request
+            clientuseragent = request.user_agent.string
+        except:
+            clientuseragent = None
+
+        # If the request args contains captchasolved
+        if request.args.get("captchasolved") == "1":
+            g.ddosify_method = "GET"
+
+            text_captcha = request.args.get("textCaptcha")
+            audio_captcha = request.args.get("audioCaptcha")
+            captcha_token = request.args.get("captchatoken")
+
+            # If the text_captcha and the captcha_token is None, a captcha has to be solved
+            if None in [text_captcha, captcha_token]:
+                return self.show_captcha(error=True)
+
+            # Decrypt the captcha token and split it at "-//-"
+            captcha_token_decrypted = SymmetricCrypto(CAPTCHASECRET).decrypt(captcha_token)
+            ct = captcha_token_decrypted.split('-//-')
+
+            # Get the url path, time, hardness, ip, user agent and text captcha code from the captcha token
+            ct_path, ct_time, ct_hardness, ct_ip, ct_useragent, ct_text = ct[0], ct[1], int(ct[2]), ct[3], ct[4], ct[5]
+
+            # If the difficulty of the solved captcha is high (= audio captcha is also required)
+            if ct_hardness == 3:
+
+                # The audio captcha token is obtained from the captcha token
+                ct_audio = ct[6]
+
+                # If the current page also has one of three, getting the audio captcha wrong will cause the check to fail.
+                if hardness == 3:
+                    if audio_captcha is None:
+                        return self.show_captcha(error=True)
+                    else:
+                        if str(audio_captcha) != str(ct_audio):
+                            return self.show_captcha(error=True)
+                else:
+                    # If the current page does not actually require an audio captcha, the check is still accepted if the audio captcha is incorrect, but the solved difficulty is set to the hardness of the current page
+                    if not audio_captcha is None:
+                        if not str(audio_captcha) != str(ct_audio):
+                            ct_hardness = hardness
+                    else:
+                        ct_hardness = hardness
+
+            # However, if the required hardness of this side is greater than that of the solved captcha, then the check is invalid
+            if hardness < ct_hardness:
+                return self.show_captcha(error=True)
+            
+            # Compare the hash of the data contained in the captcha token with the data of the current web page
+            comparison_path = Hashing().compare(urlpath, ct_path)
+            comparison_ip = Hashing().compare(clientip, ct_ip)
+            comparison_useragent = Hashing().compare(clientuseragent, ct_useragent)
+
+            # If the comparisons are not valid or the time has expired, or the text_captcha is not valid, then a captcha is displayed
+            if not comparison_path or int(time()) - int(ct_time) > 180 or (not comparison_ip and not comparison_useragent) or str(text_captcha) != str(ct_text):
+                return self.show_captcha(error=True)
+
+            # If the Ip or the user agent does not match, no captcha solve token is created, but only a one-time token intended for one-time verification
+            if comparison_ip and comparison_useragent:
+                # Generate ID and token
+                id = generate_random_string(16, with_punctuation=False)
+                token = generate_random_string(40)
+
+                # If captcha have already been solved, they will be loaded
+                if os.path.isfile(CAPTCHASOLVED_PATH):
+                    with open(CAPTCHASOLVED_PATH, "r") as file:
+                        captchasolved = json.load(file)
+                else:
+                    captchasolved = {}
+                
+                # It is checked whether the generated ID already exists
+                while any([Hashing().compare(id, hashed_id) for hashed_id, _ in captchasolved.items()]):
+                    id = generate_random_string(with_punctuation=False)
+
+                # Initialise the SymetricCrypto Class with the generated encryption token
+                symcrypto = SymmetricCrypto(token)
+
+                # Creates a data model with the ID and encrypted data
+                data = {
+                    "time": time(),
+                    "ip": symcrypto.encrypt(clientip),
+                    "user_agent": symcrypto.encrypt(clientuseragent),
+                    "hardness": symcrypto.encrypt(str(ct_hardness))
+                }
+
+                # The solved captchas are loaded again
+                if os.path.isfile(CAPTCHASOLVED_PATH):
+                    with open(CAPTCHASOLVED_PATH, "r") as file:
+                        captchasolved = json.load(file)
+                else:
+                    captchasolved = {}
+                
+                # The generated ID is added to the dict
+                captchasolved[Hashing().hash(id)] = data
+
+                # The solved captchas are saved
+                with open(CAPTCHASOLVED_PATH, "w") as file:
+                    json.dump(captchasolved, file)
+
+                # Add the created data to the response
+                g.ddosify_captcha = id+token
+
+            return
+        
+        captcha_token = None
+        if not request.args.get("captcha") is None:
+            captcha_token = request.args.get("captcha")
+        elif not request.cookies.get("captcha") is None:
+            captcha_token = request.cookies.get("captcha")
+
+        if captcha_token is None:
+            # Show captcha challenge if no captcha token is found
+            return self.show_captcha()
+
+        # Validate the captcha token
+        if len(captcha_token) != 56:
+            return self.show_captcha()
+            
+        id, token = captcha_token[:16], captcha_token[16:]
+
+        t2 = Thread(target=Services.remove_captchasolved, args=(self.verificationage, ))
+        t2.start()
+
+        # Load the list of captcha verifications from a file
+        with open(CAPTCHASOLVED_PATH, "r") as file:
+            captchasolved = json.load(file)
+        
+        for hashed_id, data in captchasolved.items():
+            # Compare the captcha ID with the stored IDs to find a match
+            comparison = Hashing().compare(id, hashed_id)
+            if comparison:
+                crypto = SymmetricCrypto(token)
+                datatime = data["time"]
+                try:
+                    # Decrypt IP, user agent and hardness of solved captcha from the stored data
+                    ip = crypto.decrypt(data["ip"])
+                    useragent = crypto.decrypt(data["user_agent"])
+                    hardness = int(crypto.decrypt(data["hardness"]))
+                except:
+                    pass
+                else:
+                    # If the captcha is still valid, check for botfightmode and match with client's IP and user agent
+                    if not int(time()) - int(datatime) > self.verificationage and hardness >= self.hardness:
+                        if not action == "fight" and not hardness == 3:
+                            if ip == clientip or useragent == clientuseragent:
+                                return
+                        else:
+                            if ip == clientip and useragent == clientuseragent:
+                                return
+                break
+                
+        # Show captcha challenge if no valid captcha verification is found
+        return self.show_captcha()
+    
     def show_changelanguage(self):
         """
         This function generates a page where you can change your language.
 
         :return: The content of the changelanguage page (HTML, JSON, TXT, or XML).
         """
-        pagepath = os.path.join(os.path.join(CURRENT_DIR, "templates"), "changelanguage.html")
+        template_dir = self.current_template_dir
+        
+        pagepath = os.path.join(template_dir, "changelanguage.html")
 
         languages = LANGUAGES
 
@@ -1081,51 +1207,20 @@ class DDoSify:
 
         return translated_page
 
-
-    def show_block(self, template: Optional[str] = None):
+    def show_block(self):
         """
         This function generates a block page to be shown in case of blocking a request.
-        
-        :param template: Path to a custom template file or directory (Optional).
-        
+                
         :return: The content of the block page (HTML, JSON, TXT, or XML).
-
-        :raises Exception: If the built-in template directory or the block.html in it does not exist
         """
 
-        pagepath = None
-        
-        # Check if a custom template is provided and set the pagepath accordingly
-        if not template is None:
-            if os.path.isfile(template):
-                # If the template is a file, use it as the pagepath
-                pagepath = os.path.isfile(template)
-            elif os.path.isdir(template):
-                # If the template is a directory, find the block template file inside it
-                for file in os.path.listdir(template):
-                    filewithoutext = file.replace("." + file.split('.')[-1], "")
-                    if filewithoutext.lower() == "block":
-                        pagepath = os.path.join(template, file)
-                    break
+        template_dir = self.current_template_dir
 
-        # If no custom template is found, check for a default template
-        if pagepath is None:
-            template_dir = self.template_dir
-            if not template_dir is None:
-                for file in os.path.listdir(template_dir):
-                    filewithoutext = file.replace("." + file.split('.')[-1], "")
-                    if filewithoutext.lower() == "block":
-                        pagepath = os.path.join(template_dir, file)
-                    break
-                if pagepath is None:
-                    print("[INFO-DDoSify] The specified template_dir does not contain a block template, the built-in one is used.")
-
-            # If still no template is found, use the built-in block template
-            if pagepath is None:
-                pagepath = os.path.join(os.path.join(CURRENT_DIR, "templates"), "block.html")
-                if not os.path.isfile(pagepath):
-                    raise Exception("The module does not seem to be installed correctly, either the built-in template_dir is missing or the block.html file in it.")
-
+        for file in os.listdir(template_dir):
+            if file.startswith("block"):
+                pagepath = os.path.join(template_dir, file)
+                break
+    
         # Determine the file extension of the template
         pageext = pagepath.split('.')[-1]
         
@@ -1160,62 +1255,34 @@ class DDoSify:
         else:
             # If the template file has an unsupported extension, serve it as a file download
             return send_file(pagepath)
-
-    def show_captcha(self, template: Optional[str] = None, error: bool = False):
+    
+    def show_captcha(self, error: bool = False):
         """
         This function generates a captcha page for the user.
         
-        :param template: Path to a custom template file or directory (Optional).
         :param error: If there is a need to show error notifications to the user.
         
         :return: The content of the captcha page (HTML, JSON, TXT, or XML).
-
-        :raises Exception: If the built-in template directory or the captcha.html in it does not exist
         """
 
-        # Get the URL path of the current request
+        action = self.current_action
+        hardness = self.current_hardness
+        template_dir = self.current_template_dir
         urlpath = urlparse(request.url).path
 
-        # Set the hardness based on the normal hardness level of the application
-        hardness = self.hardness
+        for file in os.listdir(template_dir):
+            if file.startswith("captcha"):
+                pagepath = os.path.join(template_dir, file)
+                break
 
-        # Find a matching action for the current request
-        if not self.actions.get(urlpath) is None or not self.actions.get(request.endpoint) == None:
-            if not self.actions.get(urlpath) is None:
-                _action = self.actions.get(urlpath)
-            else:
-                _action = self.actions.get(request.endpoint)
-
-            # If the action is defined as a tuple (template, action), extract the action
-            if isinstance(_action, tuple):
-                _, _action = _action
-
-            # Check if the action is a valid one among ["block", "let", "hard", "normal", "easy"]
-            if _action == "block":
-                return self.show_block(template=template)
-            elif _action == "let":
-                return
-            else:
-                hardness = 3 if self.hardness == "hard" else 2 if self.hardness == "normal" else 1
-
-        elif not self.actions.get("all") == None:
-            _action = self.actions.get("all")
-
-            # If the action is defined as a tuple (template, action), extract the action
-            if isinstance(_action, tuple):
-                _, _action = _action
-
-            # Check if the action is a valid one among ["block", "let", "hard", "normal", "easy"]
-            if _action == "block":
-                return self.show_block(template=template)
-            elif _action == "let":
-                return
-            else:
-                hardness = 3 if self.hardness == "hard" else 2 if self.hardness == "normal" else 1
+        try:
+            # Get the client's IP address
+            clientip = get_client_ip()
+        except:
+            # If an error occurs while fetching the client's IP, set the error flag
+            clientip = None
         
         if error:
-            clientip = get_client_ip()
-
             # Load the list of previously seen IPs from a file
             if os.path.isfile(SEENIPS_PATH):
                 with open(SEENIPS_PATH, "r") as file:
@@ -1250,15 +1317,15 @@ class DDoSify:
                             json.dump(seenips, file)
 
                         # If the application is in botfightmode or the action is set to "hard," apply stricter rules
-                        if self.botfightmode or hardness == 3:
+                        if action == "figth" or hardness == 3:
                             if records_length > 2:
                                 # If there have been more than one record (two or more false captchas) within the last 2 hours, block the request
-                                return self.show_block(template)
+                                return self.show_block()
                         else:
                              # If the application is not in botfightmode and the action is not "hard," apply normal rules
                             if records_length > 3:
                                 # If there have been more than two records (three or more false captchas) within the last 2 hours, block the request
-                                return self.show_block(template)
+                                return self.show_block()
                         break
 
                 if not is_found:
@@ -1269,46 +1336,6 @@ class DDoSify:
                     with open(SEENIPS_PATH, "w") as file:
                         json.dump(seenips, file)
 
-        pagepath = None
-        
-        # Check if a custom template is provided and set the pagepath accordingly
-        if not template is None:
-            if os.path.isfile(template):
-                # If the template is a file, use it as the pagepath
-                pagepath = os.path.isfile(template)
-            elif os.path.isdir(template):
-                # If the template is a directory, find the captcha template file inside it
-                for file in os.path.listdir(template):
-                    filewithoutext = file.replace("." + file.split('.')[-1], "")
-                    if filewithoutext.lower() == "captcha":
-                        pagepath = os.path.join(template, file)
-                    break
-
-        # If no custom template is found, check for a default template
-        if pagepath is None:
-            template_dir = self.template_dir
-            if not template_dir is None:
-                for file in os.path.listdir(template_dir):
-                    filewithoutext = file.replace("." + file.split('.')[-1], "")
-                    if filewithoutext.lower() == "captcha":
-                        pagepath = os.path.join(template_dir, file)
-                    break
-                if pagepath is None:
-                    print("[INFO-DDoSify] The specified template_dir does not contain a captcha template, the built-in one is used.")
-
-            # If still no template is found, use the built-in captcha template
-            if pagepath is None:
-                pagepath = os.path.join(os.path.join(CURRENT_DIR, "templates"), "captcha.html")
-                if not os.path.isfile(pagepath):
-                    raise Exception("The module does not seem to be installed correctly, either the built-in template_dir is missing or the captcha.html file in it.")
-        
-        try:
-            # Get the client's IP address
-            clientip = get_client_ip()
-        except:
-            # If an error occurs while fetching the client's IP, set the error flag
-            clientip = None
-
         try:
             # Get the client's user agent string from the request
             clientuseragent = request.user_agent.string
@@ -1316,7 +1343,7 @@ class DDoSify:
             clientuseragent = None
         
         if clientip is None and clientuseragent is None:
-            return self.show_block(template)
+            return self.show_block()
     
         # Create basic data of the captcha_token
         captcha_token = Hashing().hash(urlpath) + "-//-" + str(int(time())) + "-//-" + str(hardness) + "-//-" + Hashing().hash(clientip) + "-//-" + Hashing().hash(clientuseragent) + "-//-"
