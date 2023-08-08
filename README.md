@@ -19,7 +19,7 @@ from flask import Flask
 from ddosify import DDoSify
 
 app = Flask(__name__)
-ddosify = DDoSify(app, hardness=2)
+ddosify = DDoSify(app, default_hardness=2)
 
 @app.route("/")
 def index():
