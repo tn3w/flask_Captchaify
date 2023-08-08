@@ -8,7 +8,7 @@
 A DDoS defense system for flask applications, first sends users to a captcha page without a javascript script and creates a confirmation cookie/url arg after the captcha.
 
 > [!WARNING]
-> The syntax was changed with the latest version 0.7. See Instructions > Personalization
+> The syntax was changed with the latest version 0.7. See [Personalization](#personalization)
 
 ## How does flask_DDoSify work?
 Downloads public IP block lists[^1] and compares this data with the user, for more security the API of [Stop Forum Spam](https://www.stopforumspam.com/) is also used. If needed, a captcha is displayed to the user (or the robot) based on the strength set.[^2] Javascript is not needed for this, as the content is rendered on the server.[^3]
@@ -106,7 +106,7 @@ For more information, see the sample code above.
    | 3              | The hardness of the captcha is hard, a 9 - 14 number audio captcha is displayed in addition to the 10 - 12 character text captcha. |
    <br>
 
-4. `template_dirs` Arg
+3. `template_dirs` Arg
 
    To change the template directory of a particular route use the template_dirs arg.
 
@@ -122,8 +122,10 @@ For more information, see the sample code above.
               \block.html
               \changelanguage.html
    ```
+   > FIXME: If template file does not exist 404 is displayed
+   <br>
 
-5. `default_action` Arg
+4. `default_action` Arg
 
    To specify the default action of all routes or endpoints use the default_action arg.
 
@@ -131,8 +133,9 @@ For more information, see the sample code above.
    ```python
    ddosify = DDoSify(app, default_action="figth")
    ```
+   <br>
 
-6. `default_hardness` Arg
+5. `default_hardness` Arg
 
    To specify the default hardness of all routes or endpoints use the default_hardness arg.
 
@@ -140,8 +143,9 @@ For more information, see the sample code above.
    ```python
    ddosify = DDoSify(app, default_hardness=3)
    ```
+   <br>
 
-7. `default_template_dir` Arg
+6. `default_template_dir` Arg
 
    To specify the default template_dir of all routes or endpoints use the default_template_dir arg.
 
@@ -149,8 +153,9 @@ For more information, see the sample code above.
    ```python
    ddosify = DDoSify(app, default_template_dir="/path/to/my/custom/template/dir")
    ```
+   <br>
 
-8. `verificationage` Arg
+7. `verificationage` Arg
 
    Indicates the time in seconds how long a solved captcha is valid (Default: 3600 = 1 hour)
 
@@ -158,8 +163,9 @@ For more information, see the sample code above.
    ```python
    ddosify = DDoSify(app, verificationage=10800)
    ```
+   <br>
 
-9. `withoutcookies` Arg
+8. `withoutcookies` Arg
 
    If True, no cookies are created, and verification is proven via URL args (Default: False)
 
@@ -167,8 +173,9 @@ For more information, see the sample code above.
    ```python
    ddosify = DDoSify(app, withoutcookies=True)
    ```
+   <br>
 
-10. `block_crawler` Arg:
+9. `block_crawler` Arg
 
    If True, crawlers like Googlebot, further are estimated via their user agent as suspicious and not the website, good for websites that should not be crawled (Default: False)
 
