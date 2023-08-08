@@ -7,7 +7,10 @@
 # flask_DDoSify
 A DDoS defense system for flask applications, first sends users to a captcha page without a javascript script and creates a confirmation cookie/url arg after the captcha.
 
-### How does flask_DDoSify work?
+> [!WARNING]
+> The syntax was changed with the latest version 0.7. See Instructions > Personalization
+
+## How does flask_DDoSify work?
 Downloads public IP block lists[^1] and compares this data with the user, for more security the API of [Stop Forum Spam](https://www.stopforumspam.com/) is also used. If needed, a captcha is displayed to the user (or the robot) based on the strength set.[^2] Javascript is not needed for this, as the content is rendered on the server.[^3]
 
 An example script could look like this:[^4]
@@ -25,19 +28,19 @@ def index():
 app.run(host = "localhost", port = 8080)
 ```
 
-### Application purposes
+## Application purposes
 A few application purposes:
   - Protect against DDoS attacks [^5]
   - Your website contains content that should not be read by a robot
   - A login website
   - A dark web page that simply needs to be secured a bit
 
-#### Why should you use DDoSify if you host a Flask server?
+### Why should you use DDoSify if you host a Flask server?
 A quick and easy implementation allows even small websites or a small team of developers to quickly get robot protection. It also doesn't use third-party providers, which limits data collection from Google, Facebook and the creepy data brokers.[^6] Everything is open source, meaning you can rewrite the code yourself and perhaps make it more private.
 
-## Instructions
+# Instructions
 
-### Installation guide
+## Installation guide
 1. Make sure you have the latest version of Python and Pip installed, you also need git installed.
 2. Clone the repository to your computer with `git clone https://github.com/tn3w/flask_DDoSify` or download the ZIP file and unzip it.
 3. Make sure the folder that was created is called `flask_DDoSify`.
@@ -57,65 +60,97 @@ A quick and easy implementation allows even small websites or a small team of de
    ```
 For more information, see the sample code above.
 
-### Personalization
+## Personalization
 
 1. `actions` Arg
 
    To change the response in the case of certain routes / endpoints, you can use the actions parameter.
    
-   Example of a website that allows all bots on the main page, makes captchas hard on the login page and blocks all robots on the register page:
+   Example of a website that allows all bots on the main page, enforces captchas on the login page, and blocks all robots on the registration page:
    ```python
-   ddosify = DDoSify(app, actions={"/": "let", "/login": "hard", "/register": "block"})
+   ddosify = DDoSify(app, actions={"/": "let", "/login": "fight", "/register": "block"})
    ```
-   
-   Can also be used as a tuple, i.e. {"/myroute": ("/my/custom/template/dir": "action")}
 
-   Example of a website that has given a special template for one page:
+   When using "*" before or after the urlpath / endpoint you can address multiple urls.
+
+   Example of a website where all urls starting with /api/ are allowed through, all urls starting with "/dogs/" show everyone a captcha and all urls ending with "/cats/" block bots:
    ```python
-   ddosify = DDoSify(app, actions={"/api/cats": ("/my/json/template": "let")})
+   ddosify = DDoSify(app, actions={"*/api/*": "let", "/dogs/*": "fight", "*/cats/": "block"})
    ```
-   > FIXME: You should also be able to append * to the route to select all urls that end/beginning with the given or both.
    
    All actions:
-   | Name of action | Executing Action                                                                                                             |
-   | -------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-   | let            | Allows all traffic through, regardless of whether the IP is blocked.                                                         |
-   | block          | Blocks all traffic if it is on a block list, without captcha.                                                                |
-   | hard           | Sets the hardness for the one route to 3, which displays an extra audio captcha in addition to the normal hard text captcha. |
-   | normal         | Sets the hardness for the one route to 2, which only makes the text captcha a bit harder.                                    |
-   | easy           | Sets the hardness for the one route to 1, the text captcha is easy.                                                          |
-   > FIXME: Action fight, if given every request on the route must make a captcha.
+   | Name of action | Executing Action                                                     |
+   | -------------- | -------------------------------------------------------------------- |
+   | let            | Allows all traffic through, regardless of whether the IP is blocked. |
+   | block          | Blocks all traffic if it is on a block list, without captcha.        |
+   | fight          | Displays a captcha to all traffic, whether suspicious or not.        |
+   | captcha        | Default value, shows only suspicious traffic captchas.               |
+   <br>
 
-3. `template_dir` Arg
-
-   To change the captcha and block template use the template_dir arg.
-
-   Example of a website with a custom template:
-   ```python
-   ddosify = DDoSify(app, template_dir="/path/to/my/custom/template/dir")
-   ```
-
-   Used as the default value for all websites.
-
-4. `hardness` Arg
-
-   The hardness Arg sets the default value of the captcha hardness, for all web pages. (Default: 2)
-
-   Example of a paranoid website:
-   ```python
-   ddosify = DDoSify(app, hardness=3)
-   ```
-
-5. `botfightmode` Arg
-
-   If True, any request to the website will be considered suspicious and a captcha will have to be solved. (Default: False)
+2. `hardness` Arg
    
-   Example of a very paranoid website:
+   To change the hardness of a captcha for specific routes or endpoints use hardness.
+
+   Example of a website that sets the hardness of the main page to 1 (= easy), on the login page to 2 (= normal) and on the register page to 3 (= hard):
    ```python
-   ddosify = DDoSify(app, botfightmode=True)
+   ddosify = DDoSify(app, hardness={"/": 1, "/login": 2, "/register": 3})
    ```
 
-6. `verificationage` Arg
+   When using "*" before or after the urlpath / endpoint you can address multiple urls, like actions.
+
+   All hardness levels:
+   | Hardness Level | Captcha modification                                                                                                               |
+   | -------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+   | 1              | The captcha is easy. Only a text captcha with 6 - 8 characters is displayed                                                        |
+   | 2              | The captcha is normal. Only a text captcha with 9 - 11 characters is displayed                                                     |
+   | 3              | The hardness of the captcha is hard, a 9 - 14 number audio captcha is displayed in addition to the 10 - 12 character text captcha. |
+   <br>
+
+4. `template_dirs` Arg
+
+   To change the template directory of a particular route use the template_dirs arg.
+
+   Example of a website that has a specific template directory on /api/:
+   ```python
+   ddosify = DDoSify(app, template_dirs={"/api/*": "/path/to/special/template/dir"})
+   ```
+
+   In a template directory must look like this:
+   ```
+   templatedir\
+              \captcha.html
+              \block.html
+              \changelanguage.html
+   ```
+
+5. `default_action` Arg
+
+   To specify the default action of all routes or endpoints use the default_action arg.
+
+   Example of a very paranoid website that has set its action to "fight" for all routes:
+   ```python
+   ddosify = DDoSify(app, default_action="figth")
+   ```
+
+6. `default_hardness` Arg
+
+   To specify the default hardness of all routes or endpoints use the default_hardness arg.
+
+   Example of a very paranoid website that has set its hardness to 3 (= hard) for all routes:
+   ```python
+   ddosify = DDoSify(app, default_hardness=3)
+   ```
+
+7. `default_template_dir` Arg
+
+   To specify the default template_dir of all routes or endpoints use the default_template_dir arg.
+
+   Example of a web page with custom template_dir:
+   ```python
+   ddosify = DDoSify(app, default_template_dir="/path/to/my/custom/template/dir")
+   ```
+
+8. `verificationage` Arg
 
    Indicates the time in seconds how long a solved captcha is valid (Default: 3600 = 1 hour)
 
@@ -124,7 +159,7 @@ For more information, see the sample code above.
    ddosify = DDoSify(app, verificationage=10800)
    ```
 
-7. `withoutcookies` Arg
+9. `withoutcookies` Arg
 
    If True, no cookies are created, and verification is proven via URL args (Default: False)
 
@@ -133,7 +168,7 @@ For more information, see the sample code above.
    ddosify = DDoSify(app, withoutcookies=True)
    ```
 
-8. `block_crawler` Arg:
+10. `block_crawler` Arg:
 
    If True, crawlers like Googlebot, further are estimated via their user agent as suspicious and not the website, good for websites that should not be crawled (Default: False)
 
