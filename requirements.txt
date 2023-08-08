@@ -7,3 +7,4 @@ Jinja2
 Pillow
 requests
 bs4
+captcha
