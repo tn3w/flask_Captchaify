@@ -126,7 +126,6 @@ For more information, see the sample code above.
               \block.html
               \changelanguage.html
    ```
-   > FIXME: If template file does not exist 404 is displayed
    <br>
 
 4. `default_action` Arg
