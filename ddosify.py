@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from base64 import urlsafe_b64encode, urlsafe_b64decode, b64encode
-from flask import request, send_file, g
+from flask import request, send_file, g, abort
 from googletrans import Translator # Version: 3.1.0a0
 from bs4 import BeautifulSoup
 import ipaddress
@@ -638,20 +638,20 @@ class Language:
         # Translate headers
         headers = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
         for header in headers:
-            if 'ntr' not in header.attrs and not header.text == None:
+            if 'ntr' not in header.attrs and not header.text is None:
                 header.string = Language.translate(header.text, from_lang, to_lang)
         
         # Translate links
         links = soup.find_all('a')
         for link in links:
-            if 'ntr' not in link.attrs and not link.text == None:
+            if 'ntr' not in link.attrs and not link.text is None:
                 link.string = Language.translate(link.text, from_lang, to_lang)
         
         # Translate paragraphs
         paragraphs = soup.find_all('p')
         for paragraph in paragraphs:
             # Ignore tags that have the 'ntr' attribute or do not contain text nodes
-            if 'ntr' in paragraph.attrs or paragraph.text == None:
+            if 'ntr' in paragraph.attrs or paragraph.text is None:
                 continue
 
             # Ignores all p tags that have either an image or a link in them and not the attr linkintext
@@ -664,7 +664,7 @@ class Language:
         # Translate buttons
         buttons = soup.find_all('button')
         for button in buttons:
-            if 'ntr' not in button.attrs and not button.text == None:
+            if 'ntr' not in button.attrs and not button.text is None:
                 button.string = Language.translate(button.text, from_lang, to_lang)
         
         # Translate input placeholders
@@ -1009,7 +1009,7 @@ class DDoSify:
             clientuseragent = None
         else:
             # If the user agent is None, set the error flag
-            if clientuseragent == None:
+            if clientuseragent is None:
                 error = True
 
         # Check if the client's user agent indicates that it is a web crawler
@@ -1434,9 +1434,18 @@ class DDoSify:
 
         :return: The content of the changelanguage page (HTML, JSON, TXT, or XML).
         """
+
         template_dir = self.current_template_dir
+
+        pagepath = None
+
+        for file in os.listdir(template_dir):
+            if file.startswith("changelanguage"):
+                pagepath = os.path.join(template_dir, file)
+                break
         
-        pagepath = os.path.join(template_dir, "changelanguage.html")
+        if pagepath is None:
+            return abort(404)
 
         languages = LANGUAGES
 
@@ -1481,10 +1490,15 @@ class DDoSify:
 
         template_dir = self.current_template_dir
 
+        pagepath = None
+
         for file in os.listdir(template_dir):
             if file.startswith("block"):
                 pagepath = os.path.join(template_dir, file)
                 break
+        
+        if pagepath is None:
+            return abort(404)
     
         # Determine the file extension of the template
         pageext = pagepath.split('.')[-1]
@@ -1535,10 +1549,15 @@ class DDoSify:
         template_dir = self.current_template_dir
         urlpath = urlparse(request.url).path
 
+        pagepath = None
+
         for file in os.listdir(template_dir):
             if file.startswith("captcha"):
                 pagepath = os.path.join(template_dir, file)
                 break
+        
+        if pagepath is None:
+            return abort(404)
 
         try:
             # Get the client's IP address
