@@ -30,7 +30,9 @@ app.run(host = "localhost", port = 8080)
 
 > [!NOTE]
 > When testing DDoSify you should note that calling it from localhost gives the script a wrong IP in this case "127.0.0.1", which the script considers legitimate. When testing, use a service like cloudflared tunnel to connect to your script.
+
 <br>
+
 > [!NOTE]
 > Note that when you first start the script, it first downloads and processes the block lists, which can take between 20 - 40 seconds. When you start the script again, the block lists are updated in the background.
 
