@@ -119,13 +119,15 @@ For more information, see the sample code above.
    ddosify = DDoSify(app, template_dirs={"/api/*": "/path/to/special/template/dir"})
    ```
 
-   In a template directory must look like this:
+   A template directory can look like this:
    ```
    templatedir\
               \captcha.html
               \block.html
               \changelanguage.html
    ```
+
+   If one of the three templates does not exist in the folder, a 404 error is displayed when calling it. e.g. if you remove the changelanguage page at apis.
    <br>
 
 4. `default_action` Arg
