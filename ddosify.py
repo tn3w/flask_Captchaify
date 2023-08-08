@@ -60,7 +60,7 @@ def generate_random_string(length: int, with_punctuation: bool = True, with_lett
 
 # The captcha secret is used to check the captcha of the user
 if not os.path.isfile(os.path.join(DATA_DIR, "captchasecret.txt")):
-    CAPTCHASECRET = generate_random_string(1024)
+    CAPTCHASECRET = generate_random_string(512)
     with open(os.path.join(DATA_DIR, "captchasecret.txt"), "w") as file:
         file.write(CAPTCHASECRET)
 else:
