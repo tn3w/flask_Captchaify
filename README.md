@@ -16,7 +16,7 @@ Downloads public IP block lists[^1] and compares this data with the user, for mo
 An example script could look like this:[^4]
 ```python
 from flask import Flask
-from ddosify import DDoSify
+from flask_DDoSify.ddosify import DDoSify
 
 app = Flask(__name__)
 ddosify = DDoSify(app, default_hardness=2)
