@@ -73,7 +73,7 @@ For more information, see the sample code above.
 
    When using "*" before or after the urlpath / endpoint you can address multiple urls.
 
-   Example of a website where all urls starting with /api/ are allowed through, all urls starting with "/dogs/" show everyone a captcha and all urls ending with "/cats/" block bots:
+   Example of a website where all urls with /api/ are allowed through, all urls starting with "/dogs/" show everyone a captcha and all urls ending with "/cats/" block bots:
    ```python
    ddosify = DDoSify(app, actions={"*/api/*": "let", "/dogs/*": "fight", "*/cats/": "block"})
    ```
