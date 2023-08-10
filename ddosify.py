@@ -34,6 +34,7 @@ DATA_DIR = os.path.join(CURRENT_DIR, "data")
 SEENIPS_PATH = os.path.join(DATA_DIR, "seenips.json")
 CAPTCHASOLVED_PATH = os.path.join(DATA_DIR, "captchasolved.json")
 STOPFORUMSPAM_PATH = os.path.join(DATA_DIR, "stopforumspamcache.json")
+RATELIMIT_PATH = os.path.join(DATA_DIR, "ratelimit.json")
 
 class Services:
 
@@ -727,6 +728,9 @@ CRAWLER_USER_AGENTS = ["Googlebot", "bingbot", "Yahoo! Slurp", "YandexBot", "Bai
 with open(os.path.join(DATA_DIR, "emojis.json"), "r") as file:
     EMOJIS = json.load(file)
 
+with open(os.path.join(DATA_DIR, "teaemojis.json"), "r") as file:
+    TEAEMOJIS = json.load(file)
+
 # So that no Jinja Undefined errors come
 class SilentUndefined(Undefined):
     def _fail_with_undefined_error(self, *args, **kwargs):
@@ -771,8 +775,9 @@ class DDoSify:
 
     def __init__ (
         self, app, actions: dict = {},
-        hardness: dict = {}, template_dirs: dict = {}, default_action: str = "captcha",
-        default_hardness: int = 2, default_template_dir: Optional[str] = None, verificationage: int = 3600,
+        hardness: dict = {}, template_dirs: dict = {}, rate_limits: dict = {}, 
+        default_action: str = "captcha", default_hardness: int = 2, default_template_dir: Optional[str] = None, 
+        default_rate_limit: Optional[int] = 120, default_max_rate_limit = 1200, verificationage: int = 3600,
         withoutcookies: bool = False, block_crawler: bool = False
         ):
 
@@ -783,9 +788,12 @@ class DDoSify:
         :param actions: Dict with actions for different routes like here: {"urlpath": "fight", "endpoint": "block"}, e.g. {"/": "block", "*/api/*": "let", "/login": "fight"} which blocks all suspicious traffic to "/", allows all traffic to /api/ routes e. e.g. "/api/cats" or "/dogs/api/" if they contain "/api/", and where to "/login" any traffic whether suspicious or not has to solve a captcha. (Default = {})
         :param hardness: Dict with hardness for different routes like here: {"urlpath": 1, "endpoint": 2}, e.g. {"/": 3, "*/api/*": 1, "/login": 3}. The urlpaths have the same structure as for actions. (Default = {})
         :param template_dirs: Dict with template folder for different routes like here: {"urlpath": "/path/to/template/dir", "endpoint": "/path/to/template/dir2"}, e.g. {"/": "/path/to/template/dir", "*/api/*": "/path/to/myapi/template/dir", "/login": "/path/to/login/template/dir"}. The urlpaths have the same structure as for actions. (Default = {})
+        :param rate_limits: Dict with rate limit and max rate limit for different routes, the rate limit variable indicates how many requests an ip can make per minute, the max rate limit variable specifies the maximum number of requests that can come from all Ips like here: {"urlpath": (180, 1800), "endpoint": (130, 1300)}, e.g. {"/": (120, 1200), "*/api/*": (180, 1800), "/login": (60, 600)}. The urlpaths have the same structure as for actions. (Default = {})
         :param default_action: The default value of all pages if no special action is given in actions. (Default = "captcha")
         :param default_hardness: The default value of all pages if no special hardness is given in hardness. (Default = 2)
         :param default_template_dir: The default value of all pages if no special template_dir is given in template_dirs. (Default = None)
+        :param default_rate_limit: How many requests an ip can make per minute, if nothing is given at rate_limits this value is used. If None, no rate limit is set. (Default = 120)
+        :param default_max_rate_limit: How many requests all Ips can make per minute, if nothing is given at rate_limits this value is used. If None, no max rate limit is set. (Default = 1200)
         :param verificationage: How long the captcha verification is valid, in seconds (Default = 3600 [1 hour])
         :param withoutcookies: If True, no cookie is created after the captcha is fulfilled, but only an Arg is appended to the URL (Default = False)
         :param block_crawler: If True, known crawlers based on their user agent will also need to solve a captcha (Default = False)
@@ -804,6 +812,9 @@ class DDoSify:
         
         if not isinstance(template_dirs, dict):
             template_dirs = dict()
+
+        if not isinstance(rate_limits, dict):
+            rate_limits = {}
         
         if not default_action in ["let", "block", "fight", "captcha"]:
             default_action = "captcha"
@@ -813,6 +824,12 @@ class DDoSify:
         
         if default_template_dir is None:
             default_template_dir = os.path.join(CURRENT_DIR, "templates")
+        
+        if not isinstance(default_rate_limit, int) and not default_rate_limit is None:
+            default_rate_limit = 120
+        
+        if not isinstance(default_max_rate_limit, int) and not default_max_rate_limit is None:
+            default_max_rate_limit = 1200
 
         if not isinstance(verificationage, int):
             verificationage = 3600
@@ -828,10 +845,13 @@ class DDoSify:
         self.actions = actions
         self.hardness = hardness
         self.template_dirs = template_dirs
+        self.rate_limits = rate_limits
 
         self.default_action = default_action
         self.default_hardness = default_hardness
         self.default_template_dir = default_template_dir
+        self.default_rate_limit = default_rate_limit
+        self.default_max_rate_limit = default_max_rate_limit
 
         self.verificationage = verificationage
         self.withoutcookies = withoutcookies
@@ -927,7 +947,7 @@ class DDoSify:
     @property
     def current_template_dir(self):
         """
-        The template of the current route
+        The template directory of the current route
         """
 
         # Get urlpath and endpoint
@@ -966,6 +986,94 @@ class DDoSify:
         
         return template_dir
 
+    @property
+    def current_rate_limit(self):
+        """
+        The rate limit of the current route
+        """
+
+        # Get urlpath and endpoint
+        urlpath = urlparse(request.url).path
+        urlendpoint = request.endpoint
+
+        rate_limit = None
+
+        for path, path_rate_limit in self.rate_limits.items():
+            
+            path_rate_limit, _ = path_rate_limit
+
+            # If "/" is in the path the urlpath is used otherwise the endpoint is used
+            url = urlpath
+            if not "/" in path:
+                url = urlendpoint
+
+            # The path is validated
+            if path.startswith("*") or path.endswith("*"):
+                if path.startswith("*") and not path.endswith("*"):
+                    if url.endswith(path.replace("*", "")):
+                        rate_limit = path_rate_limit
+                elif path.endswith("*") and not path.startswith("*"):
+                    if url.startswith(path.replace("*", "")):
+                        rate_limit = path_rate_limit
+                else:
+                    if path.replace("*", "") in url:
+                        rate_limit = path_rate_limit
+            else:
+                if path == url:
+                    rate_limit = path_rate_limit
+            
+            if isinstance(rate_limit, int):
+                break
+        
+        if not isinstance(rate_limit, int):
+            rate_limit = self.default_rate_limit
+        
+        return rate_limit
+
+    @property
+    def current_max_rate_limit(self):
+        """
+        The max rate limit of the current route
+        """
+
+        # Get urlpath and endpoint
+        urlpath = urlparse(request.url).path
+        urlendpoint = request.endpoint
+
+        max_rate_limit = None
+
+        for path, path_max_rate_limit in self.rate_limits.items():
+            
+            _, path_max_rate_limit = path_max_rate_limit
+
+            # If "/" is in the path the urlpath is used otherwise the endpoint is used
+            url = urlpath
+            if not "/" in path:
+                url = urlendpoint
+
+            # The path is validated
+            if path.startswith("*") or path.endswith("*"):
+                if path.startswith("*") and not path.endswith("*"):
+                    if url.endswith(path.replace("*", "")):
+                        max_rate_limit = path_max_rate_limit
+                elif path.endswith("*") and not path.startswith("*"):
+                    if url.startswith(path.replace("*", "")):
+                        max_rate_limit = path_max_rate_limit
+                else:
+                    if path.replace("*", "") in url:
+                        max_rate_limit = path_max_rate_limit
+            else:
+                if path == url:
+                    max_rate_limit = path_max_rate_limit
+            
+            if isinstance(max_rate_limit, int):
+                break
+        
+        if not isinstance(max_rate_limit, int):
+            max_rate_limit = self.default_max_rate_limit
+        
+        return max_rate_limit
+    
     def threat_score(self: Optional["DDoSify"] = None):
         """
         Function to get the threat score of a request
@@ -1105,13 +1213,13 @@ class DDoSify:
                         crypto = SymmetricCrypto(token)
                         datatime = data["time"]
                         try:
-                            # Decrypt IP, user agent and hardness of solved captcha from the stored data
+                            # Decrypt IP, user agent from the stored data
                             ip = crypto.decrypt(data["ip"])
                             useragent = crypto.decrypt(data["user_agent"])
                         except:
                             pass
                         else:
-                            # If the captcha is still valid, check for botfightmode and match with client's IP and user agent
+                            # If the captcha is still valid, match with client's IP and user agent
                             if not int(time()) - int(datatime) > 3600:
                                 if ip == clientip or useragent == clientuseragent:
                                     score -= 0.6
@@ -1130,6 +1238,45 @@ class DDoSify:
         g.ddosify_captcha = None
         g.ddosify_method = request.method
 
+        # When an error occurs a captcha is displayed
+        error = False
+
+        try:
+            # Get the client's IP address
+            client_ip = get_client_ip()
+        except:
+            # If an error occurs while fetching the client's IP, set the error flag
+            error = True
+            client_ip = None
+
+        # FIXME: Service!!!
+        
+        if os.path.isfile(RATELIMIT_PATH):
+            with open(RATELIMIT_PATH, "r") as file:
+                saved_requests = json.load(file)
+        else:
+            saved_requests = []
+        
+        request_count = 0
+        ip_request_count = 0
+
+        for hashed_ip, timestamps in saved_requests:
+            count = 0
+            for request_time in timestamps:
+                if not int(time()) - int(request_time) > 60:
+                    count += 1
+            if not client_ip is None:
+                comparison = Hashing().compare(client_ip, hashed_ip)
+                if comparison:
+                    ip_request_count += count
+            request_count += count
+        
+        rate_limit = self.current_rate_limit
+        max_rate_limit = self.current_max_rate_limit
+
+        if ip_request_count > rate_limit or request_count > max_rate_limit:
+            return self.show_ratelimited()
+
         action = self.current_action
         hardness = self.current_hardness
 
@@ -1144,17 +1291,6 @@ class DDoSify:
         # If the parameter ddosify_changelanguage is given, the language change page is displayed
         if request.args.get("ddosify_changelanguage") == "1":
             return self.show_changelanguage()
-        
-        # When an error occurs a captcha is displayed
-        error = False
-
-        try:
-            # Get the client's IP address
-            clientip = get_client_ip()
-        except:
-            # If an error occurs while fetching the client's IP, set the error flag
-            error = True
-            clientip = None
 
         try:
             # Get the client's user agent string from the request
@@ -1196,11 +1332,11 @@ class DDoSify:
         # Define the criteria for blocking or showing captcha
         criteria = [
             error,
-            clientip in FIREHOL_IPS,
-            clientip in IPDENY_IPS,
-            clientip in EMERGINGTHREATS_IPS,
-            clientip in MYIPMS_IPS,
-            clientip in TOREXITNODES_IPS,
+            client_ip in FIREHOL_IPS,
+            client_ip in IPDENY_IPS,
+            client_ip in EMERGINGTHREATS_IPS,
+            client_ip in MYIPMS_IPS,
+            client_ip in TOREXITNODES_IPS,
             is_crawler and self.block_crawler
         ]
 
@@ -1222,7 +1358,7 @@ class DDoSify:
             
             # Check if the client's IP exists in the StopForumSpam cache
             for hashed_ip, content in stopforumspamcache.items():
-                comparison = Hashing().compare(clientip, hashed_ip)
+                comparison = Hashing().compare(client_ip, hashed_ip)
                 if comparison:
                     # The IP was found in the cache
                     found = True
@@ -1230,13 +1366,11 @@ class DDoSify:
                     # If the IP is flagged as a spammer and the time since last check is less than 7 days (604800 seconds), block the request
                     if content["spammer"] and not int(time()) - int(content["time"]) > 604800:
                         criteria.append(True)
-                    if int(time()) - int(content["time"]) > 604800:
-                        found = False
                     break
 
             if not found:
                 # If the IP is not found in the cache, make a request to the StopForumSpam API
-                response = requests.get(f"https://api.stopforumspam.org/api?ip={clientip}&json")
+                response = requests.get(f"https://api.stopforumspam.org/api?ip={client_ip}&json")
                 if response.ok:
                     try:
                         content = response.json()
@@ -1251,7 +1385,7 @@ class DDoSify:
                             criteria.append(True)
 
                         # The clientip is hashed and stored like this
-                        hashed_clientip = Hashing().hash(clientip)
+                        hashed_clientip = Hashing().hash(client_ip)
 
                         # Update the StopForumSpam cache with the result and current timestamp
                         stopforumspamcache[hashed_clientip] = {"spammer": spammer, "time": int(time())}
@@ -1276,11 +1410,11 @@ class DDoSify:
             else:
                 seenips = {}
 
-            if not clientip is None:
+            if not client_ip is None:
                 # Compare the client's IP with the seen IPs to determine if it's a repeated visit
                 for hashed_ip, records in seenips.items():
                     # Compare the client's IP with each hashed IP stored in the "seenips" list
-                    comparison = Hashing().compare(clientip, hashed_ip)
+                    comparison = Hashing().compare(client_ip, hashed_ip)
                     if comparison:
                         records_length = 0
                         for record in records:
@@ -1305,6 +1439,43 @@ class DDoSify:
         """
         This function creates cookies, stores args in the HTML code
         """
+        try:
+            # Get the client's IP address
+            client_ip = get_client_ip()
+        except:
+            client_ip = None
+
+        if not client_ip is None:
+            # FIXME: Service!!!
+
+            if os.path.isfile(RATELIMIT_PATH):
+                with open(RATELIMIT_PATH, "r") as file:
+                    saved_requests = json.load(file)
+            else:
+                saved_requests = []
+
+            found = False
+            for hashed_ip, timestamps in saved_requests.items:
+                comparison = Hashing().compare(client_ip, hashed_ip)
+                if comparison:
+                    found = True
+
+                    new_timestamps = []
+                    for request_time in timestamps:
+                        if not int(time()) - int(request_time) > 60:
+                            new_timestamps.append(request_time)
+                    new_timestamps.append(str(int(time())))
+
+                    saved_requests[hashed_ip] = new_timestamps
+                    break
+            
+            if not found:
+                hashed_ip = Hashing().hash(client_ip, 16)
+                saved_requests[hashed_ip] = [str(int(time()))]
+            
+            with open(RATELIMIT_PATH, "w") as file:
+                json.dump(saved_requests, file)
+
         if response.content_type == "text/html; charset=utf-8" and response.status_code == 200 and g.ddosify_method == "GET":        
             html = response.data
 
@@ -1693,6 +1864,60 @@ class DDoSify:
             # If the template file has an unsupported extension, serve it as a file download
             return send_file(pagepath)
     
+    def show_ratelimited(self):
+        """
+        This function generates a ratelimited page to be shown in case of a rate limit.
+                
+        :return: The content of the ratelimited page (HTML, JSON, TXT, or XML).
+        """
+
+        template_dir = self.current_template_dir
+
+        pagepath = None
+
+        for file in os.listdir(template_dir):
+            if file.startswith("ratelimited"):
+                pagepath = os.path.join(template_dir, file)
+                break
+        
+        if pagepath is None:
+            return abort(404)
+    
+        # Determine the file extension of the template
+        pageext = pagepath.split('.')[-1]
+        
+        if pageext == "html":
+            # If the template is an HTML file, process and translate the page content
+
+            # Get the language based on the user's preference
+            language = Language.language()
+
+            # Render the HTML template, adding an emoji to it using a random choice from the emojis list
+            page = render_template(pagepath, language = language, emoji = secrets.choice(TEAEMOJIS))
+
+            try:
+                # Translate the page content from English to the user's preferred language
+                translated_page = Language.translate_page(page, "en", language)
+            except:
+                # If translation fails, use the original page content
+                translated_page = page
+
+            return translated_page
+            
+        elif pageext == "json":
+            # If the template is a JSON file, load and return its content
+            with open(pagepath, "r") as file:
+                return json.load(file)
+                
+        elif pageext in ["txt", "xml"]:
+            # If the template is a TXT or XML file, read and return its content
+            with open(pagepath, "r") as file:
+                return file.read()
+        
+        else:
+            # If the template file has an unsupported extension, serve it as a file download
+            return send_file(pagepath)
+    
     def show_captcha(self, error: bool = False):
         """
         This function generates a captcha page for the user.
@@ -1851,7 +2076,10 @@ class DDoSify:
             language = Language.language()
 
             # Render the HTML template, adding an emoji to it using a random choice from the emojis list
-            page = render_template(pagepath, language = language, errormessage = errormessage, textCaptcha=captcha_image_data, audioCaptcha = captcha_audio_data, captchatoken=coded_captcha_token)
+            page = render_template(
+                pagepath, language = language, errormessage = errormessage, 
+                textCaptcha=captcha_image_data, audioCaptcha = captcha_audio_data, captchatoken=coded_captcha_token
+                )
 
             try:
                 # Translate the page content from English to the user's preferred language
