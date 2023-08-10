@@ -1447,6 +1447,7 @@ class DDoSify:
 
         if not client_ip is None:
             # FIXME: Service!!!
+            # FIXME: Maximum timestamps list length per ip which is (rate_limit * 2) - (rate_limit / 3), where when adding a new time the last value in the list is deleted.
 
             if os.path.isfile(RATELIMIT_PATH):
                 with open(RATELIMIT_PATH, "r") as file:
