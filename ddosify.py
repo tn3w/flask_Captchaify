@@ -1255,12 +1255,12 @@ class DDoSify:
             with open(RATELIMIT_PATH, "r") as file:
                 saved_requests = json.load(file)
         else:
-            saved_requests = []
+            saved_requests = {}
         
         request_count = 0
         ip_request_count = 0
 
-        for hashed_ip, timestamps in saved_requests:
+        for hashed_ip, timestamps in saved_requests.items():
             count = 0
             for request_time in timestamps:
                 if not int(time()) - int(request_time) > 60:
@@ -1452,10 +1452,10 @@ class DDoSify:
                 with open(RATELIMIT_PATH, "r") as file:
                     saved_requests = json.load(file)
             else:
-                saved_requests = []
+                saved_requests = {}
 
             found = False
-            for hashed_ip, timestamps in saved_requests.items:
+            for hashed_ip, timestamps in saved_requests.items():
                 comparison = Hashing().compare(client_ip, hashed_ip)
                 if comparison:
                     found = True
