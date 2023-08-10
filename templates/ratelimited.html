@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="{{ language }}">
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Enjoy a cup of tea</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background-color: #f2f2f2;
+                color: #181818;
+            }
+    
+            .container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+            }
+    
+            .emoji {
+                height: 100px;
+            }
+    
+            .error-text {
+                font-size: 24px;
+                margin-top: 20px;
+                text-align: center;
+            }
+    
+            .main-link {
+                font-size: 18px;
+                margin-top: 20px;
+                text-align: center;
+            }
+    
+            p {
+                text-align: center;
+                max-width: 800px;
+            }
+    
+            .ddosify-text, .ddosify-link {
+                font-size: 12px;
+                margin-top: 10px;
+                text-align: center;
+                font-weight: lighter;
+                color: #222;
+                text-decoration: none;
+            }
+            
+            .ddosify-link:hover {
+                text-decoration: underline;
+            }
+    
+            @media (prefers-color-scheme: dark) {
+                body {
+                    background-color: #121212;
+                    color: #f2f2f2;
+                }
+    
+                .error-text {
+                    color: #f2f2f2;
+                }
+    
+                .main-link a {
+                    color: #00BFFF;
+                }
+    
+                .ddosify-text, .ddosify-link {
+                    color: #999;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <img class="emoji" src="{{ emoji }}">
+            <h1 class="error-text">Have some Tea</h1>
+            <p>It appears that you are sending an excessive number of requests per minute to this website. Please reduce the frequency of your requests.</p>
+            <div class="main-link">
+                <a href="">Refresh webpage</a>
+            </div>
+            <h1 class="ddosify-text" ntr="1">DDoS protection from <a class="ddosify-link" href="https://github.com/tn3w/flask_DDoSify" target="_blank">DDoSify</a></h1>
+        </div>
+    </body>
+</html>
