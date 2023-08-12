@@ -192,7 +192,7 @@ For more information, see the sample code above.
    ```
    <br>
 
-10. `verificationage` Arg
+9. `verificationage` Arg
 
    Indicates the time in seconds how long a solved captcha is valid (Default: 3600 = 1 hour)
 
@@ -202,7 +202,7 @@ For more information, see the sample code above.
    ```
    <br>
 
-11. `withoutcookies` Arg
+9. `withoutcookies` Arg
 
    If True, no cookies are created, and verification is proven via URL args (Default: False)
 
@@ -212,7 +212,7 @@ For more information, see the sample code above.
    ```
    <br>
 
-12. `block_crawler` Arg
+9. `block_crawler` Arg
 
    If True, crawlers like Googlebot, further are estimated via their user agent as suspicious and not the website, good for websites that should not be crawled (Default: False)
 
