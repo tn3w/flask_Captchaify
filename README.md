@@ -125,6 +125,7 @@ For more information, see the sample code above.
               \captcha.html
               \block.html
               \changelanguage.html
+              \ratelimited.html
    ```
 
    If one of the three templates does not exist in the folder, a 404 error is displayed when calling it. e.g. if you remove the changelanguage page at apis.
