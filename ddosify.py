@@ -1274,34 +1274,35 @@ class DDoSify:
             # If an error occurs while fetching the client's IP, set the error flag
             error = True
             client_ip = None
-
-        Services.remove_ratelimits(self.rate_limits)
-        
-        if os.path.isfile(RATELIMIT_PATH):
-            with open(RATELIMIT_PATH, "r") as file:
-                saved_requests = json.load(file)
-        else:
-            saved_requests = {}
-        
-        request_count = 0
-        ip_request_count = 0
-
-        for hashed_ip, timestamps in saved_requests.items():
-            count = 0
-            for request_time in timestamps:
-                if not int(time()) - int(request_time) > 60:
-                    count += 1
-            if not client_ip is None:
-                comparison = Hashing().compare(client_ip, hashed_ip)
-                if comparison:
-                    ip_request_count += count
-            request_count += count
         
         rate_limit = self.current_rate_limit
         max_rate_limit = self.current_max_rate_limit
 
-        if ip_request_count > rate_limit or request_count > max_rate_limit:
-            return self.show_ratelimited()
+        if not rate_limit == 0:
+            Services.remove_ratelimits(self.rate_limits)
+            
+            if os.path.isfile(RATELIMIT_PATH):
+                with open(RATELIMIT_PATH, "r") as file:
+                    saved_requests = json.load(file)
+            else:
+                saved_requests = {}
+            
+            request_count = 0
+            ip_request_count = 0
+
+            for hashed_ip, timestamps in saved_requests.items():
+                count = 0
+                for request_time in timestamps:
+                    if not int(time()) - int(request_time) > 60:
+                        count += 1
+                if not client_ip is None:
+                    comparison = Hashing().compare(client_ip, hashed_ip)
+                    if comparison:
+                        ip_request_count += count
+                request_count += count
+
+            if ip_request_count > rate_limit or request_count > max_rate_limit:
+                return self.show_ratelimited()
 
         action = self.current_action
         hardness = self.current_hardness
@@ -1470,8 +1471,10 @@ class DDoSify:
             client_ip = get_client_ip()
         except:
             client_ip = None
+        
+        rate_limit = self.current_rate_limit
 
-        if not client_ip is None:
+        if not client_ip is None and not rate_limit == 0:
             Services.remove_ratelimits(self.rate_limits)
 
             if os.path.isfile(RATELIMIT_PATH):
@@ -2118,3 +2121,4 @@ class DDoSify:
             
         else:
             return send_file(pagepath)
+        
