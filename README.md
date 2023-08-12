@@ -8,7 +8,7 @@
 A DDoS defense system for flask applications, first sends users to a captcha page without a javascript script and creates a confirmation cookie/url arg after the captcha.
 
 > [!WARNING]
-> The syntax was changed with the version [0.7](https://github.com/tn3w/flask_DDoSify/releases/tag/v0.7). See [Personalization](#personalization) and [Changelog](https://github.com/tn3w/flask_DDoSify/compare/v0.6...v0.7)
+> The syntax was changed with the version [0.9](https://github.com/tn3w/flask_DDoSify/releases/tag/v0.9). See [Personalization](#personalization) and [Changelog](https://github.com/tn3w/flask_DDoSify/compare/v0.8...v0.9)
 
 ## How does flask_DDoSify work?
 Downloads public IP block lists[^1] and compares this data with the user, for more security the API of [Stop Forum Spam](https://www.stopforumspam.com/) is also used. If needed, a captcha is displayed to the user (or the robot) based on the strength set.[^2] Javascript is not needed for this, as the content is rendered on the server.[^3]
@@ -130,7 +130,18 @@ For more information, see the sample code above.
    If one of the three templates does not exist in the folder, a 404 error is displayed when calling it. e.g. if you remove the changelanguage page at apis.
    <br>
 
-4. `default_action` Arg
+4. `rate_limits` Arg
+
+   To change the rate_limit and max_rate_limit for a specific route or endpoint use the rate_limits arg.
+   The syntax is a bit different from the others, because two values are specified `{"route": (rate_limit, max_rate_limit), "endpoint": (rate_limit, max_rate_limit)}`. The variable rate_limit must be a number indicating how many requests per minute can come from a given ip. max_rate_limit indicates how many requests can come from all ips per minute, also a number.
+
+   Example of a website that has a specific rate_limit on /api/:
+   ```python
+   ddosify = DDoSify(app, template_dirs={"/api/*": (60, 600)})
+   ```
+   <br>
+
+5. `default_action` Arg
 
    To specify the default action of all routes or endpoints use the default_action arg.
 
@@ -140,7 +151,7 @@ For more information, see the sample code above.
    ```
    <br>
 
-5. `default_hardness` Arg
+6. `default_hardness` Arg
 
    To specify the default hardness of all routes or endpoints use the default_hardness arg.
 
@@ -150,7 +161,7 @@ For more information, see the sample code above.
    ```
    <br>
 
-6. `default_template_dir` Arg
+7. `default_template_dir` Arg
 
    To specify the default template_dir of all routes or endpoints use the default_template_dir arg.
 
@@ -160,7 +171,27 @@ For more information, see the sample code above.
    ```
    <br>
 
-7. `verificationage` Arg
+8. `default_rate_limit` Arg
+
+   To specify the default requests of an IP per minute for all routes use the default_rate_limit variable. (Default: 120 = 2 requests per minute per IP)
+
+   Example of a web page with custom rate_limit:
+   ```python
+   ddosify = DDoSify(app, default_rate_limit=60)
+   ```
+   <br>
+
+9. `default_max_rate_limit` Arg
+
+   To specify the default requests of all IPs per minute for all routes use the default_max_rate_limit variable. (Default: 1200 = 2 requests per minute from 10 IPs)
+
+   Example of a web page with custom max_rate_limit:
+   ```python
+   ddosify = DDoSify(app, default_max_rate_limit=600)
+   ```
+   <br>
+
+10. `verificationage` Arg
 
    Indicates the time in seconds how long a solved captcha is valid (Default: 3600 = 1 hour)
 
@@ -170,7 +201,7 @@ For more information, see the sample code above.
    ```
    <br>
 
-8. `withoutcookies` Arg
+11. `withoutcookies` Arg
 
    If True, no cookies are created, and verification is proven via URL args (Default: False)
 
@@ -180,7 +211,7 @@ For more information, see the sample code above.
    ```
    <br>
 
-9. `block_crawler` Arg
+12. `block_crawler` Arg
 
    If True, crawlers like Googlebot, further are estimated via their user agent as suspicious and not the website, good for websites that should not be crawled (Default: False)
 
