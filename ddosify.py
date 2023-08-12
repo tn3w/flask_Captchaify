@@ -226,11 +226,11 @@ class Services:
         """
 
         # If the file does not exist
-        if not os.path.isfile(os.path.join(DATA_DIR, "seenips.json")):
+        if not os.path.isfile(SEENIPS_PATH):
             return
         
         # Open/Read the file
-        with open(os.path.join(DATA_DIR, "seenips.json"), "r") as file:
+        with open(SEENIPS_PATH, "r") as file:
             seenips = json.load(file)
 
         # Create a copy and delete expired items
@@ -245,7 +245,7 @@ class Services:
 
         # Compare with the copy to see if anything has changed
         if copy_seenips != seenips:
-            with open(os.path.join(DATA_DIR, "seenips.json"), "w") as file:
+            with open(SEENIPS_PATH, "w") as file:
                 json.dump(copy_seenips, file)
     
     def remove_captchasolved(verificationage: int):
@@ -254,11 +254,11 @@ class Services:
         """
 
         # If the file does not exist
-        if not os.path.isfile(os.path.join(DATA_DIR, "captchasolved.json")):
+        if not os.path.isfile(CAPTCHASOLVED_PATH):
             return
         
         # Open/Read the file
-        with open(os.path.join(DATA_DIR, "captchasolved.json"), "r") as file:
+        with open(CAPTCHASOLVED_PATH, "r") as file:
             captchasolved = json.load(file)
 
         # Create a copy and delete expired items
@@ -269,7 +269,7 @@ class Services:
 
         # Compare with the copy to see if anything has changed
         if copy_captchasolved != captchasolved:
-            with open(os.path.join(DATA_DIR, "captchasolved.json"), "w") as file:
+            with open(CAPTCHASOLVED_PATH, "w") as file:
                 json.dump(copy_captchasolved, file)
     
     def remove_stopforumspam():
@@ -278,11 +278,11 @@ class Services:
         """
 
         # If the file does not exist
-        if not os.path.isfile(os.path.join(DATA_DIR, "stopforumspamcache.json")):
+        if not os.path.isfile(STOPFORUMSPAM_PATH):
             return
         
         # Open/Read the file
-        with open(os.path.join(DATA_DIR, "stopforumspamcache.json"), "r") as file:
+        with open(STOPFORUMSPAM_PATH, "r") as file:
             stopforumspam = json.load(file)
 
         # Create a copy and delete expired items
@@ -293,8 +293,34 @@ class Services:
 
         # Compare with the copy to see if anything has changed
         if copy_stopforumspam != stopforumspam:
-            with open(os.path.join(DATA_DIR, "stopforumspamcache.json"), "w") as file:
+            with open(STOPFORUMSPAM_PATH, "w") as file:
                 json.dump(copy_stopforumspam, file)
+    
+    def remove_ratelimits(rate_limit: int = 60):
+        """
+        Delete all expired items of the saved_requests dict
+        """
+
+        # If the file does not exist
+        if not os.path.isfile(RATELIMIT_PATH):
+            return
+        
+        # Open/Read the file
+        with open(RATELIMIT_PATH, "r") as file:
+            saved_requests = json.load(file)
+
+        # Calculate the maximum size of a timestamps list
+        max_items = round((rate_limit * 2) - (rate_limit / 1.5))
+
+        # Create a copy and delete expired items
+        copy_saved_requests = saved_requests.copy()
+        for hashed_ip, timestamps in saved_requests.items():
+            copy_saved_requests[hashed_ip] = timestamps[max_items:]
+        
+        # Compare with the copy to see if anything has changed
+        if copy_saved_requests != saved_requests:
+            with open(RATELIMIT_PATH, "w") as file:
+                json.dump(copy_saved_requests, file)
 
 Services.update_all_ipsets()
 
@@ -1249,7 +1275,7 @@ class DDoSify:
             error = True
             client_ip = None
 
-        # FIXME: Service!!!
+        Services.remove_ratelimits(self.rate_limits)
         
         if os.path.isfile(RATELIMIT_PATH):
             with open(RATELIMIT_PATH, "r") as file:
@@ -1446,8 +1472,7 @@ class DDoSify:
             client_ip = None
 
         if not client_ip is None:
-            # FIXME: Service!!!
-            # FIXME: Maximum timestamps list length per ip which is (rate_limit * 2) - (rate_limit / 3), where when adding a new time the last value in the list is deleted.
+            Services.remove_ratelimits(self.rate_limits)
 
             if os.path.isfile(RATELIMIT_PATH):
                 with open(RATELIMIT_PATH, "r") as file:
