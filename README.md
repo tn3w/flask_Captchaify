@@ -7,8 +7,7 @@
 # flask_DDoSify
 A DDoS defense system for flask applications, first sends users to a captcha page without a javascript script and creates a confirmation cookie/url arg after the captcha.
 
-> [!WARNING]
-> The syntax was changed with the version [0.9](https://github.com/tn3w/flask_DDoSify/releases/tag/v0.9). See [Personalization](#personalization) and [Changelog](https://github.com/tn3w/flask_DDoSify/compare/v0.8...v0.9)
+\[ \! \] With version 0.7 and 0.9 the syntax of the DDoSify() class has changed. \[ \! \]
 
 ## How does flask_DDoSify work?
 Downloads public IP block lists[^1] and compares this data with the user, for more security the API of [Stop Forum Spam](https://www.stopforumspam.com/) is also used. If needed, a captcha is displayed to the user (or the robot) based on the strength set.[^2] Javascript is not needed for this, as the content is rendered on the server.[^3]
@@ -46,11 +45,9 @@ A quick and easy implementation allows even small websites or a small team of de
 
 ## Installation guide
 1. Make sure you have the latest version of Python and Pip installed, you also need git installed.
-2. Clone the repository to your computer with `git clone https://github.com/tn3w/flask_DDoSify` or download the ZIP file and unzip it.
-3. Make sure the folder that was created is called `flask_DDoSify`.
-4. Now use the following command to install all required packages: `python -m pip install -r flask_DDoSify/requirements.txt`.
-5. Now create your flask script in the folder where the subfolder `flask_DDoSify` was installed.
-6. Make sure that after:
+2. Install the script with pip `pip install flask_DDoSify` or manually via `git clone https://github.com/tn3w/flask_DDoSify` or download the zip.
+3. If you installed it manually, make sure your python script is in the folder where there is a subfolder flask_DDoSify, and make sure you run `pip install -r requirements.txt` in the flask_DDoSify folder.
+5. Make sure that after:
    ```python
    app = Flask(__name__)
    ```
