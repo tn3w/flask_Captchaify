@@ -1279,7 +1279,7 @@ class DDoSify:
         max_rate_limit = self.current_max_rate_limit
 
         if not rate_limit == 0:
-            Services.remove_ratelimits(self.rate_limits)
+            Services.remove_ratelimits(rate_limit)
             
             if os.path.isfile(RATELIMIT_PATH):
                 with open(RATELIMIT_PATH, "r") as file:
@@ -1475,7 +1475,7 @@ class DDoSify:
         rate_limit = self.current_rate_limit
 
         if not client_ip is None and not rate_limit == 0:
-            Services.remove_ratelimits(self.rate_limits)
+            Services.remove_ratelimits(rate_limit)
 
             if os.path.isfile(RATELIMIT_PATH):
                 with open(RATELIMIT_PATH, "r") as file:
