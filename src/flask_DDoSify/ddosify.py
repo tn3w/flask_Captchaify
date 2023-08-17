@@ -315,7 +315,7 @@ class Services:
         # Create a copy and delete expired items
         copy_saved_requests = saved_requests.copy()
         for hashed_ip, timestamps in saved_requests.items():
-            copy_saved_requests[hashed_ip] = timestamps[max_items:]
+            copy_saved_requests[hashed_ip] = timestamps[:max_items]
         
         # Compare with the copy to see if anything has changed
         if copy_saved_requests != saved_requests:
