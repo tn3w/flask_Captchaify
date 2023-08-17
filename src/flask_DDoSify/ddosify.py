@@ -26,7 +26,7 @@ from threading import Thread
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 if not CURRENT_DIR.endswith('\\') and CURRENT_DIR != "":
-    CURRENT_DIR = CURRENT_DIR + "/"
+    CURRENT_DIR = CURRENT_DIR + "\\"
     
 DATA_DIR = os.path.join(CURRENT_DIR, "data")
 
