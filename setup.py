@@ -10,7 +10,7 @@ setup(
     url='https://github.com/tn3w/flask_DDoSify',
     packages=find_packages(),
     classifiers=[
-        'Development Status :: 0.9 - Production ready',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
         'Programming Language :: Python :: 3.9',
