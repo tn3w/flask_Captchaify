@@ -23,10 +23,12 @@ from time import time
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
 from threading import Thread
+import pkg_resources
 
 CURRENT_DIR = os.getcwd()
     
-DATA_DIR = os.path.join(CURRENT_DIR, "data")
+DATA_DIR = pkg_resources.resource_filename('flask_DDoSify', 'data')
+TEMPLATE_DIR = pkg_resources.resource_filename('flask_DDoSify', 'templates')
 
 # Paths for cache files, and IP log files
 SEENIPS_PATH = os.path.join(DATA_DIR, "seenips.json")
@@ -847,7 +849,7 @@ class DDoSify:
             default_hardness = 2
         
         if default_template_dir is None:
-            default_template_dir = os.path.join(CURRENT_DIR, "templates")
+            default_template_dir = TEMPLATE_DIR
         
         if not isinstance(default_rate_limit, int) and not default_rate_limit is None:
             default_rate_limit = 120
