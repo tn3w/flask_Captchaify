@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
 setup(
     name='flask_DDoSify',
@@ -8,7 +8,8 @@ setup(
     author='TN3W',
     author_email='tn3wA8xxfuVMs2@proton.me',
     url='https://github.com/tn3w/flask_DDoSify',
-    packages=find_packages(),
+    packages=['flask_DDoSify'],
+    package_dir={'': 'src'},
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
