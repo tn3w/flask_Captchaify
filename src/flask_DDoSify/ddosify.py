@@ -24,9 +24,7 @@ from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
 from threading import Thread
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-if not CURRENT_DIR.endswith('\\') and CURRENT_DIR != "":
-    CURRENT_DIR = CURRENT_DIR + "\\"
+CURRENT_DIR = os.getcwd()
     
 DATA_DIR = os.path.join(CURRENT_DIR, "data")
 
