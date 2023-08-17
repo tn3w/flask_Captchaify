@@ -2,14 +2,17 @@ from setuptools import setup
 
 setup(
     name='flask_DDoSify',
-    version='0.9.4.1',
+    version='0.9.5',
     description='Protect against bots and DDoS attacks',
     long_description='A DDoS defense system for flask applications, first sends users to a captcha page without a javascript script and creates a confirmation cookie/url arg after the captcha.',
     author='TN3W',
     author_email='tn3wA8xxfuVMs2@proton.me',
     url='https://github.com/tn3w/flask_DDoSify',
-    packages=['flask_DDoSify'],
+    packages=find_packages(where='src'),
     package_dir={'': 'src'},
+    package_data={
+        'flask_DDoSify': ['data/*', 'templates/*']
+    },
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
