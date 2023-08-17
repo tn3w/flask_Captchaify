@@ -1769,12 +1769,12 @@ class DDoSify:
                     # Decrypt IP, user agent and hardness of solved captcha from the stored data
                     ip = crypto.decrypt(data["ip"])
                     useragent = crypto.decrypt(data["user_agent"])
-                    hardness = int(crypto.decrypt(data["hardness"]))
+                    captcha_hardness = int(crypto.decrypt(data["hardness"]))
                 except:
                     pass
                 else:
                     # If the captcha is still valid, check for botfightmode and match with client's IP and user agent
-                    if not int(time()) - int(datatime) > self.verificationage and hardness >= self.hardness:
+                    if not int(time()) - int(datatime) > self.verificationage and hardness >= captcha_hardness:
                         if not action == "fight" and not hardness == 3:
                             if ip == clientip or useragent == clientuseragent:
                                 return
