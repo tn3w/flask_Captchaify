@@ -1,0 +1,37 @@
+from setuptools import setup, find_packages
+
+setup(
+    name='flask_DDoSify',
+    version='0.9',
+    description='Protect against bots and DDoS attacks',
+    long_description='A DDoS defense system for flask applications, first sends users to a captcha page without a javascript script and creates a confirmation cookie/url arg after the captcha.',
+    author='TN3W',
+    author_email='tn3wA8xxfuVMs2@proton.me',
+    url='https://github.com/tn3w/flask_DDoSify',
+    packages=find_packages(),
+    classifiers=[
+        'Development Status :: 0.9 - Production ready',
+        'Intended Audience :: Developers',
+        'License :: GNU General Public License v3.0',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+    ],
+    keywords='flask, Python, Bot, Captcha, DDoS',
+    install_requires=[
+        'cryptography',
+        'Flask',
+        'googletrans==3.1.0a0',
+        'beautifulsoup4',
+        'ipaddress',
+        'Jinja2',
+        'Pillow',
+        'requests',
+        'bs4',
+        'captcha',
+    ],
+)
