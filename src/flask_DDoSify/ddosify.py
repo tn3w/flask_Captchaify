@@ -6,7 +6,6 @@ from io import BytesIO
 import tarfile
 from zipfile import ZipFile
 import json
-from typing import Optional, Tuple
 from cryptography.hazmat.primitives import hashes, padding
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -22,8 +21,9 @@ from urllib.parse import urlparse, quote
 from time import time
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
-from threading import Thread
+from threading import Thread, Lock
 import pkg_resources
+from typing import Optional, Tuple, Union
 
 CURRENT_DIR = os.getcwd()
     
@@ -43,7 +43,7 @@ class JSON:
         if not os.path.isfile(file_name):
             raise FileNotFoundError("File '" + file_name + "' does not exist.")
         if file_name not in file_locks:
-            file_locks[file_name] = threading.Lock()
+            file_locks[file_name] = Lock()
         with file_locks[file_name]:
             with open(file_name, "r") as file:
                 data = json.load(file)
@@ -53,7 +53,7 @@ class JSON:
         if not os.path.isdir(directory):
             raise FileNotFoundError("Directory '" + directory + "' does not exist.")
         if file_name not in file_locks:
-            file_locks[file_name] = threading.Lock()
+            file_locks[file_name] = Lock()
         with file_locks[file_name]:
             with open(file_name, "w") as file:
                 json.dump(data, file)
