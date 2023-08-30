@@ -36,6 +36,28 @@ CAPTCHASOLVED_PATH = os.path.join(DATA_DIR, "captchasolved.json")
 STOPFORUMSPAM_PATH = os.path.join(DATA_DIR, "stopforumspamcache.json")
 RATELIMIT_PATH = os.path.join(DATA_DIR, "ratelimit.json")
 
+file_locks = dict()
+
+class JSON:
+    def load(file_name: str) -> Union[dict, list]:
+        if not os.path.isfile(file_name):
+            raise FileNotFoundError("File '" + file_name + "' does not exist.")
+        if file_name not in file_locks:
+            file_locks[file_name] = threading.Lock()
+        with file_locks[file_name]:
+            with open(file_name, "r") as file:
+                data = json.load(file)
+            return data
+    def dump(data: Union[dict, list], file_name: str) -> None:
+        directory = os.path.dirname(file_name)
+        if not os.path.isdir(directory):
+            raise FileNotFoundError("Directory '" + directory + "' does not exist.")
+        if file_name not in file_locks:
+            file_locks[file_name] = threading.Lock()
+        with file_locks[file_name]:
+            with open(file_name, "w") as file:
+                json.dump(data, file)
+
 class Services:
 
     def need_update(ipsetpath: str):
@@ -47,9 +69,7 @@ class Services:
         if not os.path.isfile(os.path.join(DATA_DIR, ipsetpath)):
             return True
         
-        # Get time of the last update
-        with open(os.path.join(DATA_DIR, ipsetpath), "r") as file:
-            last_update_time = json.load(file)["time"]
+        last_update_time = JSON.load(os.path.join(DATA_DIR, ipsetpath))["time"]
 
         # When the file has expired
         if int(time()) - int(last_update_time) > 3600:
@@ -84,9 +104,7 @@ class Services:
         # Remove duplicates from the list of collected IP addresses
         firehol_ips["ips"] = list(set(firehol_ips["ips"]))
         
-        # Open the JSON file in write mode and save the collected IP addresses
-        with open(os.path.join(DATA_DIR, "fireholipset.json"), "w") as file:
-            json.dump(firehol_ips, file)
+        JSON.dump(firehol_ips, os.path.join(DATA_DIR, "fireholipset.json"))
     
     def update_ipdenyipset():
         """
@@ -122,9 +140,7 @@ class Services:
         # Remove duplicates from the list of collected IP addresses
         ipdeny_ips["ips"] = list(set(ipdeny_ips["ips"]))
         
-        # Open the JSON file in write mode and save the collected IP addresses
-        with open(os.path.join(DATA_DIR, "ipdenyipset.json"), "w") as file:
-            json.dump(ipdeny_ips, file)
+        JSON.dump(ipdeny_ips, os.path.join(DATA_DIR, "ipdenyipset.json"))
     
     def update_emergingthreatsipset():
         """
@@ -142,9 +158,8 @@ class Services:
             emergingthreats_ips = [line.strip().split('/')[0] for line in response.text.splitlines() if line.strip() and not line.startswith("#")]
             emergingthreats_ips = list(set(emergingthreats_ips))
             
-            # Open the JSON file in write mode and save the list of Ips.
-            with open(os.path.join(DATA_DIR, "emergingthreatsipset.json"), "w") as file:
-                json.dump({"time": str(int(time())), "ips": emergingthreats_ips}, file)
+
+            JSON.dump({"time": str(int(time())), "ips": emergingthreats_ips}, os.path.join(DATA_DIR, "emergingthreatsipset.json"))
         else:
             response.raise_for_status()
     
@@ -167,10 +182,8 @@ class Services:
                         content = txt_file.read().decode('utf-8')
                         myipms_ips = [line.strip().split('/')[0].split('#')[0].replace('\t', '') for line in content.splitlines() if line.strip() and not line.startswith("#")]
                         myipms_ips = list(set(myipms_ips))
-            
-            # Open the JSON file in write mode and save the list of Ips.
-            with open(os.path.join(DATA_DIR, "myipmsipset.json"), "w") as file:
-                json.dump({"time": str(int(time())), "ips": myipms_ips}, file)
+                        
+            JSON.dump({"time": str(int(time())), "ips": myipms_ips}, os.path.join(DATA_DIR, "myipmsipset.json"))
         else:
             response.raise_for_status()
     
@@ -187,9 +200,7 @@ class Services:
             torexitnodes_ip = [line.strip() for line in response.text.splitlines() if line.strip() and not line.startswith("#")]
             torexitnodes_ip = list(set(torexitnodes_ip))
             
-            # Open the JSON file in write mode and save the list of Tor exit nodes.
-            with open(os.path.join(DATA_DIR, "torexitnodes.json"), "w") as file:
-                json.dump({"time": str(int(time())), "ips": torexitnodes_ip}, file)
+            JSON.dump({"time": str(int(time())), "ips": torexitnodes_ip}, os.path.join(DATA_DIR, "torexitnodes.json"))
         else:
             response.raise_for_status()
     
@@ -230,8 +241,7 @@ class Services:
             return
         
         # Open/Read the file
-        with open(SEENIPS_PATH, "r") as file:
-            seenips = json.load(file)
+        seenips = JSON.load(SEENIPS_PATH)
 
         # Create a copy and delete expired items
         copy_seenips = seenips.copy()
@@ -245,8 +255,7 @@ class Services:
 
         # Compare with the copy to see if anything has changed
         if copy_seenips != seenips:
-            with open(SEENIPS_PATH, "w") as file:
-                json.dump(copy_seenips, file)
+            JSON.dump(copy_seenips, SEENIPS_PATH)
     
     def remove_captchasolved(verificationage: int):
         """
@@ -258,8 +267,7 @@ class Services:
             return
         
         # Open/Read the file
-        with open(CAPTCHASOLVED_PATH, "r") as file:
-            captchasolved = json.load(file)
+        captchasolved = JSON.load(CAPTCHASOLVED_PATH)
 
         # Create a copy and delete expired items
         copy_captchasolved = captchasolved.copy()
@@ -269,8 +277,7 @@ class Services:
 
         # Compare with the copy to see if anything has changed
         if copy_captchasolved != captchasolved:
-            with open(CAPTCHASOLVED_PATH, "w") as file:
-                json.dump(copy_captchasolved, file)
+            JSON.dump(copy_captchasolved, CAPTCHASOLVED_PATH)
     
     def remove_stopforumspam():
         """
@@ -282,8 +289,7 @@ class Services:
             return
         
         # Open/Read the file
-        with open(STOPFORUMSPAM_PATH, "r") as file:
-            stopforumspam = json.load(file)
+        stopforumspam = JSON.load(STOPFORUMSPAM_PATH)
 
         # Create a copy and delete expired items
         copy_stopforumspam = stopforumspam.copy()
@@ -293,8 +299,7 @@ class Services:
 
         # Compare with the copy to see if anything has changed
         if copy_stopforumspam != stopforumspam:
-            with open(STOPFORUMSPAM_PATH, "w") as file:
-                json.dump(copy_stopforumspam, file)
+            JSON.dump(copy_stopforumspam, STOPFORUMSPAM_PATH)
     
     def remove_ratelimits(rate_limit: int = 60):
         """
@@ -306,8 +311,7 @@ class Services:
             return
         
         # Open/Read the file
-        with open(RATELIMIT_PATH, "r") as file:
-            saved_requests = json.load(file)
+        saved_requests = JSON.load(RATELIMIT_PATH)
 
         # Calculate the maximum size of a timestamps list
         max_items = round((rate_limit * 2) - (rate_limit / 1.5))
@@ -319,8 +323,7 @@ class Services:
         
         # Compare with the copy to see if anything has changed
         if copy_saved_requests != saved_requests:
-            with open(RATELIMIT_PATH, "w") as file:
-                json.dump(copy_saved_requests, file)
+            JSON.dump(copy_saved_requests, RATELIMIT_PATH)
 
 Services.update_all_ipsets()
 
@@ -463,7 +466,7 @@ class SymmetricCrypto:
 
 class Hashing:
     """
-    Implementation of secure hashing with SHA256 and 200000 iterations
+    Implementation of secure hashing with SHA256 and 50000 iterations
     """
 
     def __init__(self, salt: Optional[str] = None):
@@ -504,7 +507,7 @@ class Hashing:
             algorithm=hashes.SHA256(),
             length=hash_length,
             salt=salt,
-            iterations=200000,
+            iterations=50000,
             backend=default_backend()
         )
 
@@ -604,9 +607,7 @@ class Language:
         translations_file = os.path.join(DATA_DIR, "translations.json")
         
         if os.path.isfile(translations_file):
-            # If the file exists, load the translations from the file
-            with open(translations_file, "r") as file:
-                translations = json.load(file)
+            translations = JSON.load(translations_file)
         else:
             # If the file does not exist, initialize the translations as an empty list
             translations = []
@@ -637,8 +638,7 @@ class Language:
         }
         translations.append(translation)
         
-        with open(translations_file, "w") as file:
-            json.dump(translations, file)
+        JSON.dump(translations, translations_file)
 
         # In some languages, it looks better if the first character is large
         if to_lang in ["de", "en", "es", "fr", "pt", "it"]:
@@ -750,12 +750,8 @@ def get_client_ip() -> str:
     return client_ip
 
 CRAWLER_USER_AGENTS = ["Googlebot", "bingbot", "Yahoo! Slurp", "YandexBot", "Baiduspider", "DuckDuckGo-Favicons-Bot", "AhrefsBot", "SemrushBot", "MJ12bot", "BLEXBot", "SeznamBot", "Exabot", "AhrefsBot", "archive.org_bot", "Applebot", "spbot", "Genieo", "linkdexbot", "Lipperhey Link Explorer", "SISTRIX Crawler", "MojeekBot", "CCBot", "Uptimebot", "XoviBot", "Neevabot", "SEOkicks-Robot", "meanpathbot", "MojeekBot", "RankActiveLinkBot", "CrawlomaticBot", "sentibot", "ExtLinksBot", "Superfeedr bot", "LinkfluenceBot", "Plerdybot", "Statbot", "Brainity", "Slurp", "Barkrowler", "RanksonicSiteAuditor", "rogerbot", "BomboraBot", "RankActiveLinkBot", "mail.ru", "AI Crawler", "Xenu Link Sleuth", "SEMrushBot", "Baiduspider-render", "coccocbot", "Sogou web spider", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler", "CodiBot", "libwww-perl", "Purebot", "Statbot", "iCjobs", "Cliqzbot", "SafeDNSBot", "AhrefsBot", "MetaURI API", "meanpathbot", "ADmantX Platform Semantic Analyzer", "CrawlomaticBot", "moget", "meanpathbot", "FPT-Aibot", "Domains Project", "SimpleCrawler", "YoudaoBot", "SafeDNSBot", "Slurp", "XoviBot", "Baiduspider", "FPT-Aibot", "SiteExplorer", "Lipperhey Link Explorer", "CrawlomaticBot", "SISTRIX Crawler", "SEMrushBot", "meanpathbot", "sentibot", "Dataprovider.com", "BLEXBot", "YoudaoBot", "Superfeedr bot", "moget", "Genieo", "sentibot", "AI Crawler", "Xenu Link Sleuth", "Barkrowler", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler"]
-
-with open(os.path.join(DATA_DIR, "emojis.json"), "r") as file:
-    EMOJIS = json.load(file)
-
-with open(os.path.join(DATA_DIR, "teaemojis.json"), "r") as file:
-    TEAEMOJIS = json.load(file)
+EMOJIS = JSON.load(os.path.join(DATA_DIR, "emojis.json"))
+TEAEMOJIS = json.load(os.path.join(DATA_DIR, "teaemojis.json"))
 
 # So that no Jinja Undefined errors come
 class SilentUndefined(Undefined):
@@ -1132,20 +1128,11 @@ class DDoSify:
         t4 = Thread(target=Services.update_all_ipsets)
         t4.start()
         
-        with open(os.path.join(DATA_DIR, "fireholipset.json"), "r") as file:
-            FIREHOL_IPS = json.load(file)["ips"]
-        
-        with open(os.path.join(DATA_DIR, "ipdenyipset.json"), "r") as file:
-            IPDENY_IPS = json.load(file)["ips"]
-        
-        with open(os.path.join(DATA_DIR, "emergingthreatsipset.json"), "r") as file:
-            EMERGINGTHREATS_IPS = json.load(file)["ips"]
-        
-        with open(os.path.join(DATA_DIR, "myipmsipset.json"), "r") as file:
-            MYIPMS_IPS = json.load(file)["ips"]
-        
-        with open(os.path.join(DATA_DIR, "torexitnodes.json"), "r") as file:
-            TOREXITNODES_IPS = json.load(file)["ips"]
+        FIREHOL_IPS = JSON.load(os.path.join(DATA_DIR, "fireholipset.json"))["ips"]
+        IPDENY_IPS = JSON.load(os.path.join(DATA_DIR, "ipdenyipset.json"))["ips"]
+        EMERGINGTHREATS_IPS = JSON.load(os.path.join(DATA_DIR, "emergingthreatsipset.json"))["ips"]
+        MYIPMS_IPS = JSON.load(os.path.join(DATA_DIR, "myipmsipset.json"))["ips"]
+        TOREXITNODES_IPS = JSON.load(os.path.join(DATA_DIR, "torexitnodes.json"))["ips"]
 
         # Define the criteria for blocking or showing captcha
         criteria = [
@@ -1167,8 +1154,7 @@ class DDoSify:
 
         # Check if the StopForumSpam cache file exists and load its content
         if os.path.isfile(STOPFORUMSPAM_PATH):
-            with open(STOPFORUMSPAM_PATH, "r") as file:
-                stopforumspamcache = json.load(file)
+            stopforumspamcache = JSON.load(STOPFORUMSPAM_PATH)
         else:
             # If the cache file doesn't exist, create an empty dictionary
             stopforumspamcache = {}
@@ -1211,8 +1197,8 @@ class DDoSify:
 
                     # Update the StopForumSpam cache with the result and current timestamp
                     stopforumspamcache[hashed_clientip] = {"spammer": spammer, "time": int(time())}
-                    with open(STOPFORUMSPAM_PATH, "w") as file:
-                        json.dump(stopforumspamcache, file)
+                    
+                    JSON.dump(stopforumspamcache, STOPFORUMSPAM_PATH)
             else:
                 # If the request to the API fails, block the request
                 criteria.append(True)
@@ -1229,8 +1215,7 @@ class DDoSify:
                 id, token = captcha_token[:16], captcha_token[16:]
 
                 # Load the list of captcha verifications from a file
-                with open(CAPTCHASOLVED_PATH, "r") as file:
-                    captchasolved = json.load(file)
+                captchasolved = JSON.load(CAPTCHASOLVED_PATH)
                 
                 for hashed_id, data in captchasolved.items():
                     # Compare the captcha ID with the stored IDs to find a match
@@ -1282,8 +1267,7 @@ class DDoSify:
             Services.remove_ratelimits(rate_limit)
             
             if os.path.isfile(RATELIMIT_PATH):
-                with open(RATELIMIT_PATH, "r") as file:
-                    saved_requests = json.load(file)
+                saved_requests = JSON.load(RATELIMIT_PATH)
             else:
                 saved_requests = {}
             
@@ -1341,20 +1325,11 @@ class DDoSify:
         t = Thread(target=Services.update_all_ipsets)
         t.start()
         
-        with open(os.path.join(DATA_DIR, "fireholipset.json"), "r") as file:
-            FIREHOL_IPS = json.load(file)["ips"]
-        
-        with open(os.path.join(DATA_DIR, "ipdenyipset.json"), "r") as file:
-            IPDENY_IPS = json.load(file)["ips"]
-        
-        with open(os.path.join(DATA_DIR, "emergingthreatsipset.json"), "r") as file:
-            EMERGINGTHREATS_IPS = json.load(file)["ips"]
-        
-        with open(os.path.join(DATA_DIR, "myipmsipset.json"), "r") as file:
-            MYIPMS_IPS = json.load(file)["ips"]
-        
-        with open(os.path.join(DATA_DIR, "torexitnodes.json"), "r") as file:
-            TOREXITNODES_IPS = json.load(file)["ips"]
+        FIREHOL_IPS = JSON.load(os.path.join(DATA_DIR, "fireholipset.json"))["ips"]
+        IPDENY_IPS = JSON.load(os.path.join(DATA_DIR, "ipdenyipset.json"))["ips"]
+        EMERGINGTHREATS_IPS = JSON.load(os.path.join(DATA_DIR, "emergingthreatsipset.json"))["ips"]
+        MYIPMS_IPS = JSON.load(os.path.join(DATA_DIR, "myipmsipset.json"))["ips"]
+        TOREXITNODES_IPS = JSON.load(os.path.join(DATA_DIR, "torexitnodes.json"))["ips"]
 
         # Define the criteria for blocking or showing captcha
         criteria = [
@@ -1374,8 +1349,7 @@ class DDoSify:
 
             # Check if the StopForumSpam cache file exists and load its content
             if os.path.isfile(STOPFORUMSPAM_PATH):
-                with open(STOPFORUMSPAM_PATH, "r") as file:
-                    stopforumspamcache = json.load(file)
+                stopforumspamcache = JSON.load(STOPFORUMSPAM_PATH)
             else:
                 # If the cache file doesn't exist, create an empty dictionary
                 stopforumspamcache = {}
@@ -1416,8 +1390,8 @@ class DDoSify:
 
                         # Update the StopForumSpam cache with the result and current timestamp
                         stopforumspamcache[hashed_clientip] = {"spammer": spammer, "time": int(time())}
-                        with open(STOPFORUMSPAM_PATH, "w") as file:
-                            json.dump(stopforumspamcache, file)
+                        
+                        JSON.dump(stopforumspamcache, STOPFORUMSPAM_PATH)
                 else:
                     # If the request to the API fails, block the request
                     criteria.append(True)
@@ -1432,8 +1406,7 @@ class DDoSify:
 
             # Load the list of previously seen IPs from a file
             if os.path.isfile(SEENIPS_PATH):
-                with open(SEENIPS_PATH, "r") as file:
-                    seenips = json.load(file)
+                seenips = JSON.load(SEENIPS_PATH)
             else:
                 seenips = {}
 
@@ -1478,8 +1451,7 @@ class DDoSify:
             Services.remove_ratelimits(rate_limit)
 
             if os.path.isfile(RATELIMIT_PATH):
-                with open(RATELIMIT_PATH, "r") as file:
-                    saved_requests = json.load(file)
+                saved_requests = JSON.load(RATELIMIT_PATH)
             else:
                 saved_requests = {}
 
@@ -1502,8 +1474,7 @@ class DDoSify:
                 hashed_ip = Hashing().hash(client_ip, 16)
                 saved_requests[hashed_ip] = [str(int(time()))]
             
-            with open(RATELIMIT_PATH, "w") as file:
-                json.dump(saved_requests, file)
+            JSON.dump(saved_requests, RATELIMIT_PATH)
 
         if response.content_type == "text/html; charset=utf-8" and response.status_code == 200 and g.ddosify_method == "GET":        
             html = response.data
@@ -1697,8 +1668,7 @@ class DDoSify:
 
                 # If captcha have already been solved, they will be loaded
                 if os.path.isfile(CAPTCHASOLVED_PATH):
-                    with open(CAPTCHASOLVED_PATH, "r") as file:
-                        captchasolved = json.load(file)
+                    captchasolved = JSON.load(CAPTCHASOLVED_PATH)
                 else:
                     captchasolved = {}
                 
@@ -1719,17 +1689,14 @@ class DDoSify:
 
                 # The solved captchas are loaded again
                 if os.path.isfile(CAPTCHASOLVED_PATH):
-                    with open(CAPTCHASOLVED_PATH, "r") as file:
-                        captchasolved = json.load(file)
+                    captchasolved = JSON.load(CAPTCHASOLVED_PATH)
                 else:
                     captchasolved = {}
                 
                 # The generated ID is added to the dict
                 captchasolved[Hashing().hash(id)] = data
 
-                # The solved captchas are saved
-                with open(CAPTCHASOLVED_PATH, "w") as file:
-                    json.dump(captchasolved, file)
+                JSON.dump(captchasolved, CAPTCHASOLVED_PATH)
 
                 # Add the created data to the response
                 g.ddosify_captcha = id+token
@@ -1755,9 +1722,7 @@ class DDoSify:
         t2 = Thread(target=Services.remove_captchasolved, args=(self.verificationage, ))
         t2.start()
 
-        # Load the list of captcha verifications from a file
-        with open(CAPTCHASOLVED_PATH, "r") as file:
-            captchasolved = json.load(file)
+        captchasolved = JSON.load(CAPTCHASOLVED_PATH)
         
         for hashed_id, data in captchasolved.items():
             # Compare the captcha ID with the stored IDs to find a match
@@ -1790,7 +1755,7 @@ class DDoSify:
         """
         This function generates a page where you can change your language.
 
-        :return: The content of the changelanguage page (HTML, JSON, TXT, or XML).
+        :return: The content of the changelanguage page.
         """
 
         template_dir = self.current_template_dir
@@ -1981,8 +1946,7 @@ class DDoSify:
         if error:
             # Load the list of previously seen IPs from a file
             if os.path.isfile(SEENIPS_PATH):
-                with open(SEENIPS_PATH, "r") as file:
-                    seenips = json.load(file)
+                seenips = JSON.load(SEENIPS_PATH)
             else:
                 seenips = {}
             
@@ -2008,9 +1972,7 @@ class DDoSify:
                         records.append(str(int(time())))
                         seenips[hashed_ip] = records
 
-                        # The dict is saved
-                        with open(SEENIPS_PATH, "w") as file:
-                            json.dump(seenips, file)
+                        JSON.dump(seenips, SEENIPS_PATH)
 
                         # If the application is in botfightmode or the action is set to "hard," apply stricter rules
                         if action == "figth" or hardness == 3:
@@ -2028,9 +1990,7 @@ class DDoSify:
                     hashed_ip = Hashing().hash(clientip)
                     seenips[hashed_ip] = [str(int(time()))]
 
-                    # The dict is saved
-                    with open(SEENIPS_PATH, "w") as file:
-                        json.dump(seenips, file)
+                    JSON.dump(seenips, SEENIPS_PATH)
 
         try:
             # Get the client's user agent string from the request
