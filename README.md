@@ -24,7 +24,8 @@ ddosify = DDoSify(app, default_hardness=2)
 def index():
     return 'Hello Human!'
 
-app.run(host = "localhost", port = 8080)
+if __name__ == "__main__":
+    app.run(host = "localhost", port = 8080)
 ```
 
 > [!NOTE]
@@ -60,7 +61,6 @@ A quick and easy implementation allows even small websites or a small team of de
    from flask_DDoSify.ddosify import DDoSify
    ```
 For more information, see the sample code above.
-
 ## Personalization
 
 1. `actions` Arg
@@ -107,28 +107,7 @@ For more information, see the sample code above.
    | 3              | The hardness of the captcha is hard, a 9 - 14 number audio captcha is displayed in addition to the 10 - 12 character text captcha. |
    <br>
 
-3. `template_dirs` Arg
-
-   To change the template directory of a particular route use the template_dirs arg.
-
-   Example of a website that has a specific template directory on /api/:
-   ```python
-   ddosify = DDoSify(app, template_dirs={"/api/*": "/path/to/special/template/dir"})
-   ```
-
-   A template directory can look like this:
-   ```
-   templatedir\
-              \captcha.html
-              \block.html
-              \changelanguage.html
-              \ratelimited.html
-   ```
-
-   If one of the three templates does not exist in the folder, a 404 error is displayed when calling it. e.g. if you remove the changelanguage page at apis.
-   <br>
-
-4. `rate_limits` Arg
+3. `rate_limits` Arg
 
    To change the rate_limit and max_rate_limit for a specific route or endpoint use the rate_limits arg.
    The syntax is a bit different from the others, because two values are specified `{"route": (rate_limit, max_rate_limit), "endpoint": (rate_limit, max_rate_limit)}`. The variable rate_limit must be a number indicating how many requests per minute can come from a given ip. max_rate_limit indicates how many requests can come from all ips per minute, also a number.
@@ -139,13 +118,34 @@ For more information, see the sample code above.
    ```
    <br>
 
+4. `template_dirs` Arg
+
+   To change the template directory of a particular route use the template_dirs arg.
+
+   Example of a website that has a specific template directory on /api/:
+   ```python
+   ddosify = DDoSify(app, template_dirs={"/api/*": "/path/to/special/template/directory"})
+   ```
+
+   A template directory can look like this:
+   ```
+   template_directory\
+              \captcha.html
+              \block.html
+              \rate_limited.html
+              \change_language.html
+   ```
+
+   If one of the three templates does not exist in the folder, a 404 error is displayed when calling it. e.g. if you remove the changelanguage page at apis.
+   <br>
+
 5. `default_action` Arg
 
    To specify the default action of all routes or endpoints use the default_action arg.
 
    Example of a very paranoid website that has set its action to "fight" for all routes:
    ```python
-   ddosify = DDoSify(app, default_action="figth")
+   ddosify = DDoSify(app, default_action="fight")
    ```
    <br>
 
@@ -159,17 +159,7 @@ For more information, see the sample code above.
    ```
    <br>
 
-7. `default_template_dir` Arg
-
-   To specify the default template_dir of all routes or endpoints use the default_template_dir arg.
-
-   Example of a web page with custom template_dir:
-   ```python
-   ddosify = DDoSify(app, default_template_dir="/path/to/my/custom/template/dir")
-   ```
-   <br>
-
-8. `default_rate_limit` Arg
+7. `default_rate_limit` Arg
 
    To specify the default requests of an IP per minute for all routes use the default_rate_limit variable. (Default: 120 = 2 requests per minute per IP)
 
@@ -179,13 +169,23 @@ For more information, see the sample code above.
    ```
    <br>
 
-9. `default_max_rate_limit` Arg
+8. `default_max_rate_limit` Arg
 
    To specify the default requests of all IPs per minute for all routes use the default_max_rate_limit variable. (Default: 1200 = 2 requests per minute from 10 IPs)
 
    Example of a web page with custom max_rate_limit:
    ```python
    ddosify = DDoSify(app, default_max_rate_limit=600)
+   ```
+   <br>
+
+9. `default_template_dir` Arg
+
+   To specify the default template_dir of all routes or endpoints use the default_template_dir arg.
+
+   Example of a web page with custom template_dir:
+   ```python
+   ddosify = DDoSify(app, default_template_dir="/path/to/my/custom/template/directory")
    ```
    <br>
 
@@ -211,14 +211,23 @@ For more information, see the sample code above.
 
 9. `block_crawler` Arg
 
-   If True, crawlers like Googlebot, further are estimated via their user agent as suspicious and not the website, good for websites that should not be crawled (Default: False)
+   If True, crawlers like Googlebot, further are estimated via their user agent as suspicious and not the website, good for websites that should not be crawled (Default: True)
 
    Web page with block_crawler enabled:
    ```python
    ddosify = DDoSify(app, block_crawler=True)
    ```
+   <br>
 
-<br>
+9. `crawler_hints` Arg:
+
+   If True, crawlers like Googlebot, are shown meta tags and the title of a normal web page, while they would have to solve a captcha. (Default: True)
+   
+   Web page with crawler_hints disabled:
+   ```python
+   ddosify = DDoSify(app, crawler_hints=False)
+   ```
+   <br>
 
 [^1]: The block lists of [FireHol](https://firehol.org/), [Ipdeny](https://www.ipdeny.com), [Emerging Threats](https://rules.emergingthreats.net), [MyIp.ms](https://myip.ms/) and a list of [Tor exit nodes](https://www.torproject.org/) are used. These lists, the last excluded, only offer protection against data centres or known attackers.
 [^2]: Text and, if the set strength is above 2, audio captchas can already be partially solved by robots, this is a solution for small websites or, e.g. dark web sites that cannot use third party solutions. However, it should still provide sufficient protection.
