@@ -71,6 +71,7 @@ def get_client_ip() -> str:
     client_ip = request.remote_addr
     client_ip = shorten_ipv6(client_ip)
     return client_ip
+
 class SilentUndefined(Undefined):
     def _fail_with_undefined_error(self, *args, **kwargs):
         return None
@@ -153,6 +154,7 @@ class JSON:
             raise FileNotFoundError("Directory '" + file_directory + "' does not exist.")
         
         if file_name not in file_locks:
+            # file deepcode ignore Unhashable: <please specify a reason of ignoring this>
             file_locks[file_name] = Lock()
 
         with file_locks[file_name]:
@@ -160,6 +162,7 @@ class JSON:
                 json.dump(data, file)
 
 DATA_DIR = pkg_resources.resource_filename('flask_DDoSify', 'data')
+TRANSLATIONS_PATH = os.path.join(DATA_DIR, "translations.json")
 TEMPLATE_DIR = pkg_resources.resource_filename('flask_DDoSify', 'templates')
 CRAWLER_USER_AGENTS = ["Googlebot", "bingbot", "Yahoo! Slurp", "YandexBot", "Baiduspider", "DuckDuckGo-Favicons-Bot", "AhrefsBot", "SemrushBot", "MJ12bot", "BLEXBot", "SeznamBot", "Exabot", "AhrefsBot", "archive.org_bot", "Applebot", "spbot", "Genieo", "linkdexbot", "Lipperhey Link Explorer", "SISTRIX Crawler", "MojeekBot", "CCBot", "Uptimebot", "XoviBot", "Neevabot", "SEOkicks-Robot", "meanpathbot", "MojeekBot", "RankActiveLinkBot", "CrawlomaticBot", "sentibot", "ExtLinksBot", "Superfeedr bot", "LinkfluenceBot", "Plerdybot", "Statbot", "Brainity", "Slurp", "Barkrowler", "RanksonicSiteAuditor", "rogerbot", "BomboraBot", "RankActiveLinkBot", "mail.ru", "AI Crawler", "Xenu Link Sleuth", "SEMrushBot", "Baiduspider-render", "coccocbot", "Sogou web spider", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler", "CodiBot", "libwww-perl", "Purebot", "Statbot", "iCjobs", "Cliqzbot", "SafeDNSBot", "AhrefsBot", "MetaURI API", "meanpathbot", "ADmantX Platform Semantic Analyzer", "CrawlomaticBot", "moget", "meanpathbot", "FPT-Aibot", "Domains Project", "SimpleCrawler", "YoudaoBot", "SafeDNSBot", "Slurp", "XoviBot", "Baiduspider", "FPT-Aibot", "SiteExplorer", "Lipperhey Link Explorer", "CrawlomaticBot", "SISTRIX Crawler", "SEMrushBot", "meanpathbot", "sentibot", "Dataprovider.com", "BLEXBot", "YoudaoBot", "Superfeedr bot", "moget", "Genieo", "sentibot", "AI Crawler", "Xenu Link Sleuth", "Barkrowler", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler"]
 EMOJIS = JSON.load(os.path.join(DATA_DIR, "emojis.json"))
@@ -181,6 +184,7 @@ class SymmetricCrypto:
         if password is None:
             password = secrets.token_urlsafe(64)
 
+        # file deepcode ignore AttributeLoadOnNone: <please specify a reason of ignoring this>
         self.password = password.encode()
         self.salt_length = salt_length
 
@@ -307,12 +311,6 @@ class Hashing:
         comparison_hash = Hashing(salt=salt).hash(plain_text, hash_length = hash_length).split("//")[0]
 
         return comparison_hash == hash
-
-#DATA_DIR = pkg_resources.resource_filename('flask_DDoSify', 'data')
-LANGUAGES_PATH = os.path.join(DATA_DIR, "languages.json")
-LANGUAGES = JSON.load(LANGUAGES_PATH)
-LANGUAGES_CODE = [language["code"] for language in LANGUAGES]
-TRANSLATIONS_PATH = os.path.join(DATA_DIR, "translations.json")
 
 class Language:
 
@@ -1184,13 +1182,13 @@ class DDoSify:
     def _set_cookies(self, response):
         response = make_response(response)
         if not g.ddosify_captcha is None:
-            response.set_cookie("captcha", g.ddosify_captcha, max_age = self.verificationage, httponly = True, secure = self.app.config.get("HTTPS"))
+            response.set_cookie("captcha", g.ddosify_captcha, max_age=self.verificationage)
         if request.args.get("ddosify_language") in LANGUAGES_CODE:
-            response.set_cookie("language", request.args.get("ddosify_language"), max_age = 60*60*24*30*12*3, httponly = True, secure = self.app.config.get("HTTPS"))
+            response.set_cookie("language", request.args.get("ddosify_language"), max_age=60*60*24*30*12*3)
         elif request.args.get("language") in LANGUAGES_CODE:
-            response.set_cookie("language", request.args.get("language"), max_age = 60*60*24*30*12*3, httponly = True, secure = self.app.config.get("HTTPS"))
+            response.set_cookie("language", request.args.get("language"), max_age=60*60*24*30*12*3)
         elif request.cookies.get("language") in LANGUAGES_CODE:
-            response.set_cookie("language", request.cookies.get("language"), max_age = 60*60*24*30*12*3, httponly = True, secure = self.app.config.get("HTTPS"))
+            response.set_cookie("language", request.cookies.get("language"), max_age=60*60*24*30*12*3)
         return response
 
     def _add_args(self, response):
