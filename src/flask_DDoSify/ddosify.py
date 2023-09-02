@@ -1,398 +1,198 @@
 import os
-import string
-import secrets
-import requests
-from io import BytesIO
-import tarfile
-from zipfile import ZipFile
+import re
 import json
-from cryptography.hazmat.primitives import hashes, padding
-from cryptography.hazmat.primitives import padding
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from base64 import urlsafe_b64encode, urlsafe_b64decode, b64encode
-from flask import request, send_file, g, abort
-from googletrans import Translator # Version: 3.1.0a0
-from bs4 import BeautifulSoup
+import random
+import atexit
+import secrets
+import tarfile
+import requests
 import ipaddress
-from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
-from urllib.parse import urlparse, quote
+import pkg_resources
 from time import time
+from io import BytesIO
+from zipfile import ZipFile
+from base64 import b64encode
+from bs4 import BeautifulSoup
+from googletrans import Translator
+from threading import Thread, Lock
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
-from threading import Thread, Lock
-import pkg_resources
-from typing import Optional, Tuple, Union
+from urllib.parse import urlparse, quote
+from base64 import urlsafe_b64encode, urlsafe_b64decode
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes, padding
+from jinja2 import Environment, select_autoescape, Undefined
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from flask import Flask, request, g, abort, send_file, make_response, redirect
+from typing import Union, Optional
 
-CURRENT_DIR = os.getcwd()
+def generate_random_string(length: int, with_punctuation: bool = True, with_letters: bool = True):
+    """
+    Generates a random string
+
+    :param length: The length of the string
+    :param with_punctuation: Whether to include special characters
+    :param with_letters: Whether letters should be included
+    """
+
+    characters = "0123456789"
+
+    if with_punctuation:
+        characters += "!\"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"
+
+    if with_letters:
+        characters += "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
     
-DATA_DIR = pkg_resources.resource_filename('flask_DDoSify', 'data')
-TEMPLATE_DIR = pkg_resources.resource_filename('flask_DDoSify', 'templates')
+    random_string = ''.join(secrets.choice(characters) for _ in range(length))
+    return random_string
 
-# Paths for cache files, and IP log files
-SEENIPS_PATH = os.path.join(DATA_DIR, "seenips.json")
-CAPTCHASOLVED_PATH = os.path.join(DATA_DIR, "captchasolved.json")
-STOPFORUMSPAM_PATH = os.path.join(DATA_DIR, "stopforumspamcache.json")
-RATELIMIT_PATH = os.path.join(DATA_DIR, "ratelimit.json")
+def get_client_ip() -> str:
+    def shorten_ipv6(ip_address):
+        try:
+            return str(ipaddress.IPv6Address(ip_address).compressed)
+        except:
+            return ip_address
+    
+    headers_to_check = [
+        'X-Forwarded-For',
+        'X-Real-Ip',
+        'CF-Connecting-IP',
+        'True-Client-Ip',
+    ]
+
+    for header in headers_to_check:
+        if header in request.headers:
+            client_ip = request.headers[header]
+            client_ip = client_ip.split(',')[0].strip()
+            client_ip = shorten_ipv6(client_ip)
+            return client_ip
+
+    client_ip = request.remote_addr
+    client_ip = shorten_ipv6(client_ip)
+    return client_ip
+class SilentUndefined(Undefined):
+    def _fail_with_undefined_error(self, *args, **kwargs):
+        return None
+
+def render_template(file_name: str, **args) -> str:
+    """
+    Function to load an HTML file and perform optional string replacements.
+    """
+
+    if not os.path.isfile(file_name):
+        raise FileNotFoundError("File '" + file_name + "' not found.")
+
+    env = Environment(
+        autoescape=select_autoescape(['html', 'xml']),
+        undefined=SilentUndefined
+    )
+    
+    with open(file_name, "r") as file:
+        html = file.read()
+
+    template = env.from_string(html)
+
+    language = Language.get_language()
+
+    args["language"] = language
+    
+    html = template.render(**args)
+
+    html = Language.translate_page(html, "en", language)
+
+    html = re.sub(r'<!--(.*?)-->', '', html, flags=re.DOTALL)
+    html = re.sub(r'\s+', ' ', html)
+
+    script_pattern = r'<script\b[^>]*>(.*?)<\/script>'
+    def minimize_script(match):
+        script_content = match.group(1)
+        script_content = re.sub(r'\s+', ' ', script_content)
+        return f'<script>{script_content}</script>'
+    html = re.sub(script_pattern, minimize_script, html, flags=re.DOTALL | re.IGNORECASE)
+
+    style_pattern = r'<style\b[^>]*>(.*?)<\/style>'
+    def minimize_style(match):
+        style_content = match.group(1)
+        style_content = re.sub(r'\s+', ' ', style_content)
+        return f'<style>{style_content}</style>'
+    html = re.sub(style_pattern, minimize_style, html, flags=re.DOTALL | re.IGNORECASE)
+
+    return html
 
 file_locks = dict()
 
 class JSON:
+
     def load(file_name: str) -> Union[dict, list]:
+        """
+        Function to load a JSON file securely.
+
+        :param file_name: The JSON file you want to load
+        """
         if not os.path.isfile(file_name):
             raise FileNotFoundError("File '" + file_name + "' does not exist.")
+        
         if file_name not in file_locks:
             file_locks[file_name] = Lock()
+
         with file_locks[file_name]:
             with open(file_name, "r") as file:
                 data = json.load(file)
             return data
+        
     def dump(data: Union[dict, list], file_name: str) -> None:
-        directory = os.path.dirname(file_name)
-        if not os.path.isdir(directory):
-            raise FileNotFoundError("Directory '" + directory + "' does not exist.")
+        """
+        Function to save a JSON file securely.
+        
+        :param data: The data to be stored should be either dict or list
+        :param file_name: The file to save to
+        """
+        file_directory = os.path.dirname(file_name)
+        if not os.path.isdir(file_directory):
+            raise FileNotFoundError("Directory '" + file_directory + "' does not exist.")
+        
         if file_name not in file_locks:
             file_locks[file_name] = Lock()
+
         with file_locks[file_name]:
             with open(file_name, "w") as file:
                 json.dump(data, file)
 
-class Services:
-
-    def need_update(ipsetpath: str):
-        """
-        Function to find out if an IPset needs an update
-        """
-        
-        # If the file does not exist
-        if not os.path.isfile(os.path.join(DATA_DIR, ipsetpath)):
-            return True
-        
-        last_update_time = JSON.load(os.path.join(DATA_DIR, ipsetpath))["time"]
-
-        # When the file has expired
-        if int(time()) - int(last_update_time) > 3600:
-            return True
-        return False
-    
-    def update_fireholipset():
-        """
-        Function to update the IPset of FireHol
-        """
-        # List of URLs to the FireHOL IP lists
-        firehol_urls = [
-            "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level1.netset",
-            "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level2.netset",
-            "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level3.netset",
-            "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level4.netset"
-        ]
-
-        # Empty list for the collected IP addresses
-        firehol_ips = {"time": str(int(time())), "ips": []}
-
-        # Loop to retrieve and process the IP lists.
-        for firehol_url in firehol_urls:
-            response = requests.get(firehol_url)
-            if response.ok:
-                # Extract the IP addresses from the response and add them to the list
-                ips = [line.strip().split('/')[0] for line in response.text.splitlines() if line.strip() and not line.startswith("#")]
-                firehol_ips["ips"].extend(ips)
-            else:
-                response.raise_for_status()
-
-        # Remove duplicates from the list of collected IP addresses
-        firehol_ips["ips"] = list(set(firehol_ips["ips"]))
-        
-        JSON.dump(firehol_ips, os.path.join(DATA_DIR, "fireholipset.json"))
-    
-    def update_ipdenyipset():
-        """
-        Function to update the IPset of IPDeny
-        """
-        # List of URLs to the IP deny IP lists (for IPv4 and IPv6).
-        ipdeny_urls = [
-            "https://www.ipdeny.com/ipblocks/data/countries/all-zones.tar.gz",
-            "https://www.ipdeny.com/ipv6/ipaddresses/blocks/ipv6-all-zones.tar.gz"
-        ]
-
-        # Empty list for the collected IP addresses
-        ipdeny_ips = {"time": str(int(time())), "ips": []}
-
-        # Loop to retrieve and process the IP lists.
-        for ipdeny_url in ipdeny_urls:
-            response = requests.get(ipdeny_url)
-            if response.ok:
-                # Load the TAR-GZ file and extract its contents
-                tar_file = BytesIO(response.content)
-                with tarfile.open(fileobj=tar_file, mode="r:gz") as tar:
-                    members = tar.getmembers()
-                    for member in members:
-                        # Check if the member is a file and has the extension ".zone".
-                        if member.isfile() and member.name.endswith('.zone'):
-                            # Read the contents of the file, decode it as UTF-8 and extract the IP addresses
-                            file_content = tar.extractfile(member).read().decode("utf-8")
-                            ips = [line.strip().split('/')[0] for line in file_content.splitlines() if line.strip() and not line.startswith("#")]
-                            ipdeny_ips["ips"].extend(ips)
-            else:
-                response.raise_for_status()
-        
-        # Remove duplicates from the list of collected IP addresses
-        ipdeny_ips["ips"] = list(set(ipdeny_ips["ips"]))
-        
-        JSON.dump(ipdeny_ips, os.path.join(DATA_DIR, "ipdenyipset.json"))
-    
-    def update_emergingthreatsipset():
-        """
-        Function to update the IPset of Emerging Threats
-        """
-        # URL to get the list of IP's
-        emergingthreats_url = "https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt"
-        
-        # Request the list of IP's
-        response = requests.get(emergingthreats_url)
-        
-        # Check if the request was successful
-        if response.ok:
-            # Extract the IP addresses from the response and remove duplicates
-            emergingthreats_ips = [line.strip().split('/')[0] for line in response.text.splitlines() if line.strip() and not line.startswith("#")]
-            emergingthreats_ips = list(set(emergingthreats_ips))
-            
-
-            JSON.dump({"time": str(int(time())), "ips": emergingthreats_ips}, os.path.join(DATA_DIR, "emergingthreatsipset.json"))
-        else:
-            response.raise_for_status()
-    
-    def update_myipmsipset():
-        """
-        Function to update the IPset of MyIP.ms
-        """
-        # URL to get the list of IP's
-        myipms_url = "https://myip.ms/files/blacklist/general/full_blacklist_database.zip"
-        
-        # Request the zip file
-        response = requests.get(myipms_url)
-        
-        # Check if the request was successful
-        if response.ok:
-            with BytesIO(response.content) as zip_file:
-                # Load the ZIP file and extract its contents
-                with ZipFile(zip_file, "r") as z:
-                    with z.open("full_blacklist_database.txt", "r") as txt_file:
-                        content = txt_file.read().decode('utf-8')
-                        myipms_ips = [line.strip().split('/')[0].split('#')[0].replace('\t', '') for line in content.splitlines() if line.strip() and not line.startswith("#")]
-                        myipms_ips = list(set(myipms_ips))
-                        
-            JSON.dump({"time": str(int(time())), "ips": myipms_ips}, os.path.join(DATA_DIR, "myipmsipset.json"))
-        else:
-            response.raise_for_status()
-    
-    def update_torexitnodes():
-        # URL to get the list of Tor exit nodes
-        torbulkexitlist_url = "https://check.torproject.org/torbulkexitlist"
-        
-        # Request the list of Tor exit nodes
-        response = requests.get(torbulkexitlist_url)
-        
-        # Check if the request was successful
-        if response.ok:
-            # Extract the IP addresses from the response and remove duplicates
-            torexitnodes_ip = [line.strip() for line in response.text.splitlines() if line.strip() and not line.startswith("#")]
-            torexitnodes_ip = list(set(torexitnodes_ip))
-            
-            JSON.dump({"time": str(int(time())), "ips": torexitnodes_ip}, os.path.join(DATA_DIR, "torexitnodes.json"))
-        else:
-            response.raise_for_status()
-    
-    def update_all_ipsets():
-        if Services.need_update("fireholipset.json"):
-            try:
-                Services.update_fireholipset()
-            except:
-                Services.update_fireholipset()
-        if Services.need_update("ipdenyipset.json"):
-            try:
-                Services.update_ipdenyipset()
-            except:
-                Services.update_ipdenyipset()
-        if Services.need_update("emergingthreatsipset.json"):
-            try:
-                Services.update_emergingthreatsipset()
-            except:
-                Services.update_emergingthreatsipset()
-        if Services.need_update("myipmsipset.json"):
-            try:
-                Services.update_myipmsipset()
-            except:
-                Services.update_myipmsipset()
-        if Services.need_update("torexitnodes.json"):
-            try:
-                Services.update_torexitnodes()
-            except:
-                Services.update_torexitnodes()
-    
-    def remove_seenips():
-        """
-        Delete all expired items of the seenips dict
-        """
-
-        # If the file does not exist
-        if not os.path.isfile(SEENIPS_PATH):
-            return
-        
-        # Open/Read the file
-        seenips = JSON.load(SEENIPS_PATH)
-
-        # Create a copy and delete expired items
-        copy_seenips = seenips.copy()
-        for hashed_ip, records in seenips.items():
-            new_records = []
-            for record in records:
-                if not int(time()) - int(record) > 14400:
-                    new_records.append(record)
-
-            copy_seenips[hashed_ip] = new_records
-
-        # Compare with the copy to see if anything has changed
-        if copy_seenips != seenips:
-            JSON.dump(copy_seenips, SEENIPS_PATH)
-    
-    def remove_captchasolved(verificationage: int):
-        """
-        Delete all expired items of the captchasolved dict
-        """
-
-        # If the file does not exist
-        if not os.path.isfile(CAPTCHASOLVED_PATH):
-            return
-        
-        # Open/Read the file
-        captchasolved = JSON.load(CAPTCHASOLVED_PATH)
-
-        # Create a copy and delete expired items
-        copy_captchasolved = captchasolved.copy()
-        for hashed_id, data in captchasolved.items():
-            if int(time()) - int(data["time"]) > verificationage:
-                del copy_captchasolved[hashed_id]
-
-        # Compare with the copy to see if anything has changed
-        if copy_captchasolved != captchasolved:
-            JSON.dump(copy_captchasolved, CAPTCHASOLVED_PATH)
-    
-    def remove_stopforumspam():
-        """
-        Delete all expired items of the stopforumspam dict
-        """
-
-        # If the file does not exist
-        if not os.path.isfile(STOPFORUMSPAM_PATH):
-            return
-        
-        # Open/Read the file
-        stopforumspam = JSON.load(STOPFORUMSPAM_PATH)
-
-        # Create a copy and delete expired items
-        copy_stopforumspam = stopforumspam.copy()
-        for hashed_ip, content in stopforumspam.items():
-            if int(time()) - int(content["time"]) > 604800:
-                del copy_stopforumspam[hashed_ip]
-
-        # Compare with the copy to see if anything has changed
-        if copy_stopforumspam != stopforumspam:
-            JSON.dump(copy_stopforumspam, STOPFORUMSPAM_PATH)
-    
-    def remove_ratelimits(rate_limit: int = 60):
-        """
-        Delete all expired items of the saved_requests dict
-        """
-
-        # If the file does not exist
-        if not os.path.isfile(RATELIMIT_PATH):
-            return
-        
-        # Open/Read the file
-        saved_requests = JSON.load(RATELIMIT_PATH)
-
-        # Calculate the maximum size of a timestamps list
-        max_items = round((rate_limit * 2) - (rate_limit / 1.5))
-
-        # Create a copy and delete expired items
-        copy_saved_requests = saved_requests.copy()
-        for hashed_ip, timestamps in saved_requests.items():
-            copy_saved_requests[hashed_ip] = timestamps[:max_items]
-        
-        # Compare with the copy to see if anything has changed
-        if copy_saved_requests != saved_requests:
-            JSON.dump(copy_saved_requests, RATELIMIT_PATH)
-
-Services.update_all_ipsets()
-
-def generate_random_string(length: int, with_punctuation: bool = True, with_letters: bool = True):
-    """
-    Generates a random string of the specified length with optional character types
-
-    :param length: The desired length of the random string
-    :param with_punctuation: Specifies whether special characters should be included in the string (default: True)
-    :param with_letters: Specifies whether letters should be included in the string (default: True)
-
-    :return: A random string of the given length with the given characters.
-    """
-
-    # Define a basic string of digits (0-9)
-    characters = string.digits
-    
-    # Add special characters if the option 'with_punctuation' is activated.
-    if with_punctuation:
-        characters += string.punctuation
-
-    # Add letters if the option 'with_letters' is activated.
-    if with_letters:
-        characters += string.ascii_letters
-
-    # Create a random string of the desired length by dragging characters from the 'characters' string and returns it
-    random_string = ''.join(secrets.choice(characters) for _ in range(length))
-    return random_string
-
-# The captcha secret is used to check the captcha of the user
-if not os.path.isfile(os.path.join(DATA_DIR, "captchasecret.txt")):
-    CAPTCHASECRET = generate_random_string(512)
-    with open(os.path.join(DATA_DIR, "captchasecret.txt"), "w") as file:
-        file.write(CAPTCHASECRET)
-else:
-    with open(os.path.join(DATA_DIR, "captchasecret.txt"), "r") as file:
-        CAPTCHASECRET = file.read()
+DATA_DIR = pkg_resources.resource_filename('flask_DDoSify', 'data')
+TEMPLATE_DIR = pkg_resources.resource_filename('flask_DDoSify', 'templates')
+CRAWLER_USER_AGENTS = ["Googlebot", "bingbot", "Yahoo! Slurp", "YandexBot", "Baiduspider", "DuckDuckGo-Favicons-Bot", "AhrefsBot", "SemrushBot", "MJ12bot", "BLEXBot", "SeznamBot", "Exabot", "AhrefsBot", "archive.org_bot", "Applebot", "spbot", "Genieo", "linkdexbot", "Lipperhey Link Explorer", "SISTRIX Crawler", "MojeekBot", "CCBot", "Uptimebot", "XoviBot", "Neevabot", "SEOkicks-Robot", "meanpathbot", "MojeekBot", "RankActiveLinkBot", "CrawlomaticBot", "sentibot", "ExtLinksBot", "Superfeedr bot", "LinkfluenceBot", "Plerdybot", "Statbot", "Brainity", "Slurp", "Barkrowler", "RanksonicSiteAuditor", "rogerbot", "BomboraBot", "RankActiveLinkBot", "mail.ru", "AI Crawler", "Xenu Link Sleuth", "SEMrushBot", "Baiduspider-render", "coccocbot", "Sogou web spider", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler", "CodiBot", "libwww-perl", "Purebot", "Statbot", "iCjobs", "Cliqzbot", "SafeDNSBot", "AhrefsBot", "MetaURI API", "meanpathbot", "ADmantX Platform Semantic Analyzer", "CrawlomaticBot", "moget", "meanpathbot", "FPT-Aibot", "Domains Project", "SimpleCrawler", "YoudaoBot", "SafeDNSBot", "Slurp", "XoviBot", "Baiduspider", "FPT-Aibot", "SiteExplorer", "Lipperhey Link Explorer", "CrawlomaticBot", "SISTRIX Crawler", "SEMrushBot", "meanpathbot", "sentibot", "Dataprovider.com", "BLEXBot", "YoudaoBot", "Superfeedr bot", "moget", "Genieo", "sentibot", "AI Crawler", "Xenu Link Sleuth", "Barkrowler", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler"]
+EMOJIS = JSON.load(os.path.join(DATA_DIR, "emojis.json"))
+TEAEMOJIS = JSON.load(os.path.join(DATA_DIR, "teaemojis.json"))
+LANGUAGES = JSON.load(os.path.join(DATA_DIR, "languages.json"))
+LANGUAGES_CODE = [language["code"] for language in LANGUAGES]
 
 class SymmetricCrypto:
     """
-    Implementation of secure symmetric encryption with AES
+    Implementation of symmetric encryption with AES
     """
 
     def __init__(self, password: Optional[str] = None, salt_length: int = 32):
         """
-        Initialize the SymmetricCrypto object with password and salt_length
-
         :param password: A secure encryption password, should be at least 32 characters long
         :param salt_length: The length of the salt, should be at least 16
         """
 
-        # If the password is not given, a secure random password is created
         if password is None:
             password = secrets.token_urlsafe(64)
 
         self.password = password.encode()
         self.salt_length = salt_length
 
-    def generate_key_and_salt(self) -> Tuple[bytes, bytes]:
+    def encrypt(self, plain_text: str) -> str:
         """
-        Generates Key with KDF and a secure random Salt
+        Encrypts a text
 
-        :return: The encryption key generated with PBKDF2HMAC and the randomly generated salt used to generate the key has a length of self.salt_length as Tuple
+        :param plaintext: The text to be encrypted
         """
 
-        # Generate a random salt
         salt = secrets.token_bytes(self.salt_length)
 
-        # Use PBKDF2HMAC to derive the encryption key
         kdf_ = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
@@ -401,50 +201,28 @@ class SymmetricCrypto:
             backend=default_backend()
         )
         key = kdf_.derive(self.password)
-        
-        return key, salt
 
-    def encrypt(self, plaintext: str) -> str:
-        """
-        Encrypts a text with the password and a salt
-
-        :param plaintext: The text to be encrypted, as a string
-        
-        :return: The text encrypted with the password and a randomly generated salt and iv
-        """
-
-        # Generate a random salt and encryption key
-        key, salt = self.generate_key_and_salt()
-
-        # Generate a random IV (Initialization Vector)
         iv = secrets.token_bytes(16)
 
-        # Use AES in CBC mode to encrypt the plaintext
         cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
         encryptor = cipher.encryptor()
         padder = padding.PKCS7(algorithms.AES.block_size).padder()
-        padded_data = padder.update(plaintext.encode()) + padder.finalize()
+        padded_data = padder.update(plain_text.encode()) + padder.finalize()
         ciphertext = encryptor.update(padded_data) + encryptor.finalize()
 
-        # Combine salt, iv, and ciphertext, and return as a URL-safe Base64 encoded string
         return urlsafe_b64encode(salt + iv + ciphertext).decode()
 
-    def decrypt(self, ciphertext: str) -> str:
+    def decrypt(self, cipher_text: str) -> str:
         """
-        Decrypts a text with the password and a salt
+        Decrypts a text
 
-        :param ciphertext: The encrypted text, must have been encrypted with the password, as a string
-        
-        :return: The actual text
+        :param ciphertext: The encrypted text
         """
 
-        # Decode the URL-safe Base64 encoded ciphertext
-        ciphertext = urlsafe_b64decode(ciphertext.encode())
+        cipher_text = urlsafe_b64decode(cipher_text.encode())
 
-        # Extract salt, iv, and ciphertext from the combined data
-        salt, iv, ciphertext = ciphertext[:self.salt_length], ciphertext[self.salt_length:self.salt_length + 16], ciphertext[self.salt_length + 16:]
+        salt, iv, cipher_text = cipher_text[:self.salt_length], cipher_text[self.salt_length:self.salt_length + 16], cipher_text[self.salt_length + 16:]
 
-        # Derive the encryption key using the password and salt
         kdf_ = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
@@ -454,44 +232,36 @@ class SymmetricCrypto:
         )
         key = kdf_.derive(self.password)
 
-        # Decrypt the ciphertext
         cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
         decryptor = cipher.decryptor()
         unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
-        decrypted_data = decryptor.update(ciphertext) + decryptor.finalize()
+        decrypted_data = decryptor.update(cipher_text) + decryptor.finalize()
         plaintext = unpadder.update(decrypted_data) + unpadder.finalize()
 
-        # Return the decrypted plaintext
         return plaintext.decode()
 
 class Hashing:
     """
-    Implementation of secure hashing with SHA256 and 50000 iterations
+    Implementation of hashing with SHA256 and 50000 iterations
     """
 
     def __init__(self, salt: Optional[str] = None):
         """
-        Initialize the Hashing object with salt
-
-        :param salt: The salt, makes the hashing process more secure (Optional)
+        :param salt: The salt, makes the hashing process more secure
         """
 
         self.salt = salt
 
-    def hash(self, plaintext: str, hash_length: int = 32) -> str:
+    def hash(self, plain_text: str, hash_length: int = 32) -> str:
         """
         Function to hash a plaintext
 
-        :param plaintext: The text to be hashed
+        :param plain_text: The text to be hashed
         :param hash_length: The length of the returned hashed value
-
-        :return: The hashed plaintext
         """
 
-        # Convert plaintext to bytes
-        plaintext = str(plaintext).encode('utf-8')
+        plain_text = str(plain_text).encode('utf-8')
 
-        # Set the salt, which is generated randomly if it is not defined and otherwise made into bytes if it is string
         salt = self.salt
         if salt is None:
             salt = secrets.token_bytes(32)
@@ -502,7 +272,6 @@ class Hashing:
                 except:
                     salt = salt.encode('utf-8')
 
-        # Create a PBKDF2 instance using the SHA-256 hash algorithm
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=hash_length,
@@ -511,318 +280,296 @@ class Hashing:
             backend=default_backend()
         )
 
-        # Calculate the bytes hash
-        hashed_data = kdf.derive(plaintext)
+        hashed_data = kdf.derive(plain_text)
 
-        # Make/Return the bytes hash with base64 and add the salt after it
         hash = urlsafe_b64encode(hashed_data).decode('utf-8') + "//" + salt.hex()
         return hash
 
-    def compare(self, plaintext: str, hash: str) -> bool:
+    def compare(self, plain_text: str, hash: str) -> bool:
         """
         Compares a plaintext with a hashed value
 
-        :param plaintext: The text that was hashed
+        :param plain_text: The text that was hashed
         :param hash: The hashed value
-
-        :return: The result of the comparison as bool
-
-        :raises ValueError: If salt is None and there is no salt in the provided hash
         """
 
-        # The salt is defined
         salt = self.salt
         if "//" in hash:
             hash, salt = hash.split("//")
 
         if salt is None:
             raise ValueError("Salt cannot be None if there is no salt in hash")
+        
+        salt = bytes.fromhex(salt)
 
-        # Get the hash length by making the hash from a base64 encoded string into a bytes object and measuring the length from it
         hash_length = len(urlsafe_b64decode(hash.encode('utf-8')))
 
-        # A second hash of the plaintext is generated 
-        comparisonhash = Hashing(salt=bytes.fromhex(salt)).hash(plaintext, hash_length = hash_length).split("//")[0]
+        comparison_hash = Hashing(salt=salt).hash(plain_text, hash_length = hash_length).split("//")[0]
 
-        # The two hashes are compared and the result is returned
-        return comparisonhash == hash
+        return comparison_hash == hash
 
-# Loading the languages lists to use them in the Languages class
-with open(os.path.join(DATA_DIR, "languages.json"), "r") as file:
-    LANGUAGES = json.load(file)
-
-LANGUAGE_LIST = [language["code"] for language in LANGUAGES]
+#DATA_DIR = pkg_resources.resource_filename('flask_DDoSify', 'data')
+LANGUAGES_PATH = os.path.join(DATA_DIR, "languages.json")
+LANGUAGES = JSON.load(LANGUAGES_PATH)
+LANGUAGES_CODE = [language["code"] for language in LANGUAGES]
+TRANSLATIONS_PATH = os.path.join(DATA_DIR, "translations.json")
 
 class Language:
-    """
-    Implementation of various methods that have something to do with languages
-    """
 
-    @staticmethod
-    def language(default: str = "en") -> str:
+    def get_language():
         """
         Function to get the language of a user
-
-        :param default: The language to be returned if no language can be found
-
-        :return: The language preferred by the user
         """
 
-        if request.args.get("ddosify_language") in LANGUAGE_LIST:
+        if request.args.get("ddosify_language") in LANGUAGES_CODE:
             return request.args.get("ddosify_language")
-        elif request.args.get("language") in LANGUAGE_LIST:
+        elif request.args.get("language") in LANGUAGES_CODE:
             return request.args.get("language")
-        elif request.cookies.get("language") in LANGUAGE_LIST:
+        elif request.cookies.get("language") in LANGUAGES_CODE:
             return request.cookies.get("language")
         
-        # Get the preferred language of the user
-        preferred_language = request.accept_languages.best_match(LANGUAGE_LIST)
+        preferred_language = request.accept_languages.best_match(LANGUAGES_CODE)
 
-        # If the preferred language is not None
         if preferred_language != None:
             return preferred_language
         
-        # Return the default language if no user languages are provided
-        return default
+        return "en"
 
     @staticmethod
     def translate(text_to_translate: str, from_lang: str, to_lang: str) -> str:
         """
         Function to translate a text 'text_to_translate' from a language 'from_lang' to a language 'to_lang'
-
-        :param text_to_translate: The text in language 'from_lang' to be translated into language 'to_lang'
-        :param from_lang: The language of the 'text_to_translate', can also be 'auto'
-        :param to_lang: The language in which the text should be translated 'text_to_translate'
-
-        :return: The translated text
-
-        :raises Exception: If no translation could be made
         """
 
-        # If both languages match, the text is simply returned
         if from_lang == to_lang:
             return text_to_translate
-
-        # Specify the file path to the translation file
-        translations_file = os.path.join(DATA_DIR, "translations.json")
         
-        if os.path.isfile(translations_file):
-            translations = JSON.load(translations_file)
+        if os.path.isfile(TRANSLATIONS_PATH):
+            translations = JSON.load(TRANSLATIONS_PATH)
         else:
-            # If the file does not exist, initialize the translations as an empty list
             translations = []
         
-        # Check if the translation is already available in the cache
         for translation in translations:
             if translation["text_to_translate"] == text_to_translate and translation["from_lang"] == from_lang and translation["to_lang"] == to_lang:
-                return translation["output"]
+                return translation["translated_output"]
         
-        # Perform the translation using the Translator class
         translator = Translator()
-        try:
-            output = translator.translate(text_to_translate, src=from_lang, dest=to_lang).text
-        except:
-            raise Exception("The text could not be translated")
+
+        translated_output = translator.translate(text_to_translate, src=from_lang, dest=to_lang).text
             
         try:
-            output = output.encode('latin-1').decode('unicode_escape')
+            translated_output = translated_output.encode('latin-1').decode('unicode_escape')
         except:
             pass
         
-        # Cache the translation in the translations file
         translation = {
             "text_to_translate": text_to_translate, 
             "from_lang": from_lang,
             "to_lang": to_lang, 
-            "output": output
+            "translated_output": translated_output
         }
         translations.append(translation)
         
-        JSON.dump(translations, translations_file)
+        JSON.dump(translations, TRANSLATIONS_PATH)
 
-        # In some languages, it looks better if the first character is large
         if to_lang in ["de", "en", "es", "fr", "pt", "it"]:
-            output = output[0].upper() + output[1:]
+            translated_output = translated_output[0].upper() + translated_output[1:]
             
-        return output
+        return translated_output
 
     @staticmethod
     def translate_page(html: str, from_lang: str, to_lang: str) -> str:
         """
         Function to translate a page into the correct language
-
-        :param html: The untranslated page in 'from_lang'
-        :param from_lang: The language of the HTML page given with 'html'
-        :param to_lang: The language into which the HTML web page should be translated
-
-        :return: The translated HTML page
-
-        > Note: function can give a bs4 error if the html page is poorly implemented as well as errors in the individual for loops e.g. for missing attributes.
         """
         
         soup = BeautifulSoup(html, 'html.parser')
-        
-        # Translate headers
-        headers = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
-        for header in headers:
-            if 'ntr' not in header.attrs and not header.text is None:
-                header.string = Language.translate(header.text, from_lang, to_lang)
-        
-        # Translate links
-        links = soup.find_all('a')
-        for link in links:
-            if 'ntr' not in link.attrs and not link.text is None:
-                link.string = Language.translate(link.text, from_lang, to_lang)
-        
-        # Translate paragraphs
-        paragraphs = soup.find_all('p')
-        for paragraph in paragraphs:
-            # Ignore tags that have the 'ntr' attribute or do not contain text nodes
-            if 'ntr' in paragraph.attrs or paragraph.text is None:
-                continue
 
-            # Ignores all p tags that have either an image or a link in them and not the attr linkintext
-            if (len(paragraph.find_all('img')) > 0 or len(paragraph.find_all('a')) > 0) and not 'linkintext' in paragraph.attrs:
-                continue
+        def translate_htmlified_text(html_tag):
+            try:
+                new_soup = BeautifulSoup(str(html_tag), 'html.parser')
+                outer_tag = new_soup.find(lambda tag: tag.find_all(recursive=False))
+                text = ''.join(str(tag) for tag in outer_tag.contents)
+            except:
+                text = html_tag.text
+            
+            if "<" in text:
+                pattern = r'(<.*?>)(.*?)(<\/.*?>)'
+        
+                def replace(match):
+                    tag_open, content, tag_close = match.groups()
+                    processed_content = Language.translate(content, from_lang, to_lang)
+                    return f'{tag_open}{processed_content}{tag_close}'
+                
+                modified_text = re.sub(pattern, replace, text)
             else:
-                # Translates the paragraph
-                paragraph.string = Language.translate(paragraph.text, from_lang, to_lang)
+                modified_text = Language.translate(text, from_lang, to_lang)
+            return modified_text
         
-        # Translate buttons
-        buttons = soup.find_all('button')
-        for button in buttons:
-            if 'ntr' not in button.attrs and not button.text is None:
-                button.string = Language.translate(button.text, from_lang, to_lang)
+        tags = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'p', 'button'])
+        for tag in tags:
+            if 'ntr' not in tag.attrs:
+                tag.string = translate_htmlified_text(tag)
         
-        # Translate input placeholders
         inputs = soup.find_all('input')
         for input_tag in inputs:
             if input_tag.has_attr('placeholder') and 'ntr' not in input_tag.attrs:
                 input_tag['placeholder'] = Language.translate(input_tag['placeholder'], from_lang, to_lang)
         
-        # Get the translated HTML
-        translated_html = str(soup)
+        head_tag = soup.find('head')
+        if head_tag:
+            title_element = head_tag.find('title')
+            if title_element:
+                title_element.string = Language.translate(title_element.text, from_lang, to_lang)
+        
+        translated_html = str(soup).replace("&lt;", "<").replace("&gt;", ">")
         return translated_html
 
-def shorten_ipv6(ip_address: str) -> str:
-    """
-    Function to shorten an IPv6 IP address.
+class Services:
 
-    :param ip_address: Any IP address, can also be IPv4.
+    def need_update(ipsetpath: str):
+        """
+        Function to find out if an IPset needs an update
+        """
+        if not os.path.isfile(os.path.join(DATA_DIR, ipsetpath)):
+            return True
+        last_update_time = JSON.load(os.path.join(DATA_DIR, ipsetpath))["time"]
+        if int(time()) - int(last_update_time) > 3600:
+            return True
+        return False
     
-    :return: The shortened IPv6 IP address or the given ip_address if it's not a valid IPv6.
-    """
-    try:
-        return str(ipaddress.IPv6Address(ip_address).compressed)
-    except: # ipaddress.AddressValueError
-        return ip_address
-
-def get_client_ip() -> str:
-    """
-    Function to get the IP address of a user.
-
-    :return: The IP with which the client has requested the server.
+    def update_firehol_ip_set():
+        """
+        Function to update the IPset of FireHol
+        """
+        firehol_urls = [
+            "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level1.netset",
+            "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level2.netset",
+            "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level3.netset",
+            "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level4.netset"
+        ]
+        firehol_ips = {"time": str(int(time())), "ips": []}
+        for firehol_url in firehol_urls:
+            response = requests.get(firehol_url)
+            if response.ok:
+                ips = [line.strip().split('/')[0] for line in response.text.splitlines() if line.strip() and not line.startswith("#")]
+                firehol_ips["ips"].extend(ips)
+            else:
+                response.raise_for_status()
+        firehol_ips["ips"] = list(set(firehol_ips["ips"]))
+        JSON.dump(firehol_ips, os.path.join(DATA_DIR, "fireholipset.json"))
     
-    :raises Exception: If no IP address was found.
-    """
-    headers_to_check = [
-        'X-Forwarded-For',
-        'X-Real-Ip',
-        'CF-Connecting-IP',
-        'True-Client-Ip',
-    ]
-
-    for header in headers_to_check:
-        if header in request.headers:
-            # Extract the client's IP from the header and handle multiple IPs (e.g., proxy or VPN).
-            client_ip = request.headers[header]
-            client_ip = client_ip.split(',')[0].strip()
-            client_ip = shorten_ipv6(client_ip) # Shortens Ipv6 to compare it better with block lists
-            return client_ip
-
-    # If no headers contain the IP, fallback to using request.remote_addr
-    client_ip = request.remote_addr
-    client_ip = shorten_ipv6(client_ip)  # Shortens Ipv6 to compare it better with block lists
-
-    if client_ip is None:
-        raise Exception("Failed to get the user's IP address.")
-
-    return client_ip
-
-CRAWLER_USER_AGENTS = ["Googlebot", "bingbot", "Yahoo! Slurp", "YandexBot", "Baiduspider", "DuckDuckGo-Favicons-Bot", "AhrefsBot", "SemrushBot", "MJ12bot", "BLEXBot", "SeznamBot", "Exabot", "AhrefsBot", "archive.org_bot", "Applebot", "spbot", "Genieo", "linkdexbot", "Lipperhey Link Explorer", "SISTRIX Crawler", "MojeekBot", "CCBot", "Uptimebot", "XoviBot", "Neevabot", "SEOkicks-Robot", "meanpathbot", "MojeekBot", "RankActiveLinkBot", "CrawlomaticBot", "sentibot", "ExtLinksBot", "Superfeedr bot", "LinkfluenceBot", "Plerdybot", "Statbot", "Brainity", "Slurp", "Barkrowler", "RanksonicSiteAuditor", "rogerbot", "BomboraBot", "RankActiveLinkBot", "mail.ru", "AI Crawler", "Xenu Link Sleuth", "SEMrushBot", "Baiduspider-render", "coccocbot", "Sogou web spider", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler", "CodiBot", "libwww-perl", "Purebot", "Statbot", "iCjobs", "Cliqzbot", "SafeDNSBot", "AhrefsBot", "MetaURI API", "meanpathbot", "ADmantX Platform Semantic Analyzer", "CrawlomaticBot", "moget", "meanpathbot", "FPT-Aibot", "Domains Project", "SimpleCrawler", "YoudaoBot", "SafeDNSBot", "Slurp", "XoviBot", "Baiduspider", "FPT-Aibot", "SiteExplorer", "Lipperhey Link Explorer", "CrawlomaticBot", "SISTRIX Crawler", "SEMrushBot", "meanpathbot", "sentibot", "Dataprovider.com", "BLEXBot", "YoudaoBot", "Superfeedr bot", "moget", "Genieo", "sentibot", "AI Crawler", "Xenu Link Sleuth", "Barkrowler", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler"]
-EMOJIS = JSON.load(os.path.join(DATA_DIR, "emojis.json"))
-TEAEMOJIS = JSON.load(os.path.join(DATA_DIR, "teaemojis.json"))
-
-# So that no Jinja Undefined errors come
-class SilentUndefined(Undefined):
-    def _fail_with_undefined_error(self, *args, **kwargs):
-        return None
-
-def render_template(filepath: str, **args) -> str:
-    """
-    Function to load an HTML file and perform optional string replacements.
-
-    :params filepath: The path of the file
-    :params args: Jinja2 Args
-
-    :returns html: The HTML page
-
-    :raises FileNotFoundError: If the file does not exist
-    """
+    def update_ip_deny_ip_set():
+        """
+        Function to update the IPset of IPDeny
+        """
+        ip_deny_urls = [
+            "https://www.ipdeny.com/ipblocks/data/countries/all-zones.tar.gz",
+            "https://www.ipdeny.com/ipv6/ipaddresses/blocks/ipv6-all-zones.tar.gz"
+        ]
+        ip_deny_ips = {"time": str(int(time())), "ips": []}
+        for ipdeny_url in ip_deny_urls:
+            response = requests.get(ipdeny_url)
+            if response.ok:
+                tar_file = BytesIO(response.content)
+                with tarfile.open(fileobj=tar_file, mode="r:gz") as tar:
+                    members = tar.getmembers()
+                    for member in members:
+                        if member.isfile() and member.name.endswith('.zone'):
+                            file_content = tar.extractfile(member).read().decode("utf-8")
+                            ips = [line.strip().split('/')[0] for line in file_content.splitlines() if line.strip() and not line.startswith("#")]
+                            ip_deny_ips["ips"].extend(ips)
+            else:
+                response.raise_for_status()
+        ip_deny_ips["ips"] = list(set(ip_deny_ips["ips"]))
+        JSON.dump(ip_deny_ips, os.path.join(DATA_DIR, "ipdenyipset.json"))
     
-    # Raise a FileNotFoundError if the file does not exist
-    if not os.path.isfile(filepath):
-        raise FileNotFoundError(filepath)
-        
-    # Configuration of the Jinja2 environment
-    env = Environment(
-        loader=FileSystemLoader(os.path.dirname(filepath)),
-        autoescape=select_autoescape(['html', 'xml']),
-        undefined=SilentUndefined
-    )
+    def update_emerging_threats_ip_set():
+        """
+        Function to update the IPset of Emerging Threats
+        """
+        emerging_threats_url = "https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt"
+        response = requests.get(emerging_threats_url)
+        if response.ok:
+            emerging_threats_ips = [line.strip().split('/')[0] for line in response.text.splitlines() if line.strip() and not line.startswith("#")]
+            emerging_threats_ips = list(set(emerging_threats_ips))
+            JSON.dump({"time": str(int(time())), "ips": emerging_threats_ips}, os.path.join(DATA_DIR, "emergingthreatsipset.json"))
+        else:
+            response.raise_for_status()
     
-    # Load the template file
-    template = env.get_template(os.path.basename(filepath))
+    def update_my_ip_ms_ip_set():
+        """
+        Function to update the IPset of MyIP.ms
+        """
+        my_ip_ms_url = "https://myip.ms/files/blacklist/general/full_blacklist_database.zip"
+        response = requests.get(my_ip_ms_url)
+        if response.ok:
+            with BytesIO(response.content) as zip_file:
+                with ZipFile(zip_file, "r") as z:
+                    with z.open("full_blacklist_database.txt", "r") as txt_file:
+                        content = txt_file.read().decode('utf-8')
+                        my_ip_ms_ips = [line.strip().split('/')[0].split('#')[0].replace('\t', '') for line in content.splitlines() if line.strip() and not line.startswith("#")]
+                        my_ip_ms_ips = list(set(my_ip_ms_ips))
+            JSON.dump({"time": str(int(time())), "ips": my_ip_ms_ips}, os.path.join(DATA_DIR, "myipmsipset.json"))
+        else:
+            response.raise_for_status()
     
-    # Render the template with the passed variables
-    html = template.render(**args)
+    def update_tor_exit_nodes():
+        tor_bulk_exit_list_url = "https://check.torproject.org/torbulkexitlist"
+        response = requests.get(tor_bulk_exit_list_url)
+        if response.ok:
+            tor_exit_nodes_ip = [line.strip() for line in response.text.splitlines() if line.strip() and not line.startswith("#")]
+            tor_exit_nodes_ip = list(set(tor_exit_nodes_ip))
+            JSON.dump({"time": str(int(time())), "ips": tor_exit_nodes_ip}, os.path.join(DATA_DIR, "torexitnodes.json"))
+        else:
+            response.raise_for_status()
     
-    # Return the HTML content
-    return html
+    def update_all_ipsets():
+        if Services.need_update("fireholipset.json"):
+            Services.update_firehol_ip_set()
+        if Services.need_update("ipdenyipset.json"):
+            Services.update_ip_deny_ip_set()
+        if Services.need_update("emergingthreatsipset.json"):
+            Services.update_emerging_threats_ip_set()
+        if Services.need_update("myipmsipset.json"):
+            Services.update_my_ip_ms_ip_set()
+        if Services.need_update("torexitnodes.json"):
+            Services.update_tor_exit_nodes()
+
+Services.update_all_ipsets()
 
 class DDoSify:
     """
     Shows the user/bot a captcha before the request first if the request comes from a dangerous IP
+    Further function are: Rate Limits, Crawler Hints, Custom Templates, Rules for Specific Routes
     """
 
     def __init__ (
-        self, app, actions: dict = {},
-        hardness: dict = {}, template_dirs: dict = {}, rate_limits: dict = {}, 
-        default_action: str = "captcha", default_hardness: int = 2, default_template_dir: Optional[str] = None, 
-        default_rate_limit: Optional[int] = 120, default_max_rate_limit = 1200, verificationage: int = 3600,
-        withoutcookies: bool = False, block_crawler: bool = False
+        self, app: Flask, actions: dict = {},
+        hardness: dict = {}, rate_limits: dict = {}, template_dirs: dict = {},
+        default_action: str = "captcha", default_hardness: int = 2, default_rate_limit: Optional[int] = 120, 
+        default_max_rate_limit = 1200, default_template_dir: Optional[str] = None, verificationage: int = 3600,
+        withoutcookies: bool = False, block_crawler: bool = True, crawler_hints: bool = True
         ):
-
         """
         Initialize the DDoSify object
 
         :param app: Your Flask App
         :param actions: Dict with actions for different routes like here: {"urlpath": "fight", "endpoint": "block"}, e.g. {"/": "block", "*/api/*": "let", "/login": "fight"} which blocks all suspicious traffic to "/", allows all traffic to /api/ routes e. e.g. "/api/cats" or "/dogs/api/" if they contain "/api/", and where to "/login" any traffic whether suspicious or not has to solve a captcha. (Default = {})
         :param hardness: Dict with hardness for different routes like here: {"urlpath": 1, "endpoint": 2}, e.g. {"/": 3, "*/api/*": 1, "/login": 3}. The urlpaths have the same structure as for actions. (Default = {})
-        :param template_dirs: Dict with template folder for different routes like here: {"urlpath": "/path/to/template/dir", "endpoint": "/path/to/template/dir2"}, e.g. {"/": "/path/to/template/dir", "*/api/*": "/path/to/myapi/template/dir", "/login": "/path/to/login/template/dir"}. The urlpaths have the same structure as for actions. (Default = {})
         :param rate_limits: Dict with rate limit and max rate limit for different routes, the rate limit variable indicates how many requests an ip can make per minute, the max rate limit variable specifies the maximum number of requests that can come from all Ips like here: {"urlpath": (180, 1800), "endpoint": (130, 1300)}, e.g. {"/": (120, 1200), "*/api/*": (180, 1800), "/login": (60, 600)}. The urlpaths have the same structure as for actions. (Default = {})
+        :param template_dirs: Dict with template folder for different routes like here: {"urlpath": "/path/to/template/dir", "endpoint": "/path/to/template/dir2"}, e.g. {"/": "/path/to/template/dir", "*/api/*": "/path/to/myapi/template/dir", "/login": "/path/to/login/template/dir"}. The urlpaths have the same structure as for actions. (Default = {})
         :param default_action: The default value of all pages if no special action is given in actions. (Default = "captcha")
         :param default_hardness: The default value of all pages if no special hardness is given in hardness. (Default = 2)
-        :param default_template_dir: The default value of all pages if no special template_dir is given in template_dirs. (Default = None)
         :param default_rate_limit: How many requests an ip can make per minute, if nothing is given at rate_limits this value is used. If None, no rate limit is set. (Default = 120)
         :param default_max_rate_limit: How many requests all Ips can make per minute, if nothing is given at rate_limits this value is used. If None, no max rate limit is set. (Default = 1200)
+        :param default_template_dir: The default value of all pages if no special template_dir is given in template_dirs. (Default = None)
         :param verificationage: How long the captcha verification is valid, in seconds (Default = 3600 [1 hour])
         :param withoutcookies: If True, no cookie is created after the captcha is fulfilled, but only an Arg is appended to the URL (Default = False)
         :param block_crawler: If True, known crawlers based on their user agent will also need to solve a captcha (Default = False)
-
-        :raises ValueError: If the flask app is None
+        :param crawler_hints: If True, crawlers will cache a page with no content only with meta content of the real web page that is already in the cache.
         """
-        
+
         if app is None:
             raise ValueError("The Flask app cannot be None")
 
@@ -832,26 +579,26 @@ class DDoSify:
         if not isinstance(hardness, dict):
             hardness = dict()
         
-        if not isinstance(template_dirs, dict):
-            template_dirs = dict()
-
         if not isinstance(rate_limits, dict):
             rate_limits = {}
+        
+        if not isinstance(template_dirs, dict):
+            template_dirs = dict()
         
         if not default_action in ["let", "block", "fight", "captcha"]:
             default_action = "captcha"
         
         if not default_hardness in [1, 2, 3]:
             default_hardness = 2
-        
-        if default_template_dir is None:
-            default_template_dir = TEMPLATE_DIR
-        
+
         if not isinstance(default_rate_limit, int) and not default_rate_limit is None:
             default_rate_limit = 120
         
         if not isinstance(default_max_rate_limit, int) and not default_max_rate_limit is None:
             default_max_rate_limit = 1200
+        
+        if default_template_dir is None:
+            default_template_dir = TEMPLATE_DIR
 
         if not isinstance(verificationage, int):
             verificationage = 3600
@@ -860,754 +607,406 @@ class DDoSify:
             withoutcookies = False
         
         if not isinstance(block_crawler, bool):
-            block_crawler = False
-
+            block_crawler = True
+        
+        if not isinstance(crawler_hints, bool):
+            crawler_hints = True
+        
         self.app = app
 
         self.actions = actions
         self.hardness = hardness
-        self.template_dirs = template_dirs
         self.rate_limits = rate_limits
+        self.template_dirs = template_dirs
 
         self.default_action = default_action
         self.default_hardness = default_hardness
-        self.default_template_dir = default_template_dir
         self.default_rate_limit = default_rate_limit
         self.default_max_rate_limit = default_max_rate_limit
+        self.default_template_dir = default_template_dir
 
         self.verificationage = verificationage
         self.withoutcookies = withoutcookies
         self.block_crawler = block_crawler
+        self.crawler_hints = crawler_hints
 
-        app.before_request(self.show_ddosify)
-        app.after_request(self.handle_after_request)
-    
-    @property
-    def current_action(self):
-        """
-        The action of the current route
-        """
+        self.CAPTCHA_SECRET = generate_random_string(512)
 
-        # Get urlpath and endpoint
-        urlpath = urlparse(request.url).path
-        urlendpoint = request.endpoint
+        RATE_LIMIT_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_rate-limit.json")
+        while os.path.isfile(RATE_LIMIT_PATH):
+            RATE_LIMIT_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_rate-limit.json")
+        self.RATE_LIMIT_PATH = RATE_LIMIT_PATH
 
-        action = None
+        STOP_FORUM_SPAM_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_sfs-cache.json")
+        while os.path.isfile(STOP_FORUM_SPAM_PATH):
+            STOP_FORUM_SPAM_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_sfs-cache.json")
+        self.STOP_FORUM_SPAM_PATH = STOP_FORUM_SPAM_PATH
 
-        for path, path_action in self.actions.items():
+        FAILED_CAPTCHA_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_failed-captchas.json")
+        while os.path.isfile(FAILED_CAPTCHA_PATH):
+            FAILED_CAPTCHA_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_failed-captchas.json")
+        self.FAILED_CAPTCHA_PATH = FAILED_CAPTCHA_PATH
 
-            # If "/" is in the path the urlpath is used otherwise the endpoint is used
-            url = urlpath
-            if not "/" in path:
-                url = urlendpoint
+        CAPTCHA_SOLVED_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_captcha-solved.json")
+        while os.path.isfile(CAPTCHA_SOLVED_PATH):
+            CAPTCHA_SOLVED_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_captcha-solved.json")
+        self.CAPTCHA_SOLVED_PATH = CAPTCHA_SOLVED_PATH
 
-            # The path is validated
-            if path.startswith("*") or path.endswith("*"):
-                if path.startswith("*") and not path.endswith("*"):
-                    if url.endswith(path.replace("*", "")):
-                        action = path_action
-                elif path.endswith("*") and not path.startswith("*"):
-                    if url.startswith(path.replace("*", "")):
-                        action = path_action
-                else:
-                    if path.replace("*", "") in url:
-                        action = path_action
-            else:
-                if path == url:
-                    action = path_action
-            
-            if action in ["let", "block", "fight", "captcha"]:
-                break
-        
-        if not action in ["let", "block", "fight", "captcha"]:
-            action = self.default_action
-        
-        return action
+        if self.crawler_hints:
+            CRAWLER_HINTS_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_ch-cache.json")
+            while os.path.isfile(CRAWLER_HINTS_PATH):
+                CRAWLER_HINTS_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_ch-cache.json")
+            self.CRAWLER_HINTS_PATH = CRAWLER_HINTS_PATH
 
-    @property
-    def current_hardness(self):
-        """
-        The hardness of the current route
-        """
-        
-        # Get urlpath and endpoint
-        urlpath = urlparse(request.url).path
-        urlendpoint = request.endpoint
+        app.before_request(self._set_ip)
+        app.before_request(self._rate_limit)
+        app.before_request(self._change_language)
+        app.before_request(self._fight_bots)
 
-        hardness = None
-
-        for path, path_hardness in self.hardness.items():
-
-            # If "/" is in the path the urlpath is used otherwise the endpoint is used
-            url = urlpath
-            if not "/" in path:
-                url = urlendpoint
-            
-            # The path is validated
-            if path.startswith("*") or path.endswith("*"):
-                if path.startswith("*") and not path.endswith("*"):
-                    if url.endswith(path.replace("*", "")):
-                        hardness = path_hardness
-                elif path.endswith("*") and not path.startswith("*"):
-                    if url.startswith(path.replace("*", "")):
-                        hardness = path_hardness
-                else:
-                    if path.replace("*", "") in url:
-                        hardness = path_hardness
-            else:
-                if path == url:
-                    hardness = path_hardness
-            
-            if hardness in [1, 2, 3]:
-                break
-        
-        if not hardness in [1, 2, 3]:
-            hardness = self.default_hardness
-        
-        return hardness
-        
-    @property
-    def current_template_dir(self):
-        """
-        The template directory of the current route
-        """
-
-        # Get urlpath and endpoint
-        urlpath = urlparse(request.url).path
-        urlendpoint = request.endpoint
-
-        template_dir = None
-
-        for path, path_template_dir in self.template_dirs.items():
-
-            # If "/" is in the path the urlpath is used otherwise the endpoint is used
-            url = urlpath
-            if not "/" in path:
-                url = urlendpoint
-
-            # The path is validated
-            if path.startswith("*") or path.endswith("*"):
-                if path.startswith("*") and not path.endswith("*"):
-                    if url.endswith(path.replace("*", "")):
-                        template_dir = path_template_dir
-                elif path.endswith("*") and not path.startswith("*"):
-                    if url.startswith(path.replace("*", "")):
-                        template_dir = path_template_dir
-                else:
-                    if path.replace("*", "") in url:
-                        template_dir = path_template_dir
-            else:
-                if path == url:
-                    template_dir = path_template_dir
-            
-            if isinstance(template_dir, str):
-                break
-        
-        if not isinstance(template_dir, str):
-            template_dir = self.default_template_dir
-        
-        return template_dir
-
-    @property
-    def current_rate_limit(self):
-        """
-        The rate limit of the current route
-        """
-
-        # Get urlpath and endpoint
-        urlpath = urlparse(request.url).path
-        urlendpoint = request.endpoint
-
-        rate_limit = None
-
-        for path, path_rate_limit in self.rate_limits.items():
-            
-            path_rate_limit, _ = path_rate_limit
-
-            # If "/" is in the path the urlpath is used otherwise the endpoint is used
-            url = urlpath
-            if not "/" in path:
-                url = urlendpoint
-
-            # The path is validated
-            if path.startswith("*") or path.endswith("*"):
-                if path.startswith("*") and not path.endswith("*"):
-                    if url.endswith(path.replace("*", "")):
-                        rate_limit = path_rate_limit
-                elif path.endswith("*") and not path.startswith("*"):
-                    if url.startswith(path.replace("*", "")):
-                        rate_limit = path_rate_limit
-                else:
-                    if path.replace("*", "") in url:
-                        rate_limit = path_rate_limit
-            else:
-                if path == url:
-                    rate_limit = path_rate_limit
-            
-            if isinstance(rate_limit, int):
-                break
-        
-        if not isinstance(rate_limit, int):
-            rate_limit = self.default_rate_limit
-        
-        return rate_limit
-
-    @property
-    def current_max_rate_limit(self):
-        """
-        The max rate limit of the current route
-        """
-
-        # Get urlpath and endpoint
-        urlpath = urlparse(request.url).path
-        urlendpoint = request.endpoint
-
-        max_rate_limit = None
-
-        for path, path_max_rate_limit in self.rate_limits.items():
-            
-            _, path_max_rate_limit = path_max_rate_limit
-
-            # If "/" is in the path the urlpath is used otherwise the endpoint is used
-            url = urlpath
-            if not "/" in path:
-                url = urlendpoint
-
-            # The path is validated
-            if path.startswith("*") or path.endswith("*"):
-                if path.startswith("*") and not path.endswith("*"):
-                    if url.endswith(path.replace("*", "")):
-                        max_rate_limit = path_max_rate_limit
-                elif path.endswith("*") and not path.startswith("*"):
-                    if url.startswith(path.replace("*", "")):
-                        max_rate_limit = path_max_rate_limit
-                else:
-                    if path.replace("*", "") in url:
-                        max_rate_limit = path_max_rate_limit
-            else:
-                if path == url:
-                    max_rate_limit = path_max_rate_limit
-            
-            if isinstance(max_rate_limit, int):
-                break
-        
-        if not isinstance(max_rate_limit, int):
-            max_rate_limit = self.default_max_rate_limit
-        
-        return max_rate_limit
-    
-    def threat_score(self: Optional["DDoSify"] = None):
-        """
-        Function to get the threat score of a request
-        """
-        error = False
-
-        try:
-            clientip = get_client_ip()
-        except:
-            error = True
-            clientip = None
-
-        try:
-            clientuseragent = request.user_agent.string
-        except:
-            error = True
-            clientuseragent = None
+        app.after_request(self._add_rate_limit)
+        if self.withoutcookies:
+            app.after_request(self._add_args)
         else:
-            if clientuseragent is None:
-                error = True
+            app.after_request(self._set_cookies)
 
-        is_crawler = False
-        if not error:
-            for crawlername in CRAWLER_USER_AGENTS:
-                if crawlername.lower() in clientuseragent.lower():
-                    is_crawler = True
-        
-        score = 0
+        if self.crawler_hints:
+            app.after_request(self._crawler_hints)
 
-        t4 = Thread(target=Services.update_all_ipsets)
-        t4.start()
-        
-        FIREHOL_IPS = JSON.load(os.path.join(DATA_DIR, "fireholipset.json"))["ips"]
-        IPDENY_IPS = JSON.load(os.path.join(DATA_DIR, "ipdenyipset.json"))["ips"]
-        EMERGINGTHREATS_IPS = JSON.load(os.path.join(DATA_DIR, "emergingthreatsipset.json"))["ips"]
-        MYIPMS_IPS = JSON.load(os.path.join(DATA_DIR, "myipmsipset.json"))["ips"]
-        TOREXITNODES_IPS = JSON.load(os.path.join(DATA_DIR, "torexitnodes.json"))["ips"]
+        atexit.register(self._delete_files)
+    
+    @property
+    def _preferences(self):
+        def is_correct_route(path: str):
+            url_path = urlparse(request.url).path
+            url_endpoint = request.endpoint
 
-        # Define the criteria for blocking or showing captcha
-        criteria = [
-            (error, 0.5),
-            (clientip in FIREHOL_IPS, 0.3),
-            (clientip in IPDENY_IPS, 0.3),
-            (clientip in EMERGINGTHREATS_IPS, 0.3),
-            (clientip in MYIPMS_IPS, 0.3),
-            (clientip in TOREXITNODES_IPS, 0.3),
-            (is_crawler, 0.2)
+            url = url_path
+            if not "/" in path:
+                url = url_endpoint
+
+            if '*' in path:
+                real_path = path.replace("*", "")
+                if (path.startswith("*") and path.endswith("*") and real_path in url) or \
+                    (path.startswith("*") and url.endswith(real_path)) or \
+                        (path.endswith("*") and url.startswith(real_path)):
+                    return True
+                first_part, second_part = path.split("*")[0], path.split("*")[1]
+
+                if url.startswith(first_part) and url.endswith(second_part):
+                    return True
+
+            else:
+                if path == url_endpoint:
+                    return True
+            
+            return False
+
+        current_url = {
+            "action": self.default_action,
+            "hardness": self.default_hardness,
+            "rate_limit": self.default_rate_limit,
+            "max_rate_limit": self.default_max_rate_limit,
+            "template_dir": self.default_template_dir
+        }
+
+        preferences = [
+            {"name": "action", "list": self.actions}, 
+            {"name": "hardness", "list": self.hardness}, 
+            {"name": "rate_limits", "list": self.rate_limits}, 
+            {"name": "template_dir", "list": self.template_dirs}
         ]
 
-        for scorecriteria, scorepoints in criteria:
-            if scorecriteria:
-                score += scorepoints
+        for preference in preferences:
+            if len(preference["list"]) == 0:
+                continue
+            for path, path_preference in preference.items():
+                if is_correct_route(path):
+                    if preference["name"] != "rate_limits":
+                        current_url[preference["name"]] = path_preference
+                    else:
+                        current_url["rate_limit"], current_url["max_rate_limit"] = path_preference
         
-        t5 = Thread(target=Services.remove_stopforumspam)
-        t5.start()
-
-        # Check if the StopForumSpam cache file exists and load its content
-        if os.path.isfile(STOPFORUMSPAM_PATH):
-            stopforumspamcache = JSON.load(STOPFORUMSPAM_PATH)
-        else:
-            # If the cache file doesn't exist, create an empty dictionary
-            stopforumspamcache = {}
-
-        # Variable indicating whether the IP was found in the cache
-        found = False
+        return current_url
+    
+    def _correct_template(self, template_type: str, **args):
+        if not template_type in ["captcha", "block", "rate_limited"]:
+            raise Exception("'" + template_type + "' is not a Template Type.")
         
-        # Check if the client's IP exists in the StopForumSpam cache
-        for hashed_ip, content in stopforumspamcache.items():
-            comparison = Hashing().compare(clientip, hashed_ip)
-            if comparison:
-                # The IP was found in the cache
-                found = True
-                
-                # If the IP is flagged as a spammer and the time since last check is less than 7 days (604800 seconds), block the request
-                if content["spammer"] and not int(time()) - int(content["time"]) > 604800:
-                    score += 0.5
-                if int(time()) - int(content["time"]) > 604800:
-                    found = False
+        template_dir = self._preferences["template_dir"]
+
+        page_path = None
+
+        for file in os.listdir(template_dir):
+            if file.startswith(template_type):
+                page_path = os.path.join(template_dir, file)
                 break
-
-        if not found:
-            # If the IP is not found in the cache, make a request to the StopForumSpam API
-            response = requests.get(f"https://api.stopforumspam.org/api?ip={clientip}&json")
-            if response.ok:
-                try:
-                    content = response.json()
-                except:
-                    # If an error occurs while parsing the API response, block the request
-                    criteria.append(True)
-                else:
-                    spammer = False
-                    # Check if the IP appears in the StopForumSpam database and set the spammer flag accordingly
-                    if content["ip"]["appears"] > 0:
-                        spammer = True
-                        score += 0.5
-
-                    # The clientip is hashed and stored like this
-                    hashed_clientip = Hashing().hash(clientip)
-
-                    # Update the StopForumSpam cache with the result and current timestamp
-                    stopforumspamcache[hashed_clientip] = {"spammer": spammer, "time": int(time())}
-                    
-                    JSON.dump(stopforumspamcache, STOPFORUMSPAM_PATH)
-            else:
-                # If the request to the API fails, block the request
-                criteria.append(True)
-            
-        captcha_token = None
-        if not request.args.get("captcha") is None:
-            captcha_token = request.args.get("captcha")
-        elif not request.cookies.get("captcha") is None:
-            captcha_token = request.cookies.get("captcha")
-
-        if not captcha_token is None:
-            if len(captcha_token) == 56:
-                
-                id, token = captcha_token[:16], captcha_token[16:]
-
-                # Load the list of captcha verifications from a file
-                captchasolved = JSON.load(CAPTCHASOLVED_PATH)
-                
-                for hashed_id, data in captchasolved.items():
-                    # Compare the captcha ID with the stored IDs to find a match
-                    comparison = Hashing().compare(id, hashed_id)
-                    if comparison:
-                        crypto = SymmetricCrypto(token)
-                        datatime = data["time"]
-                        try:
-                            # Decrypt IP, user agent from the stored data
-                            ip = crypto.decrypt(data["ip"])
-                            useragent = crypto.decrypt(data["user_agent"])
-                        except:
-                            pass
-                        else:
-                            # If the captcha is still valid, match with client's IP and user agent
-                            if not int(time()) - int(datatime) > 3600:
-                                if ip == clientip or useragent == clientuseragent:
-                                    score -= 0.6
-                        break
         
-        if score > 1:
-            score = 1
+        if page_path is None:
+            return abort(404)
+    
+        page_ext = page_path.split('.')[-1]
         
-        return score
-
-    def show_ddosify(self):
-        """
-        This function displays different DDoSify pages e.g. Captcha and Block if needed
-        """
-
+        if page_ext == "html":
+            html = render_template(page_path, **args)
+            return html
+        elif page_ext == "json":
+            with open(page_path, "r") as file:
+                return JSON.load(file)
+        elif page_ext in ["txt", "xml"]:
+            with open(page_path, "r") as file:
+                return file.read()
+        else:
+            return send_file(page_path)
+    
+    def _delete_files(self):
+        files = [self.RATE_LIMIT_PATH, self.STOP_FORUM_SPAM_PATH, self.FAILED_CAPTCHA_PATH, self.CAPTCHA_SOLVED_PATH]
+        if self.crawler_hints:
+            files.append(self.CRAWLER_HINTS_PATH)
+        for file in files:
+            try:
+                os.remove(file)
+            except:
+                pass
+        
+    def _set_ip(self):
+        g.ddosify_page = False
+        g.is_crawler = False
+        client_ip = get_client_ip()
+        client_user_agent = request.user_agent.string
+        if client_ip is None or client_user_agent is None:
+            g.ddosify_page = True
+            emoji = random.choice(EMOJIS)
+            return self._correct_template("block", emoji = emoji)
+        g.client_ip = client_ip
+        g.client_user_agent = client_user_agent
         g.ddosify_captcha = None
-        g.ddosify_method = request.method
+    
+    def _rate_limit(self):
+        if os.path.isfile(self.RATE_LIMIT_PATH):
+            rate_limited_ips = JSON.load(self.RATE_LIMIT_PATH)
+        else:
+            rate_limited_ips = {}
 
-        # When an error occurs a captcha is displayed
-        error = False
+        preferences = self._preferences
 
-        try:
-            # Get the client's IP address
-            client_ip = get_client_ip()
-        except:
-            # If an error occurs while fetching the client's IP, set the error flag
-            error = True
-            client_ip = None
+        rate_limit = preferences["rate_limit"]
+        max_rate_limit = preferences["max_rate_limit"]
         
-        rate_limit = self.current_rate_limit
-        max_rate_limit = self.current_max_rate_limit
+        request_count = 0
+        ip_request_count = 0
 
-        if not rate_limit == 0:
-            Services.remove_ratelimits(rate_limit)
-            
-            if os.path.isfile(RATELIMIT_PATH):
-                saved_requests = JSON.load(RATELIMIT_PATH)
+        for hashed_ip, ip_timestamps in rate_limited_ips.items():
+            count = 0
+            for request_time in ip_timestamps:
+                if not int(time()) - int(request_time) > 60:
+                    count += 1
+            comparison = Hashing().compare(g.client_ip, hashed_ip)
+            if comparison:
+                ip_request_count += count
+            request_count += count
+
+        if (ip_request_count >= rate_limit and not rate_limit == 0) or \
+            (request_count >= max_rate_limit and not max_rate_limit == 0):
+            g.ddosify_page = True
+            emoji = random.choice(TEAEMOJIS)
+            return self._correct_template("rate_limited", emoji = emoji), 418
+    
+    def _change_language(self):
+        if request.args.get("ddosify_changelanguage") == "1":
+            languages = LANGUAGES
+
+            search = None
+            if not request.args.get("ddosify_search") is None:
+                searchlanguages = []
+
+                for lang in languages:
+                    if request.args.get("ddosify_search").lower() in lang["name"].lower():
+                        searchlanguages.append(lang)
+
+                languages = searchlanguages
+                search = request.args.get("ddosify_search")
+
+            template_dir = self._preferences["template_dir"]
+
+            for file in os.listdir(template_dir):
+                if file.startswith("change_language"):
+                    g.ddosify_page = True
+                    return render_template(os.path.join(template_dir, file), search=search, languages=languages)
+                
+    def _fight_bots(self):
+        url_path = urlparse(request.url).path
+
+        def add_failed_captcha():
+            if os.path.isfile(self.FAILED_CAPTCHA_PATH):
+                seenips = JSON.load(self.FAILED_CAPTCHA_PATH)
             else:
-                saved_requests = {}
+                seenips = {}
+
+            is_found = False
+
+            for hashed_ip, ip_records in seenips.items():
+                comparison = Hashing().compare(g.client_ip, hashed_ip)
+                if comparison:
+                    is_found = True
+
+                    records_length = 0
+                    for record in ip_records:
+                        if not int(time()) - int(record) > 7200:
+                            records_length += 1
+                    records_length += 1
+
+                    ip_records.append(str(int(time())))
+                    seenips[hashed_ip] = ip_records
+
+                    JSON.dump(seenips, self.FAILED_CAPTCHA_PATH)
+
+            if not is_found:
+                hashed_client_ip = Hashing().hash(g.client_ip)
+                seenips[hashed_client_ip] = [str(int(time()))]
+
+                JSON.dump(seenips, self.FAILED_CAPTCHA_PATH)
+        
+        def show_captcha(error: bool = False):
+            captcha_token = Hashing().hash(url_path) + "-//-" + str(int(time())) + "-//-" + str(hardness) + "-//-" +\
+                Hashing().hash(g.client_ip) + "-//-" + Hashing().hash(g.client_user_agent) + "-//-"
+
+            string_length = (5 if hardness == 1 else 8 if hardness == 2 else 9) + random.choice([1, 1, 2, 3])
             
-            request_count = 0
-            ip_request_count = 0
+            image_captcha_code = generate_random_string(string_length, with_punctuation=False)
 
-            for hashed_ip, timestamps in saved_requests.items():
-                count = 0
-                for request_time in timestamps:
-                    if not int(time()) - int(request_time) > 60:
-                        count += 1
-                if not client_ip is None:
-                    comparison = Hashing().compare(client_ip, hashed_ip)
-                    if comparison:
-                        ip_request_count += count
-                request_count += count
+            if string_length > 6:
+                image_captcha_code = image_captcha_code.upper()
+            
+            image_captcha = ImageCaptcha(width=320, height=120, fonts=[
+                os.path.join(DATA_DIR, "Comic_Sans_MS.ttf"),
+                os.path.join(DATA_DIR, "DroidSansMono.ttf"),
+                os.path.join(DATA_DIR, "Helvetica.ttf")
+            ])
 
-            if ip_request_count > rate_limit or request_count > max_rate_limit:
-                return self.show_ratelimited()
+            captcha_image = image_captcha.generate(image_captcha_code)
 
-        action = self.current_action
-        hardness = self.current_hardness
+            captcha_image_data = b64encode(captcha_image.getvalue()).decode('utf-8')
+            captcha_image_data = "data:image/png;base64," + captcha_image_data
 
-        # If the action let is given, return
+            captcha_token += image_captcha_code
+
+            captcha_audio_data = None
+
+            if hardness == 3:
+                int_length = 8 + random.choice([1, 2, 3, 4, 5, 6])
+
+                audio_captcha_code = generate_random_string(int_length, with_punctuation=False, with_letters=False)
+                audio_captcha = AudioCaptcha()
+                captcha_audio = audio_captcha.generate(audio_captcha_code)
+
+                captcha_audio_data = b64encode(captcha_audio).decode('utf-8')
+                captcha_audio_data = "data:audio/wav;base64," + captcha_audio_data
+
+                captcha_token += "-//-" + audio_captcha_code
+            
+            coded_captcha_token = SymmetricCrypto(self.CAPTCHA_SECRET).encrypt(captcha_token)
+
+            error = "That was not right, try again!" if error else None
+
+            return self._correct_template("captcha", error = error, textCaptcha=captcha_image_data, audioCaptcha = captcha_audio_data, captchatoken=coded_captcha_token)
+
+        action = self._preferences["action"]
+        hardness = self._preferences["hardness"]
+
         if action == "let":
             return
 
-        # When the action fight is given, a captcha is displayed
-        if action == "fight":
-            return self.show_captchavalidate()
-
-        # If the parameter ddosify_changelanguage is given, the language change page is displayed
-        if request.args.get("ddosify_changelanguage") == "1":
-            return self.show_changelanguage()
-
-        try:
-            # Get the client's user agent string from the request
-            clientuseragent = request.user_agent.string
-        except:
-            # If an error occurs while fetching the user agent, set the error flag
-            error = True
-            clientuseragent = None
-        else:
-            # If the user agent is None, set the error flag
-            if clientuseragent is None:
-                error = True
-
-        # Check if the client's user agent indicates that it is a web crawler
         is_crawler = False
-        if not error:
-            for crawlername in CRAWLER_USER_AGENTS:
-                if crawlername.lower() in clientuseragent.lower():
-                    is_crawler = True
+        for crawlername in CRAWLER_USER_AGENTS:
+            if crawlername.lower() in g.client_user_agent.lower():
+                is_crawler = True
+        
+        g.is_crawler = is_crawler
         
         t = Thread(target=Services.update_all_ipsets)
         t.start()
-        
+
         FIREHOL_IPS = JSON.load(os.path.join(DATA_DIR, "fireholipset.json"))["ips"]
         IPDENY_IPS = JSON.load(os.path.join(DATA_DIR, "ipdenyipset.json"))["ips"]
         EMERGINGTHREATS_IPS = JSON.load(os.path.join(DATA_DIR, "emergingthreatsipset.json"))["ips"]
         MYIPMS_IPS = JSON.load(os.path.join(DATA_DIR, "myipmsipset.json"))["ips"]
         TOREXITNODES_IPS = JSON.load(os.path.join(DATA_DIR, "torexitnodes.json"))["ips"]
 
-        # Define the criteria for blocking or showing captcha
         criteria = [
-            error,
-            client_ip in FIREHOL_IPS,
-            client_ip in IPDENY_IPS,
-            client_ip in EMERGINGTHREATS_IPS,
-            client_ip in MYIPMS_IPS,
-            client_ip in TOREXITNODES_IPS,
-            is_crawler and self.block_crawler
+            g.client_ip in FIREHOL_IPS,
+            g.client_ip in IPDENY_IPS,
+            g.client_ip in EMERGINGTHREATS_IPS,
+            g.client_ip in MYIPMS_IPS,
+            g.client_ip in TOREXITNODES_IPS,
+            is_crawler and self.block_crawler,
+            action == "fight"
         ]
 
-        # If none of the criteria is True, proceed to check StopForumSpam API
         if not any(criteria):
-            t3 = Thread(target=Services.remove_stopforumspam)
-            t3.start()
-
-            # Check if the StopForumSpam cache file exists and load its content
-            if os.path.isfile(STOPFORUMSPAM_PATH):
-                stopforumspamcache = JSON.load(STOPFORUMSPAM_PATH)
+            if os.path.isfile(self.STOP_FORUM_SPAM_PATH):
+                stopforumspamcache = JSON.load(self.STOP_FORUM_SPAM_PATH)
             else:
-                # If the cache file doesn't exist, create an empty dictionary
                 stopforumspamcache = {}
 
-            # Variable indicating whether the IP was found in the cache
             found = False
             
-            # Check if the client's IP exists in the StopForumSpam cache
-            for hashed_ip, content in stopforumspamcache.items():
-                comparison = Hashing().compare(client_ip, hashed_ip)
+            for hashed_ip, ip_content in stopforumspamcache.items():
+                comparison = Hashing().compare(g.client_ip, hashed_ip)
                 if comparison:
-                    # The IP was found in the cache
                     found = True
                     
-                    # If the IP is flagged as a spammer and the time since last check is less than 7 days (604800 seconds), block the request
-                    if content["spammer"] and not int(time()) - int(content["time"]) > 604800:
+                    if ip_content["spammer"] and not int(time()) - int(ip_content["time"]) > 604800:
                         criteria.append(True)
                     break
 
             if not found:
-                # If the IP is not found in the cache, make a request to the StopForumSpam API
-                response = requests.get(f"https://api.stopforumspam.org/api?ip={client_ip}&json")
+                response = requests.get(f"https://api.stopforumspam.org/api?ip={g.client_ip}&json")
                 if response.ok:
                     try:
                         content = response.json()
                     except:
-                        # If an error occurs while parsing the API response, block the request
                         criteria.append(True)
                     else:
                         spammer = False
-                        # Check if the IP appears in the StopForumSpam database and set the spammer flag accordingly
                         if content["ip"]["appears"] > 0:
                             spammer = True
                             criteria.append(True)
 
-                        # The clientip is hashed and stored like this
-                        hashed_clientip = Hashing().hash(client_ip)
+                        hashed_client_ip = Hashing().hash(g.client_ip)
 
-                        # Update the StopForumSpam cache with the result and current timestamp
-                        stopforumspamcache[hashed_clientip] = {"spammer": spammer, "time": int(time())}
+                        stopforumspamcache[hashed_client_ip] = {"spammer": spammer, "time": int(time())}
                         
-                        JSON.dump(stopforumspamcache, STOPFORUMSPAM_PATH)
+                        JSON.dump(stopforumspamcache, self.STOP_FORUM_SPAM_PATH)
                 else:
-                    # If the request to the API fails, block the request
                     criteria.append(True)
         
-        if any(criteria):
-            # Show block page
-            if action == "block":
-                return self.show_block()
-
-            t1 = Thread(target=Services.remove_seenips)
-            t1.start()
-
-            # Load the list of previously seen IPs from a file
-            if os.path.isfile(SEENIPS_PATH):
-                seenips = JSON.load(SEENIPS_PATH)
-            else:
-                seenips = {}
-
-            if not client_ip is None:
-                # Compare the client's IP with the seen IPs to determine if it's a repeated visit
-                for hashed_ip, records in seenips.items():
-                    # Compare the client's IP with each hashed IP stored in the "seenips" list
-                    comparison = Hashing().compare(client_ip, hashed_ip)
-                    if comparison:
-                        records_length = 0
-                        for record in records:
-                            # Calculate the number of records (visits) within the last 4 hours (14400 seconds)
-                            if not int(time()) - int(record) > 14400:
-                                records_length += 1
-                        # If the application is in botfightmode or the action is set to "hard," apply stricter rules
-                        if action == "fight" or hardness == 3:
-                            if records_length > 2:
-                                # If there have been more than one record (two or more false captchas) within the last 2 hours, block the request
-                                return self.show_block()
-                        else:
-                            # If the application is not in botfightmode and the action is not "hard," apply normal rules
-                            if records_length > 3:
-                                # If there have been more than two records (three or more false captchas) within the last 2 hours, block the request
-                                return self.show_block()
-                        break
-            
-            return self.show_captchavalidate()
-    
-    def handle_after_request(self, response):
-        """
-        This function creates cookies, stores args in the HTML code
-        """
-        try:
-            # Get the client's IP address
-            client_ip = get_client_ip()
-        except:
-            client_ip = None
+        if not any(criteria):
+            return
         
-        rate_limit = self.current_rate_limit
-
-        if not client_ip is None and not rate_limit == 0:
-            Services.remove_ratelimits(rate_limit)
-
-            if os.path.isfile(RATELIMIT_PATH):
-                saved_requests = JSON.load(RATELIMIT_PATH)
-            else:
-                saved_requests = {}
-
-            found = False
-            for hashed_ip, timestamps in saved_requests.items():
-                comparison = Hashing().compare(client_ip, hashed_ip)
-                if comparison:
-                    found = True
-
-                    new_timestamps = []
-                    for request_time in timestamps:
-                        if not int(time()) - int(request_time) > 60:
-                            new_timestamps.append(request_time)
-                    new_timestamps.append(str(int(time())))
-
-                    saved_requests[hashed_ip] = new_timestamps
-                    break
-            
-            if not found:
-                hashed_ip = Hashing().hash(client_ip, 16)
-                saved_requests[hashed_ip] = [str(int(time()))]
-            
-            JSON.dump(saved_requests, RATELIMIT_PATH)
-
-        if response.content_type == "text/html; charset=utf-8" and response.status_code == 200 and g.ddosify_method == "GET":        
-            html = response.data
-
-            # Add required url args to any url on the page
-            soup = BeautifulSoup(html, 'html.parser')
-
-            required_url_args = ""
-
-            if self.withoutcookies:
-                if not g.ddosify_captcha is None:
-                    required_url_args = "captcha=" + quote(g.ddosify_captcha)
-                elif not request.args.get("captcha") is None:
-                    required_url_args = "captcha=" + quote(request.args.get("captcha"))
-            else:
-                if not g.ddosify_captcha is None:
-                    response.set_cookie("captcha", g.ddosify_captcha, max_age=self.verificationage)
-            
-            language_edit = ""
-            if request.args.get("ddosify_language") in LANGUAGE_LIST:
-                language_edit = request.args.get("ddosify_language")
-                if not self.withoutcookies:
-                    response.set_cookie("language", language_edit, max_age=60*60*24*30*12*3)
-            elif request.args.get("language") in LANGUAGE_LIST:
-                language_edit = request.args.get("language")
-                if not self.withoutcookies:
-                    response.set_cookie("language", language_edit, max_age=60*60*24*30*12*3)
-            elif request.cookies.get("language") in LANGUAGE_LIST:
-                language_edit = request.cookies.get("language")
-                if not self.withoutcookies:
-                    response.set_cookie("language", language_edit, max_age=60*60*24*30*12*3)
-
-            # Iterate over <a> and <button> tags in the parsed HTML
-            for href_tag in soup.find_all('a') + soup.find_all('button'):
-                try:
-                    # Buttons/a objects without href tag will be skipped
-                    if not href_tag['href']:
-                        continue
-                except:
-                    continue
-
-                # Links that do not lead to the page again are skipped
-                if not href_tag['href'].startswith('/') and not href_tag['href'].startswith('?'):
-                    continue
-                
-                special_character1 = "?"
-                
-                # Check if the href attribute contains a '?'
-                if "?" in href_tag['href']:
-                    special_character1 = "&"
-                
-                if required_url_args == "":
-                    special_character1 = ""
-
-                special_character2 = "?"
-
-                if "?" in href_tag['href'] or "?" in special_character1:
-                    special_character2 = "&"
-                
-                # Append the required URL arguments to the href attribute
-                if href_tag['href']:
-                    href_tag['href'] = href_tag['href'] + special_character1 + required_url_args
-                    if not language_edit == "":
-                        href_tag['href'] = href_tag['href'] + special_character2 + "language=" + language_edit
-            
-            # Iterate over <form> tags in the parsed HTML
-            for form_tag in soup.find_all('form'):
-                # Append the required URL arguments to the form tag
-                if required_url_args != "":
-                    input_tag = f'<input type="hidden" name="{required_url_args.split("=")[0]}" value="{required_url_args.split("=")[1]}">'
-                else:
-                    input_tag = ""
-                
-                if not language_edit == "":
-                    input_tag += f'<input type="hidden" name="language" value="{language_edit}">'
-
-                button_tag = form_tag.find('button')  # Find the first <button> tag inside the form
-                if button_tag:
-                    # Insert the input tag before the button tag
-                    button_tag.insert_before(input_tag)
-                else:
-                    # If no <button> tag is found, simply append the input tag to the form
-                    form_tag.append(input_tag)
-
-                # Check if the form has an "action" attribute
-                if 'action' in form_tag.attrs:
-                    action_text = form_tag['action']
-
-                    special_character1 = "?"
-                
-                    # Check if the href attribute contains a '?'
-                    if "?" in action_text:
-                        special_character1 = "&"
-                    
-                    if required_url_args == "":
-                        special_character1 = ""
-                    
-                    special_character2 = "?"
-
-                    if "?" in action_text or "?" in special_character1:
-                        special_character2 = "&"
-                        
-                    edited_action_text = action_text + special_character1 + required_url_args
-                    if not language_edit == "":
-                        edited_action_text += special_character2 + "language=" + language_edit
-                    form_tag['action'] = edited_action_text
-            
-            response.data = str(soup).replace("&lt;", "<").replace("&gt;", ">")
+        if action == "block":
+            g.ddosify_page = True
+            emoji = random.choice(EMOJIS)
+            return self._correct_template("block", emoji = emoji)
         
-        return response
-    
-    def show_captchavalidate(self):
-        """
-        Function to validate a captcha request, returns None if a captcha was already solved
-        """
+        if os.path.isfile(self.FAILED_CAPTCHA_PATH):
+            failed_captchas = JSON.load(self.FAILED_CAPTCHA_PATH)
+        else:
+            failed_captchas = {}
 
-        action = self.current_action
-        hardness = self.current_hardness
-        urlpath = urlparse(request.url).path
-
-        try:
-            # Get the client's IP address
-            clientip = get_client_ip()
-        except:
-            clientip = None
-
-        try:
-            # Get the client's user agent string from the request
-            clientuseragent = request.user_agent.string
-        except:
-            clientuseragent = None
-
-        # If the request args contains captchasolved
+        for hashed_ip, ip_records in failed_captchas.items():
+            comparison = Hashing().compare(g.client_ip, hashed_ip)
+            if comparison:
+                records_length = 0
+                for record in ip_records:
+                    if not int(time()) - int(record) > 14400:
+                        records_length += 1
+                if (action == "fight" or hardness == 3) and records_length > 2 or records_length > 3:
+                    g.ddosify_page = True
+                    emoji = random.choice(EMOJIS)
+                    return self._correct_template("block", emoji = emoji)
+        
+        is_failed_captcha = False
+        
         if request.args.get("captchasolved") == "1":
             g.ddosify_method = "GET"
 
@@ -1615,93 +1014,91 @@ class DDoSify:
             audio_captcha = request.args.get("audioCaptcha")
             captcha_token = request.args.get("captchatoken")
 
-            # If the text_captcha and the captcha_token is None, a captcha has to be solved
-            if None in [text_captcha, captcha_token]:
-                return self.show_captcha(error=True)
+            if not None in [text_captcha, captcha_token]:
+                try:
+                    captcha_token_decrypted = SymmetricCrypto(self.CAPTCHA_SECRET).decrypt(captcha_token)
+                except:
+                    pass
+                else:
+                    ct = captcha_token_decrypted.split('-//-')
 
-            # Decrypt the captcha token and split it at "-//-"
-            captcha_token_decrypted = SymmetricCrypto(CAPTCHASECRET).decrypt(captcha_token)
-            ct = captcha_token_decrypted.split('-//-')
+                    ct_path, ct_time, ct_hardness, ct_ip, ct_useragent, ct_text = ct[0], ct[1], int(ct[2]), ct[3], ct[4], ct[5]
 
-            # Get the url path, time, hardness, ip, user agent and text captcha code from the captcha token
-            ct_path, ct_time, ct_hardness, ct_ip, ct_useragent, ct_text = ct[0], ct[1], int(ct[2]), ct[3], ct[4], ct[5]
+                    is_failing = False
 
-            # If the difficulty of the solved captcha is high (= audio captcha is also required)
-            if ct_hardness == 3:
+                    if ct_hardness == 3:
+                        ct_audio = ct[6]
 
-                # The audio captcha token is obtained from the captcha token
-                ct_audio = ct[6]
+                        if hardness == 3:
+                            if audio_captcha is None:
+                                is_failing = True
+                            else:
+                                if str(audio_captcha) != str(ct_audio):
+                                    is_failing = True
+                        else:
+                            if not audio_captcha is None:
+                                if not str(audio_captcha) != str(ct_audio):
+                                    ct_hardness = hardness
+                            else:
+                                ct_hardness = hardness
+                    
+                    if not is_failing:
+                        if not hardness < ct_hardness:
+                            comparison_path = Hashing().compare(url_path, ct_path)
+                            comparison_ip = Hashing().compare(g.client_ip, ct_ip)
+                            comparison_user_agent = Hashing().compare(g.client_user_agent, ct_useragent)
 
-                # If the current page also has one of three, getting the audio captcha wrong will cause the check to fail.
-                if hardness == 3:
-                    if audio_captcha is None:
-                        return self.show_captcha(error=True)
+                            if not comparison_path or \
+                                int(time()) - int(ct_time) > 180 or \
+                                    (not comparison_ip and not comparison_user_agent) or \
+                                        str(text_captcha) != str(ct_text):
+                                is_failed_captcha = True
+
+                            else:
+                                id = generate_random_string(16, with_punctuation=False)
+                                token = generate_random_string(40)
+
+                                if os.path.isfile(self.CAPTCHA_SOLVED_PATH):
+                                    captcha_solved = JSON.load(self.CAPTCHA_SOLVED_PATH)
+                                else:
+                                    captcha_solved = {}
+                                
+                                while any([Hashing().compare(id, hashed_id) for hashed_id, _ in captcha_solved.items()]):
+                                    id = generate_random_string(with_punctuation=False)
+
+                                symcrypto = SymmetricCrypto(self.CAPTCHA_SECRET)
+
+                                data = {
+                                    "time": int(time()),
+                                    "ip": symcrypto.encrypt(g.client_ip),
+                                    "user_agent": symcrypto.encrypt(g.client_user_agent),
+                                    "hardness": symcrypto.encrypt(str(ct_hardness))
+                                }
+
+                                if os.path.isfile(self.CAPTCHA_SOLVED_PATH):
+                                    captcha_solved = JSON.load(self.CAPTCHA_SOLVED_PATH)
+                                else:
+                                    captcha_solved = {}
+                                
+                                captcha_solved[Hashing().hash(id)] = data
+
+                                JSON.dump(captcha_solved, self.CAPTCHA_SOLVED_PATH)
+
+                                g.ddosify_captcha = id+token
+
+                                if self.withoutcookies:
+                                    return redirect(request.url.replace("http://", request.scheme + "://")\
+                                        .replace("?textCaptcha=" + str(request.args.get("textCaptcha")), "").replace("&textCaptcha=" + str(request.args.get("textCaptcha")), "")\
+                                        .replace("?audioCaptcha=" + str(request.args.get("audioCaptcha")), "").replace("&audioCaptcha=" + str(request.args.get("audioCaptcha")), "")\
+                                        .replace("?captchatoken=" + str(request.args.get("captchatoken")), "").replace("&captchatoken=" + str(request.args.get("captchatoken")), "")\
+                                        .replace("?captchasolved=1", "").replace("&captchasolved=1", "") + "?captcha=" + quote(g.ddosify_captcha))
+                                return
+                        else:
+                            is_failed_captcha = True
                     else:
-                        if str(audio_captcha) != str(ct_audio):
-                            return self.show_captcha(error=True)
-                else:
-                    # If the current page does not actually require an audio captcha, the check is still accepted if the audio captcha is incorrect, but the solved difficulty is set to the hardness of the current page
-                    if not audio_captcha is None:
-                        if not str(audio_captcha) != str(ct_audio):
-                            ct_hardness = hardness
-                    else:
-                        ct_hardness = hardness
-
-            # However, if the required hardness of this side is greater than that of the solved captcha, then the check is invalid
-            if hardness < ct_hardness:
-                return self.show_captcha(error=True)
-            
-            # Compare the hash of the data contained in the captcha token with the data of the current web page
-            comparison_path = Hashing().compare(urlpath, ct_path)
-            comparison_ip = Hashing().compare(clientip, ct_ip)
-            comparison_useragent = Hashing().compare(clientuseragent, ct_useragent)
-
-            # If the comparisons are not valid or the time has expired, or the text_captcha is not valid, then a captcha is displayed
-            if not comparison_path or int(time()) - int(ct_time) > 180 or (not comparison_ip and not comparison_useragent) or str(text_captcha) != str(ct_text):
-                return self.show_captcha(error=True)
-
-            # If the Ip or the user agent does not match, no captcha solve token is created, but only a one-time token intended for one-time verification
-            if comparison_ip and comparison_useragent:
-                # Generate ID and token
-                id = generate_random_string(16, with_punctuation=False)
-                token = generate_random_string(40)
-
-                # If captcha have already been solved, they will be loaded
-                if os.path.isfile(CAPTCHASOLVED_PATH):
-                    captchasolved = JSON.load(CAPTCHASOLVED_PATH)
-                else:
-                    captchasolved = {}
-                
-                # It is checked whether the generated ID already exists
-                while any([Hashing().compare(id, hashed_id) for hashed_id, _ in captchasolved.items()]):
-                    id = generate_random_string(with_punctuation=False)
-
-                # Initialise the SymetricCrypto Class with the generated encryption token
-                symcrypto = SymmetricCrypto(token)
-
-                # Creates a data model with the ID and encrypted data
-                data = {
-                    "time": time(),
-                    "ip": symcrypto.encrypt(clientip),
-                    "user_agent": symcrypto.encrypt(clientuseragent),
-                    "hardness": symcrypto.encrypt(str(ct_hardness))
-                }
-
-                # The solved captchas are loaded again
-                if os.path.isfile(CAPTCHASOLVED_PATH):
-                    captchasolved = JSON.load(CAPTCHASOLVED_PATH)
-                else:
-                    captchasolved = {}
-                
-                # The generated ID is added to the dict
-                captchasolved[Hashing().hash(id)] = data
-
-                JSON.dump(captchasolved, CAPTCHASOLVED_PATH)
-
-                # Add the created data to the response
-                g.ddosify_captcha = id+token
-
-            return
+                        is_failed_captcha = True
+            else:
+                is_failed_captcha = True
         
         captcha_token = None
         if not request.args.get("captcha") is None:
@@ -1710,375 +1107,220 @@ class DDoSify:
             captcha_token = request.cookies.get("captcha")
 
         if captcha_token is None:
-            # Show captcha challenge if no captcha token is found
-            return self.show_captcha()
-
-        # Validate the captcha token
+            g.ddosify_page = True
+            if is_failed_captcha:
+                add_failed_captcha()
+            return show_captcha(error=is_failed_captcha)
+        
         if len(captcha_token) != 56:
-            return self.show_captcha()
+            g.ddosify_page = True
+            if is_failed_captcha:
+                add_failed_captcha()
+            return show_captcha(error=is_failed_captcha)
             
         id, token = captcha_token[:16], captcha_token[16:]
 
-        t2 = Thread(target=Services.remove_captchasolved, args=(self.verificationage, ))
-        t2.start()
-
-        captchasolved = JSON.load(CAPTCHASOLVED_PATH)
-        
-        for hashed_id, data in captchasolved.items():
-            # Compare the captcha ID with the stored IDs to find a match
+        if os.path.isfile(self.CAPTCHA_SOLVED_PATH):
+            captcha_solved = JSON.load(self.CAPTCHA_SOLVED_PATH)
+        else:
+            captcha_solved = {}
+       
+        for hashed_id, ip_data in captcha_solved.items():
             comparison = Hashing().compare(id, hashed_id)
             if comparison:
-                crypto = SymmetricCrypto(token)
-                datatime = data["time"]
+                crypto = SymmetricCrypto(self.CAPTCHA_SECRET)
+                datatime = ip_data["time"]
                 try:
-                    # Decrypt IP, user agent and hardness of solved captcha from the stored data
-                    ip = crypto.decrypt(data["ip"])
-                    useragent = crypto.decrypt(data["user_agent"])
-                    captcha_hardness = int(crypto.decrypt(data["hardness"]))
+                    ip = crypto.decrypt(ip_data["ip"])
+                    useragent = crypto.decrypt(ip_data["user_agent"])
+                    captcha_hardness = int(crypto.decrypt(ip_data["hardness"]))
                 except:
                     pass
                 else:
-                    # If the captcha is still valid, check for botfightmode and match with client's IP and user agent
                     if not int(time()) - int(datatime) > self.verificationage and hardness >= captcha_hardness:
-                        if not action == "fight" and not hardness == 3:
-                            if ip == clientip or useragent == clientuseragent:
-                                return
-                        else:
-                            if ip == clientip and useragent == clientuseragent:
-                                return
-                break
-                
-        # Show captcha challenge if no valid captcha verification is found
-        return self.show_captcha()
-    
-    def show_changelanguage(self):
-        """
-        This function generates a page where you can change your language.
-
-        :return: The content of the changelanguage page.
-        """
-
-        template_dir = self.current_template_dir
-
-        pagepath = None
-
-        for file in os.listdir(template_dir):
-            if file.startswith("changelanguage"):
-                pagepath = os.path.join(template_dir, file)
+                        if ip == g.client_ip and useragent == g.client_user_agent:
+                            return
                 break
         
-        if pagepath is None:
-            return abort(404)
+        g.ddosify_page = True
 
-        languages = LANGUAGES
+        if is_failed_captcha:
+            add_failed_captcha()
 
-        search = None
-        if not request.args.get("ddosify_search") is None:
-            searchlanguages = []
+        return show_captcha(error=is_failed_captcha)
 
-            # If the search term is in the language, the languages are added to the list according to the language priority
-            for lang in languages:
-                if request.args.get("ddosify_search").lower() in lang["name"].lower():
-                    searchlanguages.append(lang)
+    def _add_rate_limit(self, response):
+        rate_limit = self._preferences["rate_limit"]
 
-            # The variables are updated
-            languages = searchlanguages
-            search = request.args.get("ddosify_search")
-        
-        # If no language was found/exists languages = None
-        if languages == []:
-            languages = None
-
-        # Get the language based on the user's preference
-        language = Language.language()
-
-        # Render the HTML template, adding an emoji to it using a random choice from the emojis list
-        page = render_template(pagepath, language = language, search=search, languages=languages)
-
-        try:
-            # Translate the page content from English to the user's preferred language
-            translated_page = Language.translate_page(page, "en", language)
-        except:
-            # If translation fails, use the original page content
-            translated_page = page
-
-        return translated_page
-
-    def show_block(self):
-        """
-        This function generates a block page to be shown in case of blocking a request.
-                
-        :return: The content of the block page (HTML, JSON, TXT, or XML).
-        """
-
-        template_dir = self.current_template_dir
-
-        pagepath = None
-
-        for file in os.listdir(template_dir):
-            if file.startswith("block"):
-                pagepath = os.path.join(template_dir, file)
-                break
-        
-        if pagepath is None:
-            return abort(404)
-    
-        # Determine the file extension of the template
-        pageext = pagepath.split('.')[-1]
-        
-        if pageext == "html":
-            # If the template is an HTML file, process and translate the page content
-
-            # Get the language based on the user's preference
-            language = Language.language()
-
-            # Render the HTML template, adding an emoji to it using a random choice from the emojis list
-            page = render_template(pagepath, language = language, emoji = secrets.choice(EMOJIS))
-
-            try:
-                # Translate the page content from English to the user's preferred language
-                translated_page = Language.translate_page(page, "en", language)
-            except:
-                # If translation fails, use the original page content
-                translated_page = page
-
-            return translated_page
-            
-        elif pageext == "json":
-            # If the template is a JSON file, load and return its content
-            with open(pagepath, "r") as file:
-                return json.load(file)
-                
-        elif pageext in ["txt", "xml"]:
-            # If the template is a TXT or XML file, read and return its content
-            with open(pagepath, "r") as file:
-                return file.read()
-        
-        else:
-            # If the template file has an unsupported extension, serve it as a file download
-            return send_file(pagepath)
-    
-    def show_ratelimited(self):
-        """
-        This function generates a ratelimited page to be shown in case of a rate limit.
-                
-        :return: The content of the ratelimited page (HTML, JSON, TXT, or XML).
-        """
-
-        template_dir = self.current_template_dir
-
-        pagepath = None
-
-        for file in os.listdir(template_dir):
-            if file.startswith("ratelimited"):
-                pagepath = os.path.join(template_dir, file)
-                break
-        
-        if pagepath is None:
-            return abort(404)
-    
-        # Determine the file extension of the template
-        pageext = pagepath.split('.')[-1]
-        
-        if pageext == "html":
-            # If the template is an HTML file, process and translate the page content
-
-            # Get the language based on the user's preference
-            language = Language.language()
-
-            # Render the HTML template, adding an emoji to it using a random choice from the emojis list
-            page = render_template(pagepath, language = language, emoji = secrets.choice(TEAEMOJIS))
-
-            try:
-                # Translate the page content from English to the user's preferred language
-                translated_page = Language.translate_page(page, "en", language)
-            except:
-                # If translation fails, use the original page content
-                translated_page = page
-
-            return translated_page
-            
-        elif pageext == "json":
-            # If the template is a JSON file, load and return its content
-            with open(pagepath, "r") as file:
-                return json.load(file)
-                
-        elif pageext in ["txt", "xml"]:
-            # If the template is a TXT or XML file, read and return its content
-            with open(pagepath, "r") as file:
-                return file.read()
-        
-        else:
-            # If the template file has an unsupported extension, serve it as a file download
-            return send_file(pagepath)
-    
-    def show_captcha(self, error: bool = False):
-        """
-        This function generates a captcha page for the user.
-        
-        :param error: If there is a need to show error notifications to the user.
-        
-        :return: The content of the captcha page (HTML, JSON, TXT, or XML).
-        """
-
-        action = self.current_action
-        hardness = self.current_hardness
-        template_dir = self.current_template_dir
-        urlpath = urlparse(request.url).path
-
-        pagepath = None
-
-        for file in os.listdir(template_dir):
-            if file.startswith("captcha"):
-                pagepath = os.path.join(template_dir, file)
-                break
-        
-        if pagepath is None:
-            return abort(404)
-
-        try:
-            # Get the client's IP address
-            clientip = get_client_ip()
-        except:
-            # If an error occurs while fetching the client's IP, set the error flag
-            clientip = None
-        
-        if error:
-            # Load the list of previously seen IPs from a file
-            if os.path.isfile(SEENIPS_PATH):
-                seenips = JSON.load(SEENIPS_PATH)
+        if not rate_limit == 0:
+            if os.path.isfile(self.RATE_LIMIT_PATH):
+                rate_limited_ips = JSON.load(self.RATE_LIMIT_PATH)
             else:
-                seenips = {}
+                rate_limited_ips = {}
+
+            found = False
+            for hashed_ip, ip_timestamps in rate_limited_ips.items():
+                comparison = Hashing().compare(g.client_ip, hashed_ip)
+                if comparison:
+                    found = True
+
+                    new_timestamps = []
+                    for request_time in ip_timestamps:
+                        if not int(time()) - int(request_time) > 60:
+                            new_timestamps.append(request_time)
+                    new_timestamps = [str(int(time()))] + new_timestamps
+
+                    rate_limited_ips[hashed_ip] = new_timestamps[:round(rate_limit*1.2)]
+                    break
             
-            if not clientip is None:
-                is_found = False
-
-                # Compare the client's IP with the seen IPs to determine if it's a repeated visit
-                for hashed_ip, records in seenips.items():
-                    # Compare the client's IP with each hashed IP stored in the "seenips" list
-                    comparison = Hashing().compare(clientip, hashed_ip)
-                    if comparison:
-                        is_found = True
-
-                        records_length = 0
-                        for record in records:
-                            # Calculate the number of records (visits) within the last 2 hours (7200 seconds)
-                            if not int(time()) - int(record) > 7200:
-                                records_length += 1
-                        # Adding an extra for the error
-                        records_length += 1
-
-                        # A new error record is created and added
-                        records.append(str(int(time())))
-                        seenips[hashed_ip] = records
-
-                        JSON.dump(seenips, SEENIPS_PATH)
-
-                        # If the application is in botfightmode or the action is set to "hard," apply stricter rules
-                        if action == "figth" or hardness == 3:
-                            if records_length > 2:
-                                # If there have been more than one record (two or more false captchas) within the last 2 hours, block the request
-                                return self.show_block()
-                        else:
-                             # If the application is not in botfightmode and the action is not "hard," apply normal rules
-                            if records_length > 3:
-                                # If there have been more than two records (three or more false captchas) within the last 2 hours, block the request
-                                return self.show_block()
-                        break
-
-                if not is_found:
-                    hashed_ip = Hashing().hash(clientip)
-                    seenips[hashed_ip] = [str(int(time()))]
-
-                    JSON.dump(seenips, SEENIPS_PATH)
-
-        try:
-            # Get the client's user agent string from the request
-            clientuseragent = request.user_agent.string
-        except:
-            clientuseragent = None
+            if not found:
+                hashed_client_ip = Hashing().hash(g.client_ip, 16)
+                rate_limited_ips[hashed_client_ip] = [str(int(time()))]
+            
+            JSON.dump(rate_limited_ips, self.RATE_LIMIT_PATH)
         
-        if clientip is None and clientuseragent is None:
-            return self.show_block()
+        return response
+
+    def _set_cookies(self, response):
+        response = make_response(response)
+        if not g.ddosify_captcha is None:
+            response.set_cookie("captcha", g.ddosify_captcha, max_age=self.verificationage)
+        if request.args.get("ddosify_language") in LANGUAGES_CODE:
+            response.set_cookie("language", request.args.get("ddosify_language"), max_age=60*60*24*30*12*3)
+        elif request.args.get("language") in LANGUAGES_CODE:
+            response.set_cookie("language", request.args.get("language"), max_age=60*60*24*30*12*3)
+        elif request.cookies.get("language") in LANGUAGES_CODE:
+            response.set_cookie("language", request.cookies.get("language"), max_age=60*60*24*30*12*3)
+        return response
+
+    def _add_args(self, response):
+        if response.content_type == "text/html; charset=utf-8":
+            args = {}
+            if not g.ddosify_captcha is None:
+                args["captcha"] = g.ddosify_captcha
+            elif not request.args.get("captcha") is None:
+                args["captcha"] = request.args.get("captcha")
+
+            if request.args.get("ddosify_language") in LANGUAGES_CODE:
+                args["language"] = request.args.get("ddosify_language")
+            elif request.args.get("language") in LANGUAGES_CODE:
+                args["language"] = request.args.get("language")
+            elif request.cookies.get("language") in LANGUAGES_CODE:
+                args["language"] = request.cookies.get("language")
+
+            html = response.data
+
+            soup = BeautifulSoup(html, 'html.parser')
+
+            for anchor in soup.find_all('a'):
+                try:
+                    if not anchor['href']:
+                        continue
+                except:
+                    continue
+
+                if "://" in anchor['href']:
+                    anchor_host = urlparse(anchor['href']).netloc
+                    if not anchor_host == request.host:
+                        continue
+                elif not anchor['href'].startswith("/") and \
+                    not anchor['href'].startswith("#") and \
+                        not anchor['href'].startswith("?") and \
+                            not anchor['href'].startswith("&"):
+                    continue
+
+                for arg, content in args.items():
+                    special_character = "?"
+                    if "?" in anchor["href"]:
+                        special_character = "&"
+                    anchor['href'] = anchor['href'] + special_character + arg + "=" + quote(content)
+                
+            for form in soup.find_all("form"):
+                added_input = ""
+                for arg, content in args.items():
+                    added_input += f'<input type="hidden" name="{arg}" value="{content}">'
+                
+                form_button = form.find('button')
+                if form_button:
+                    form_button.insert_before(added_input)
+                else:
+                    form.append(added_input)
+                
+                if "action" in form.attrs:
+                    for arg, content in args.items():
+                        special_character = "?"
+                        if "?" in form['action']:
+                            special_character = "&"
+                        form['action'] = form['action'] + special_character + arg + "=" + quote(content)
+        
+            response.data = str(soup).replace("&lt;", "<").replace("&gt;", ">")
+        
+        return response
     
-        # Create basic data of the captcha_token
-        captcha_token = Hashing().hash(urlpath) + "-//-" + str(int(time())) + "-//-" + str(hardness) + "-//-" + Hashing().hash(clientip) + "-//-" + Hashing().hash(clientuseragent) + "-//-"
-
-        # Calculate the length of the random string based on the hardness level
-        string_length = (5 if hardness == 1 else 8 if hardness == 2 else 9) + secrets.choice([1, 1, 2, 3])
+    def _crawler_hints(self, response):
+        if not response.content_type == "text/html; charset=utf-8":
+            return response
         
-        # Generate the random string
-        image_captcha_code = generate_random_string(string_length, with_punctuation=False).replace("v", "V").replace("s", "S")
-
-        # Change the captcha to uppercase letters only to make it not too difficult
-        if string_length > 6:
-            image_captcha_code = image_captcha_code.upper()
-
-        # Create the ImageCaptcha instance with specified width, height, and fonts
-        image_captcha = ImageCaptcha(width=320, height=120, fonts=[
-            os.path.join(DATA_DIR, "Comic_Sans_MS.ttf"),
-            os.path.join(DATA_DIR, "DroidSansMono.ttf"),
-            os.path.join(DATA_DIR, "Helvetica.ttf")
-        ])
-
-        # Generate the captcha image
-        captcha_image = image_captcha.generate(image_captcha_code)
-
-        # Convert the captcha_image to base64-encoded string with "data:image/png;base64," prefix
-        captcha_image_data = b64encode(captcha_image.getvalue()).decode('utf-8')
-        captcha_image_data = "data:image/png;base64," + captcha_image_data
-
-        captcha_token += image_captcha_code
-
-        captcha_audio_data = None
-
-        if hardness == 3:
-            # Calculate the length of the random int code based on the hardness level
-            int_length = 8 + secrets.choice([1, 2, 3, 4, 5, 6])
-
-            # Generate the random int code
-            audio_captcha_code = generate_random_string(int_length, with_punctuation=False, with_letters=False)
-
-            # Create the AudioCaptcha instance
-            audio_captcha = AudioCaptcha()
-
-            # Generate the captcha audio
-            captcha_audio = audio_captcha.generate(audio_captcha_code)
-
-            # Convert the captcha_audio to base64-encoded string with "data:audio/wav;base64," prefix
-            captcha_audio_data = b64encode(captcha_audio).decode('utf-8')
-            captcha_audio_data = "data:audio/wav;base64," + captcha_audio_data
-
-            captcha_token += "-//-" + audio_captcha_code
-        
-        coded_captcha_token = SymmetricCrypto(CAPTCHASECRET).encrypt(captcha_token)
-
-        errormessage = None
-        if error:
-            errormessage = "That was not right, try again!"
-            
-        # Determine the file extension of the template
-        pageext = pagepath.split('.')[-1]
-        
-        if pageext == "html":
-            # Get the language based on the user's preference
-            language = Language.language()
-
-            # Render the HTML template, adding an emoji to it using a random choice from the emojis list
-            page = render_template(
-                pagepath, language = language, errormessage = errormessage, 
-                textCaptcha=captcha_image_data, audioCaptcha = captcha_audio_data, captchatoken=coded_captcha_token
-                )
-
-            try:
-                # Translate the page content from English to the user's preferred language
-                translated_page = Language.translate_page(page, "en", language)
-            except:
-                # If translation fails, use the original page content
-                translated_page = page
-
-            return translated_page
-            
+        if os.path.isfile(self.CRAWLER_HINTS_PATH):
+            crawler_hints = JSON.load(self.CRAWLER_HINTS_PATH)
         else:
-            return send_file(pagepath)
+            crawler_hints = {}
+
+        path = request.path
         
+        found = None
+
+        copy_crawler_hints = crawler_hints.copy()
+
+        for hashed_path, path_data in crawler_hints.items():
+            comparison = Hashing().compare(path, hashed_path)
+            if comparison:
+                try:
+                    decrypted_path_data = json.loads(SymmetricCrypto(path).decrypt(path_data))
+                except:
+                    del copy_crawler_hints[hashed_path]
+                else:
+                    if not int(time()) - int(decrypted_path_data["time"]) > 7200:
+                        found = hashed_path
+                    else:
+                        del copy_crawler_hints[hashed_path]
+                break
+
+        symmetric_crypto = SymmetricCrypto(path)
+        
+        if found is None and not g.ddosify_page:
+            html = response.data
+            soup = BeautifulSoup(html, 'html.parser')
+
+            title_tag = soup.title
+            title = title_tag.string if title_tag else None
+            og_tags = ''.join(str(og_tag) for og_tag in soup.find_all('meta', attrs={'property': 'og'}))
+
+            hashed_path = Hashing().hash(path)
+
+            copy_crawler_hints[hashed_path] = {
+                "time": int(time),
+                "title": symmetric_crypto.encrypt(str(title)),
+                "og_tags": symmetric_crypto.encrypt(og_tags)
+            }
+
+        if copy_crawler_hints != crawler_hints:
+            JSON.dump(copy_crawler_hints, self.CRAWLER_HINTS_PATH)
+        
+        if not found is None and g.ddosify_page:
+            if g.is_crawler:
+                html = response.data
+                soup = BeautifulSoup(html, 'html.parser')
+
+                title = symmetric_crypto.decrypt(crawler_hints[found]["title"])
+                if not title == "None":
+                    soup.title.string = title
+
+                og_soup = BeautifulSoup(symmetric_crypto.decrypt(crawler_hints[found]["og_tags"]), 'html.parser')
+
+                for tag in og_soup.find_all('meta'):
+                    soup.head.append(tag)
+                
+                response = make_response(response)
+        
+        return response
