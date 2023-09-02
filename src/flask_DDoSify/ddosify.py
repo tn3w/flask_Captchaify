@@ -1184,13 +1184,13 @@ class DDoSify:
     def _set_cookies(self, response):
         response = make_response(response)
         if not g.ddosify_captcha is None:
-            response.set_cookie("captcha", g.ddosify_captcha, max_age=self.verificationage)
+            response.set_cookie("captcha", g.ddosify_captcha, max_age = self.verificationage, httponly = True, secure = self.app.config.get("HTTPS"))
         if request.args.get("ddosify_language") in LANGUAGES_CODE:
-            response.set_cookie("language", request.args.get("ddosify_language"), max_age=60*60*24*30*12*3)
+            response.set_cookie("language", request.args.get("ddosify_language"), max_age = 60*60*24*30*12*3, httponly = True, secure = self.app.config.get("HTTPS"))
         elif request.args.get("language") in LANGUAGES_CODE:
-            response.set_cookie("language", request.args.get("language"), max_age=60*60*24*30*12*3)
+            response.set_cookie("language", request.args.get("language"), max_age = 60*60*24*30*12*3, httponly = True, secure = self.app.config.get("HTTPS"))
         elif request.cookies.get("language") in LANGUAGES_CODE:
-            response.set_cookie("language", request.cookies.get("language"), max_age=60*60*24*30*12*3)
+            response.set_cookie("language", request.cookies.get("language"), max_age = 60*60*24*30*12*3, httponly = True, secure = self.app.config.get("HTTPS"))
         return response
 
     def _add_args(self, response):
