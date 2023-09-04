@@ -154,7 +154,6 @@ class JSON:
             raise FileNotFoundError("Directory '" + file_directory + "' does not exist.")
         
         if file_name not in file_locks:
-            # file deepcode ignore Unhashable: <please specify a reason of ignoring this>
             file_locks[file_name] = Lock()
 
         with file_locks[file_name]:
@@ -184,7 +183,6 @@ class SymmetricCrypto:
         if password is None:
             password = secrets.token_urlsafe(64)
 
-        # file deepcode ignore AttributeLoadOnNone: <please specify a reason of ignoring this>
         self.password = password.encode()
         self.salt_length = salt_length
 
@@ -1006,8 +1004,6 @@ class DDoSify:
         is_failed_captcha = False
         
         if request.args.get("captchasolved") == "1":
-            g.ddosify_method = "GET"
-
             text_captcha = request.args.get("textCaptcha")
             audio_captcha = request.args.get("audioCaptcha")
             captcha_token = request.args.get("captchatoken")
