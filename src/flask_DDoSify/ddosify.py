@@ -162,6 +162,7 @@ class JSON:
 
 DATA_DIR = pkg_resources.resource_filename('flask_DDoSify', 'data')
 TRANSLATIONS_PATH = os.path.join(DATA_DIR, "translations.json")
+IP_API_CACHE_PATH = os.path.join(DATA_DIR, "ipapi-cache.json")
 TEMPLATE_DIR = pkg_resources.resource_filename('flask_DDoSify', 'templates')
 CRAWLER_USER_AGENTS = ["Googlebot", "bingbot", "Yahoo! Slurp", "YandexBot", "Baiduspider", "DuckDuckGo-Favicons-Bot", "AhrefsBot", "SemrushBot", "MJ12bot", "BLEXBot", "SeznamBot", "Exabot", "AhrefsBot", "archive.org_bot", "Applebot", "spbot", "Genieo", "linkdexbot", "Lipperhey Link Explorer", "SISTRIX Crawler", "MojeekBot", "CCBot", "Uptimebot", "XoviBot", "Neevabot", "SEOkicks-Robot", "meanpathbot", "MojeekBot", "RankActiveLinkBot", "CrawlomaticBot", "sentibot", "ExtLinksBot", "Superfeedr bot", "LinkfluenceBot", "Plerdybot", "Statbot", "Brainity", "Slurp", "Barkrowler", "RanksonicSiteAuditor", "rogerbot", "BomboraBot", "RankActiveLinkBot", "mail.ru", "AI Crawler", "Xenu Link Sleuth", "SEMrushBot", "Baiduspider-render", "coccocbot", "Sogou web spider", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler", "CodiBot", "libwww-perl", "Purebot", "Statbot", "iCjobs", "Cliqzbot", "SafeDNSBot", "AhrefsBot", "MetaURI API", "meanpathbot", "ADmantX Platform Semantic Analyzer", "CrawlomaticBot", "moget", "meanpathbot", "FPT-Aibot", "Domains Project", "SimpleCrawler", "YoudaoBot", "SafeDNSBot", "Slurp", "XoviBot", "Baiduspider", "FPT-Aibot", "SiteExplorer", "Lipperhey Link Explorer", "CrawlomaticBot", "SISTRIX Crawler", "SEMrushBot", "meanpathbot", "sentibot", "Dataprovider.com", "BLEXBot", "YoudaoBot", "Superfeedr bot", "moget", "Genieo", "sentibot", "AI Crawler", "Xenu Link Sleuth", "Barkrowler", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler"]
 EMOJIS = JSON.load(os.path.join(DATA_DIR, "emojis.json"))
@@ -309,7 +310,50 @@ class Hashing:
         comparison_hash = Hashing(salt=salt).hash(plain_text, hash_length = hash_length).split("//")[0]
 
         return comparison_hash == hash
+        
+IP_INFO_KEYS = ['continent', 'continentCode', 'country', 'countryCode', 'region', 'regionName', 'city', 'district', 'zip', 'lat', 'lon', 'timezone', 'offset', 'currency', 'isp', 'org', 'as', 'asname', 'reverse', 'mobile', 'proxy', 'hosting', 'time']
 
+def get_ip_info(ip_address: str) -> dict:
+    """
+    Function to query IP information with cache con ip-api.com
+    """
+    if os.path.isfile(IP_API_CACHE_PATH):
+        ip_api_cache = JSON.load(IP_API_CACHE_PATH)
+    else:
+        ip_api_cache = {}
+
+    for hashed_ip, crypted_data in ip_api_cache.items():
+        comparison = Hashing().compare(ip_address, hashed_ip)
+        if comparison:
+            data = SymmetricCrypto(ip_address).decrypt(crypted_data)
+
+            data_json = {}
+            for i in range(22):
+                data_json[IP_INFO_KEYS[i]] = data.split("-&%-")[i]
+
+            if int(time()) - int(int(data_json["time"])) > 518400:
+                del ip_api_cache[hashed_ip]
+                break
+            return data_json
+        
+    response = requests.get(f"http://ip-api.com/json/{ip_address}?fields=66846719")
+    response.raise_for_status()
+    if response.ok:
+        response_json = response.json()
+        if response_json["status"] == "success":
+            del response_json["status"], response_json["query"]
+            response_json["time"] = time()
+            response_string = '-&%-'.join([str(value) for value in response_json.values()])
+            
+            crypted_response = SymmetricCrypto(ip_address).encrypt(response_string)
+            hashed_ip = Hashing().hash(ip_address)
+
+            ip_api_cache[hashed_ip] = crypted_response
+            JSON.dump(ip_api_cache, IP_API_CACHE_PATH)
+
+            return response_json
+    raise requests.RequestException("ip-api.com could not be requested or did not provide a correct answer")
+    
 class Language:
 
     def get_language():
