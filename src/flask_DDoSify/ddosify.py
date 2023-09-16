@@ -48,6 +48,9 @@ def generate_random_string(length: int, with_punctuation: bool = True, with_lett
     return random_string
 
 def get_client_ip() -> str:
+    """
+    Get the client IP in v4 or v6
+    """
     def shorten_ipv6(ip_address):
         try:
             return str(ipaddress.IPv6Address(ip_address).compressed)
