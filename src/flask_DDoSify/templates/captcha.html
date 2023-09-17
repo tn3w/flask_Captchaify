@@ -127,9 +127,9 @@
         <div class="captcha-container">
             <h2 ntr="1">Beep beop Boop?</h2>
             <p>Before you can see the page you have to prove that you are not a robot!</p>
-            {% if errormessage|default %}
+            {% if error|default %}
             <p style="color: #ff0000;margin:10px;">
-                {{ errormessage }}
+                {{ error }}
             </p>
             {% endif %}
             <form action="/" method="GET">
