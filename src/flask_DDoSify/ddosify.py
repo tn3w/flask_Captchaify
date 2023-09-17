@@ -1340,7 +1340,7 @@ class DDoSify:
             hashed_path = Hashing().hash(path)
 
             copy_crawler_hints[hashed_path] = {
-                "time": int(time),
+                "time": int(time()),
                 "title": symmetric_crypto.encrypt(str(title)),
                 "og_tags": symmetric_crypto.encrypt(og_tags)
             }
