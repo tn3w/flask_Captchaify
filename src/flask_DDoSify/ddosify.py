@@ -756,7 +756,7 @@ class DDoSify:
             template_dir = self._preferences["template_dir"]
 
             for file in os.listdir(template_dir):
-                if file.startswith("change_language"):
+                if file.startswith("change_language") or file.startswith("changelanguage"):
                     g.ddosify_page = True
                     return render_template(os.path.join(template_dir, file), search=search, languages=languages)
                 
