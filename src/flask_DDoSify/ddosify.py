@@ -821,9 +821,14 @@ class DDoSify:
                     criteria.append(True)
         
         if not any(criteria):
-            ip_info = get_ip_info(g.client_ip)
-            if ip_info["proxy"] or ip_info["hosting"]:
-                criteria.append(True)
+            if not g.client_ip == "127.0.0.1":
+                try:
+                    ip_info = get_ip_info(g.client_ip)
+                except:
+                    criteria.append(True)
+                else:
+                    if ip_info["proxy"] or ip_info["hosting"]:
+                        criteria.append(True)
         
         if not any(criteria):
             return
