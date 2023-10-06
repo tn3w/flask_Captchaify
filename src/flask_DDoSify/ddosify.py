@@ -4,17 +4,14 @@ import json
 import random
 import atexit
 import secrets
-import tarfile
 import requests
 import ipaddress
 import pkg_resources
 from time import time
-from io import BytesIO
-from zipfile import ZipFile
+from threading import Lock
 from base64 import b64encode
 from bs4 import BeautifulSoup
 from googletrans import Translator
-from threading import Thread, Lock
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
 from urllib.parse import urlparse, quote
@@ -468,119 +465,6 @@ class Language:
         translated_html = str(soup).replace("&lt;", "<").replace("&gt;", ">")
         return translated_html
 
-class Services:
-
-    def need_update(ipsetpath: str):
-        """
-        Function to find out if an IPset needs an update
-        """
-        if not os.path.isfile(os.path.join(DATA_DIR, ipsetpath)):
-            return True
-        last_update_time = JSON.load(os.path.join(DATA_DIR, ipsetpath))["time"]
-        if int(time()) - int(last_update_time) > 3600:
-            return True
-        return False
-    
-    def update_firehol_ip_set():
-        """
-        Function to update the IPset of FireHol
-        """
-        firehol_urls = [
-            "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level1.netset",
-            "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level2.netset",
-            "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level3.netset",
-            "https://raw.githubusercontent.com/ktsaou/blocklist-ipsets/master/firehol_level4.netset"
-        ]
-        firehol_ips = {"time": str(int(time())), "ips": []}
-        for firehol_url in firehol_urls:
-            response = requests.get(firehol_url)
-            if response.ok:
-                ips = [line.strip().split('/')[0] for line in response.text.splitlines() if line.strip() and not line.startswith("#")]
-                firehol_ips["ips"].extend(ips)
-            else:
-                response.raise_for_status()
-        firehol_ips["ips"] = list(set(firehol_ips["ips"]))
-        JSON.dump(firehol_ips, os.path.join(DATA_DIR, "fireholipset.json"))
-    
-    def update_ip_deny_ip_set():
-        """
-        Function to update the IPset of IPDeny
-        """
-        ip_deny_urls = [
-            "https://www.ipdeny.com/ipblocks/data/countries/all-zones.tar.gz",
-            "https://www.ipdeny.com/ipv6/ipaddresses/blocks/ipv6-all-zones.tar.gz"
-        ]
-        ip_deny_ips = {"time": str(int(time())), "ips": []}
-        for ipdeny_url in ip_deny_urls:
-            response = requests.get(ipdeny_url)
-            if response.ok:
-                tar_file = BytesIO(response.content)
-                with tarfile.open(fileobj=tar_file, mode="r:gz") as tar:
-                    members = tar.getmembers()
-                    for member in members:
-                        if member.isfile() and member.name.endswith('.zone'):
-                            file_content = tar.extractfile(member).read().decode("utf-8")
-                            ips = [line.strip().split('/')[0] for line in file_content.splitlines() if line.strip() and not line.startswith("#")]
-                            ip_deny_ips["ips"].extend(ips)
-            else:
-                response.raise_for_status()
-        ip_deny_ips["ips"] = list(set(ip_deny_ips["ips"]))
-        JSON.dump(ip_deny_ips, os.path.join(DATA_DIR, "ipdenyipset.json"))
-    
-    def update_emerging_threats_ip_set():
-        """
-        Function to update the IPset of Emerging Threats
-        """
-        emerging_threats_url = "https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt"
-        response = requests.get(emerging_threats_url)
-        if response.ok:
-            emerging_threats_ips = [line.strip().split('/')[0] for line in response.text.splitlines() if line.strip() and not line.startswith("#")]
-            emerging_threats_ips = list(set(emerging_threats_ips))
-            JSON.dump({"time": str(int(time())), "ips": emerging_threats_ips}, os.path.join(DATA_DIR, "emergingthreatsipset.json"))
-        else:
-            response.raise_for_status()
-    
-    def update_my_ip_ms_ip_set():
-        """
-        Function to update the IPset of MyIP.ms
-        """
-        my_ip_ms_url = "https://myip.ms/files/blacklist/general/full_blacklist_database.zip"
-        response = requests.get(my_ip_ms_url)
-        if response.ok:
-            with BytesIO(response.content) as zip_file:
-                with ZipFile(zip_file, "r") as z:
-                    with z.open("full_blacklist_database.txt", "r") as txt_file:
-                        content = txt_file.read().decode('utf-8')
-                        my_ip_ms_ips = [line.strip().split('/')[0].split('#')[0].replace('\t', '') for line in content.splitlines() if line.strip() and not line.startswith("#")]
-                        my_ip_ms_ips = list(set(my_ip_ms_ips))
-            JSON.dump({"time": str(int(time())), "ips": my_ip_ms_ips}, os.path.join(DATA_DIR, "myipmsipset.json"))
-        else:
-            response.raise_for_status()
-    
-    def update_tor_exit_nodes():
-        tor_bulk_exit_list_url = "https://check.torproject.org/torbulkexitlist"
-        response = requests.get(tor_bulk_exit_list_url)
-        if response.ok:
-            tor_exit_nodes_ip = [line.strip() for line in response.text.splitlines() if line.strip() and not line.startswith("#")]
-            tor_exit_nodes_ip = list(set(tor_exit_nodes_ip))
-            JSON.dump({"time": str(int(time())), "ips": tor_exit_nodes_ip}, os.path.join(DATA_DIR, "torexitnodes.json"))
-        else:
-            response.raise_for_status()
-    
-    def update_all_ipsets():
-        if Services.need_update("fireholipset.json"):
-            Services.update_firehol_ip_set()
-        if Services.need_update("ipdenyipset.json"):
-            Services.update_ip_deny_ip_set()
-        if Services.need_update("emergingthreatsipset.json"):
-            Services.update_emerging_threats_ip_set()
-        if Services.need_update("myipmsipset.json"):
-            Services.update_my_ip_ms_ip_set()
-        if Services.need_update("torexitnodes.json"):
-            Services.update_tor_exit_nodes()
-
-Services.update_all_ipsets()
-
 class DDoSify:
     """
     Shows the user/bot a captcha before the request first if the request comes from a dangerous IP
@@ -966,21 +850,7 @@ class DDoSify:
         
         g.is_crawler = is_crawler
         
-        t = Thread(target=Services.update_all_ipsets)
-        t.start()
-
-        FIREHOL_IPS = JSON.load(os.path.join(DATA_DIR, "fireholipset.json"))["ips"]
-        IPDENY_IPS = JSON.load(os.path.join(DATA_DIR, "ipdenyipset.json"))["ips"]
-        EMERGINGTHREATS_IPS = JSON.load(os.path.join(DATA_DIR, "emergingthreatsipset.json"))["ips"]
-        MYIPMS_IPS = JSON.load(os.path.join(DATA_DIR, "myipmsipset.json"))["ips"]
-        TOREXITNODES_IPS = JSON.load(os.path.join(DATA_DIR, "torexitnodes.json"))["ips"]
-
         criteria = [
-            g.client_ip in FIREHOL_IPS,
-            g.client_ip in IPDENY_IPS,
-            g.client_ip in EMERGINGTHREATS_IPS,
-            g.client_ip in MYIPMS_IPS,
-            g.client_ip in TOREXITNODES_IPS,
             is_crawler and self.block_crawler,
             action == "fight"
         ]
@@ -1024,7 +894,9 @@ class DDoSify:
                     criteria.append(True)
         
         if not any(criteria):
-            return
+            ip_info = get_ip_info(g.client_ip)
+            if ip_info["proxy"] or ip_info["hosting"]:
+                criteria.append(True)
         
         if action == "block":
             g.ddosify_page = True
