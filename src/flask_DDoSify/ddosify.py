@@ -3,7 +3,6 @@ import re
 import json
 import random
 import atexit
-import bcrypt
 import secrets
 import requests
 import ipaddress
@@ -17,13 +16,11 @@ from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
 from urllib.parse import urlparse, quote
 from base64 import urlsafe_b64encode, urlsafe_b64decode
-from jinja2 import Environment, select_autoescape, Undefined
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes, padding
+from jinja2 import Environment, select_autoescape, Undefined
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives import hashes
-from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from flask import Flask, request, g, abort, send_file, make_response, redirect
 from typing import Union, Optional
 
@@ -174,7 +171,16 @@ LANGUAGES = JSON.load(os.path.join(DATA_DIR, "languages.json"))
 LANGUAGES_CODE = [language["code"] for language in LANGUAGES]
 
 class SymmetricCrypto:
-    def __init__(self, password: Optional[str] = None, salt_length: int = 64):
+    """
+    Implementation of symmetric encryption with AES
+    """
+
+    def __init__(self, password: Optional[str] = None, salt_length: int = 32):
+        """
+        :param password: A secure encryption password, should be at least 32 characters long
+        :param salt_length: The length of the salt, should be at least 16
+        """
+
         if password is None:
             password = secrets.token_urlsafe(64)
 
@@ -182,7 +188,14 @@ class SymmetricCrypto:
         self.salt_length = salt_length
 
     def encrypt(self, plain_text: str) -> str:
+        """
+        Encrypts a text
+
+        :param plaintext: The text to be encrypted
+        """
+
         salt = secrets.token_bytes(self.salt_length)
+
         kdf_ = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
@@ -192,19 +205,26 @@ class SymmetricCrypto:
         )
         key = kdf_.derive(self.password)
 
-        cipher = Cipher(algorithms.AES(key), modes.CTR(salt), backend=default_backend())
+        iv = secrets.token_bytes(16)
+
+        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
         encryptor = cipher.encryptor()
         padder = padding.PKCS7(algorithms.AES.block_size).padder()
         padded_data = padder.update(plain_text.encode()) + padder.finalize()
         ciphertext = encryptor.update(padded_data) + encryptor.finalize()
 
-        return Fernet(urlsafe_b64encode(key).decode()).encrypt(ciphertext).decode()
+        return urlsafe_b64encode(salt + iv + ciphertext).decode()
 
     def decrypt(self, cipher_text: str) -> str:
-        key = Fernet(urlsafe_b64encode(self.password).decode()).key
-        cipher_text = Fernet(urlsafe_b64encode(key).decode()).decrypt(cipher_text.encode())
+        """
+        Decrypts a text
 
-        salt, cipher_text = cipher_text[:self.salt_length], cipher_text[self.salt_length:]
+        :param ciphertext: The encrypted text
+        """
+
+        cipher_text = urlsafe_b64decode(cipher_text.encode())
+
+        salt, iv, cipher_text = cipher_text[:self.salt_length], cipher_text[self.salt_length:self.salt_length + 16], cipher_text[self.salt_length + 16:]
 
         kdf_ = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
@@ -215,7 +235,7 @@ class SymmetricCrypto:
         )
         key = kdf_.derive(self.password)
 
-        cipher = Cipher(algorithms.AES(key), modes.CTR(salt), backend=default_backend())
+        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
         decryptor = cipher.decryptor()
         unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
         decrypted_data = decryptor.update(cipher_text) + decryptor.finalize()
@@ -224,19 +244,72 @@ class SymmetricCrypto:
         return plaintext.decode()
 
 class Hashing:
-    def __init__(self, salt_rounds: int = 12):
-        self.salt_rounds = salt_rounds
+    """
+    Implementation of hashing with SHA256 and 50000 iterations
+    """
 
-    def hash(self, plain_text: str) -> str:
-        plain_text = plain_text.encode('utf-8')
-        salt = bcrypt.gensalt(self.salt_rounds)
-        hashed = bcrypt.hashpw(plain_text, salt)
-        return hashed.decode('utf-8')
+    def __init__(self, salt: Optional[str] = None):
+        """
+        :param salt: The salt, makes the hashing process more secure
+        """
 
-    def compare(self, plain_text: str, hashed: str) -> bool:
-        plain_text = plain_text.encode('utf-8')
-        hashed = hashed.encode('utf-8')
-        return bcrypt.checkpw(plain_text, hashed)
+        self.salt = salt
+
+    def hash(self, plain_text: str, hash_length: int = 32) -> str:
+        """
+        Function to hash a plaintext
+
+        :param plain_text: The text to be hashed
+        :param hash_length: The length of the returned hashed value
+        """
+
+        plain_text = str(plain_text).encode('utf-8')
+
+        salt = self.salt
+        if salt is None:
+            salt = secrets.token_bytes(32)
+        else:
+            if not isinstance(salt, bytes):
+                try:
+                    salt = bytes.fromhex(salt)
+                except:
+                    salt = salt.encode('utf-8')
+
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=hash_length,
+            salt=salt,
+            iterations=50000,
+            backend=default_backend()
+        )
+
+        hashed_data = kdf.derive(plain_text)
+
+        hash = urlsafe_b64encode(hashed_data).decode('utf-8') + "//" + salt.hex()
+        return hash
+
+    def compare(self, plain_text: str, hash: str) -> bool:
+        """
+        Compares a plaintext with a hashed value
+
+        :param plain_text: The text that was hashed
+        :param hash: The hashed value
+        """
+
+        salt = self.salt
+        if "//" in hash:
+            hash, salt = hash.split("//")
+
+        if salt is None:
+            raise ValueError("Salt cannot be None if there is no salt in hash")
+        
+        salt = bytes.fromhex(salt)
+
+        hash_length = len(urlsafe_b64decode(hash.encode('utf-8')))
+
+        comparison_hash = Hashing(salt=salt).hash(plain_text, hash_length = hash_length).split("//")[0]
+
+        return comparison_hash == hash
         
 IP_INFO_KEYS = ['continent', 'continentCode', 'country', 'countryCode', 'region', 'regionName', 'city', 'district', 'zip', 'lat', 'lon', 'timezone', 'offset', 'currency', 'isp', 'org', 'as', 'asname', 'reverse', 'mobile', 'proxy', 'hosting', 'time']
 
