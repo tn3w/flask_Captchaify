@@ -329,7 +329,7 @@ def get_ip_info(ip_address: str) -> dict:
 
             data_json = {}
             for i in range(22):
-                data_json[IP_INFO_KEYS[i]] = data.split("-&%-")[i]
+                data_json[IP_INFO_KEYS[i]] = {"True": True, "False": False}.get(data.split("-&%-")[i], data.split("-&%-")[i])
 
             if int(time()) - int(int(data_json["time"])) > 518400:
                 del ip_api_cache[hashed_ip]
@@ -897,6 +897,9 @@ class DDoSify:
             ip_info = get_ip_info(g.client_ip)
             if ip_info["proxy"] or ip_info["hosting"]:
                 criteria.append(True)
+        
+        if not any(criteria):
+            return
         
         if action == "block":
             g.ddosify_page = True
