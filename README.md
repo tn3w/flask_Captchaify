@@ -10,7 +10,7 @@ A DDoS defense system for flask applications, first sends users to a captcha pag
 \[ \! \] With version 0.7 and 0.9 the syntax of the DDoSify() class has changed. \[ \! \]
 
 ## How does flask_DDoSify work?
-Downloads public IP block lists[^1] and compares this data with the user, for more security the API of [Stop Forum Spam](https://www.stopforumspam.com/) is also used. If needed, a captcha is displayed to the user (or the robot) based on the strength set.[^2] Javascript is not needed for this, as the content is rendered on the server.[^3]
+If needed, a captcha is displayed to the user (or the robot) based on the strength set.[^1] Javascript is not needed for this, as the content is rendered on the server.[^2]
 
 An example script could look like this:
 ```python
@@ -30,17 +30,17 @@ if __name__ == "__main__":
 
 > [!NOTE]
 > 1. When testing DDoSify you should note that calling it from localhost gives the script a wrong IP in this case "127.0.0.1", which the script considers legitimate. When testing, use a service like cloudflared tunnel to connect to your script.
-> 2. Note that when you first start the script, it first downloads and processes the block lists, which can take between 20 - 40 seconds. When you start the script again, the block lists are updated in the background.
+
 
 ## Application purposes
 A few application purposes:
-  - Protect against DDoS attacks [^4]
+  - Protect against DDoS attacks [^3]
   - Your website contains content that should not be read by a robot
   - A login website
   - A dark web page that simply needs to be secured a bit
 
 ### Why should you use DDoSify if you host a Flask server?
-A quick and easy implementation allows even small websites or a small team of developers to quickly get robot protection. It also doesn't use third-party providers, which limits data collection from Google, Facebook and the creepy data brokers.[^5] Everything is open source, meaning you can rewrite the code yourself and perhaps make it more private.
+A quick and easy implementation allows even small websites or a small team of developers to quickly get robot protection. It also doesn't use third-party providers, which limits data collection from Google, Facebook and the creepy data brokers.[^4] Everything is open source, meaning you can rewrite the code yourself and perhaps make it more private.
 
 # Instructions
 
@@ -83,7 +83,7 @@ For more information, see the sample code above.
    | Name of action | Executing Action                                                     |
    | -------------- | -------------------------------------------------------------------- |
    | let            | Allows all traffic through, regardless of whether the IP is blocked. |
-   | block          | Blocks all traffic if it is on a block list, without captcha.        |
+   | block          | Blocks all traffic if it is blocked, without captcha.                |
    | fight          | Displays a captcha to all traffic, whether suspicious or not.        |
    | captcha        | Default value, shows only suspicious traffic captchas.               |
    <br>
@@ -229,8 +229,7 @@ For more information, see the sample code above.
    ```
    <br>
 
-[^1]: The block lists of [FireHol](https://firehol.org/), [Ipdeny](https://www.ipdeny.com), [Emerging Threats](https://rules.emergingthreats.net), [MyIp.ms](https://myip.ms/) and a list of [Tor exit nodes](https://www.torproject.org/) are used. These lists, the last excluded, only offer protection against data centres or known attackers.
-[^2]: Text and, if the set strength is above 2, audio captchas can already be partially solved by robots, this is a solution for small websites or, e.g. dark web sites that cannot use third party solutions. However, it should still provide sufficient protection.
-[^3]: For a captcha to work, however, the user's IP and user agent must normally be stored. The website may also collect data such as language to translate the website. Cookies can also be used, this is decided by the server administrator.
-[^4]: Only if you have a large server that is supposed to protect a small server from DDoS attacks.
-[^5]: Only if you do not use other services such as Google Analytics/Meta Pixel on your website.
+[^1]: Text and, if the set strength is above 2, audio captchas can already be partially solved by robots, this is a solution for small websites or, e.g. dark web sites that cannot use third party solutions. However, it should still provide sufficient protection.
+[^2]: For a captcha to work, however, the user's IP and user agent must normally be stored. The website may also collect data such as language to translate the website. Cookies can also be used, this is decided by the server administrator.
+[^3]: Only if you have a large server that is supposed to protect a small server from DDoS attacks.
+[^4]: Only if you do not use other services such as Google Analytics/Meta Pixel on your website.
