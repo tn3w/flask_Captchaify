@@ -8,3 +8,5 @@ Pillow
 requests
 bs4
 captcha
+bcrypt
+pycryptodome
