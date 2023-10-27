@@ -10,3 +10,4 @@ bs4
 captcha
 bcrypt
 pycryptodome
+werkzeug>=3.0.1 # not directly required, pinned by Snyk to avoid a vulnerability
