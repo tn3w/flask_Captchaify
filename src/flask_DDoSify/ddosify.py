@@ -267,10 +267,8 @@ class Hashing:
         
         hash_object = hashlib.sha256(plain_text.encode())
         hex_dig = hash_object.hexdigest()
-        
-        if not self.without_salt:
-            hex_dig += "//" + salt
-        return hex_dig
+
+        return hex_dig + "//" + salt
     
     def compare(self, plain_text: str, hash: str) -> bool:
         """
@@ -286,7 +284,7 @@ class Hashing:
         
         hash_length = len(hash)
 
-        comparison_hash = Hashing(salt=salt, without_salt = self.without_salt).hash(plain_text, hash_length = hash_length).split("//")[0]
+        comparison_hash = Hashing(salt=salt).hash(plain_text, hash_length = hash_length).split("//")[0]
 
         return comparison_hash == hash
 
