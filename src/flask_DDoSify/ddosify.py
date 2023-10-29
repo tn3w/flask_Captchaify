@@ -4,6 +4,7 @@ import json
 import random
 import atexit
 import secrets
+import hashlib
 import requests
 import ipaddress
 import pkg_resources
@@ -244,18 +245,14 @@ class SymmetricCrypto:
         return plaintext.decode()
 
 class Hashing:
-    """
-    Implementation of hashing with SHA256 and 50000 iterations
-    """
+    "Implementation for fast hashing"
 
     def __init__(self, salt: Optional[str] = None):
-        """
-        :param salt: The salt, makes the hashing process more secure
-        """
+        ":param salt: The salt, makes the hashing process more secure (Optional)"
 
         self.salt = salt
-
-    def hash(self, plain_text: str, hash_length: int = 32) -> str:
+    
+    def hash(self, plain_text: str, hash_length: int = 8) -> str:
         """
         Function to hash a plaintext
 
@@ -263,31 +260,18 @@ class Hashing:
         :param hash_length: The length of the returned hashed value
         """
 
-        plain_text = str(plain_text).encode('utf-8')
-
         salt = self.salt
         if salt is None:
-            salt = secrets.token_bytes(32)
-        else:
-            if not isinstance(salt, bytes):
-                try:
-                    salt = bytes.fromhex(salt)
-                except:
-                    salt = salt.encode('utf-8')
-
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=hash_length,
-            salt=salt,
-            iterations=50000,
-            backend=default_backend()
-        )
-
-        hashed_data = kdf.derive(plain_text)
-
-        hash = urlsafe_b64encode(hashed_data).decode('utf-8') + "//" + salt.hex()
-        return hash
-
+            salt = secrets.token_hex(hash_length)
+        plain_text = salt + plain_text
+        
+        hash_object = hashlib.sha256(plain_text.encode())
+        hex_dig = hash_object.hexdigest()
+        
+        if not self.without_salt:
+            hex_dig += "//" + salt
+        return hex_dig
+    
     def compare(self, plain_text: str, hash: str) -> bool:
         """
         Compares a plaintext with a hashed value
@@ -295,22 +279,17 @@ class Hashing:
         :param plain_text: The text that was hashed
         :param hash: The hashed value
         """
-
+        
         salt = self.salt
         if "//" in hash:
             hash, salt = hash.split("//")
-
-        if salt is None:
-            raise ValueError("Salt cannot be None if there is no salt in hash")
         
-        salt = bytes.fromhex(salt)
+        hash_length = len(hash)
 
-        hash_length = len(urlsafe_b64decode(hash.encode('utf-8')))
-
-        comparison_hash = Hashing(salt=salt).hash(plain_text, hash_length = hash_length).split("//")[0]
+        comparison_hash = Hashing(salt=salt, without_salt = self.without_salt).hash(plain_text, hash_length = hash_length).split("//")[0]
 
         return comparison_hash == hash
-        
+
 IP_INFO_KEYS = ['continent', 'continentCode', 'country', 'countryCode', 'region', 'regionName', 'city', 'district', 'zip', 'lat', 'lon', 'timezone', 'offset', 'currency', 'isp', 'org', 'as', 'asname', 'reverse', 'mobile', 'proxy', 'hosting', 'time']
 
 def get_ip_info(ip_address: str) -> dict:
