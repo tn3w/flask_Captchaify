@@ -162,7 +162,7 @@ For more information, see the sample code above.
 
 7. `default_rate_limit` Arg
 
-   To specify the default requests of an IP per minute for all routes use the default_rate_limit variable. (Default: 120 = 2 requests per minute per IP)
+   To specify the default requests of an IP per minute for all routes use the default_rate_limit variable. (Default: 120 = 2 requests per second per IP)
 
    Example of a web page with custom rate_limit:
    ```python
@@ -172,7 +172,7 @@ For more information, see the sample code above.
 
 8. `default_max_rate_limit` Arg
 
-   To specify the default requests of all IPs per minute for all routes use the default_max_rate_limit variable. (Default: 1200 = 2 requests per minute from 10 IPs)
+   To specify the default requests of all IPs per minute for all routes use the default_max_rate_limit variable. (Default: 1200 = 2 requests per second from 10 IPs)
 
    Example of a web page with custom max_rate_limit:
    ```python
