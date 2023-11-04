@@ -122,7 +122,7 @@ class DDoSify:
         self.CAPTCHA_SECRET = generate_random_string(512)
 
         if self.crawler_hints:
-            self.crawler_hints_cache = list()
+            self.crawler_hints_cache = dict()
 
         app.before_request(self._set_ip)
         app.before_request(self._rate_limit)
