@@ -447,10 +447,7 @@ def get_ip_info(ip_address: str) -> dict:
     :param ip_address: The client IP
     """
 
-    if os.path.isfile(IP_API_CACHE_PATH):
-        ip_api_cache = JSON.load(IP_API_CACHE_PATH)
-    else:
-        ip_api_cache = {}
+    ip_api_cache = JSON.load(IP_API_CACHE_PATH)
 
     for hashed_ip, crypted_data in ip_api_cache.items():
         comparison = Hashing().compare(ip_address, hashed_ip)
@@ -458,10 +455,10 @@ def get_ip_info(ip_address: str) -> dict:
             data = SymmetricCrypto(ip_address).decrypt(crypted_data)
 
             data_json = {}
-            for i in range(22):
+            for i in range(23):
                 data_json[IP_INFO_KEYS[i]] = {"True": True, "False": False}.get(data.split("-&%-")[i], data.split("-&%-")[i])
 
-            if int(time()) - int(int(data_json["time"])) > 518400:
+            if int(time()) - int(data_json["time"]) > 518400:
                 del ip_api_cache[hashed_ip]
                 break
 
@@ -473,7 +470,7 @@ def get_ip_info(ip_address: str) -> dict:
         response_json = response.json()
         if response_json["status"] == "success":
             del response_json["status"], response_json["query"]
-            response_json["time"] = time()
+            response_json["time"] = int(time())
             response_string = '-&%-'.join([str(value) for value in response_json.values()])
             
             crypted_response = SymmetricCrypto(ip_address).encrypt(response_string)

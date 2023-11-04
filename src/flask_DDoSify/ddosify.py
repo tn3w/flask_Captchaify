@@ -377,6 +377,16 @@ class DDoSify:
         ]
 
         if not any(criteria):
+            if not g.client_ip == "127.0.0.1":
+                try:
+                    ip_info = get_ip_info(g.client_ip)
+                except Exception as e:
+                    criteria.append(True)
+                else:
+                    if ip_info["proxy"] or ip_info["hosting"]:
+                        criteria.append(True)
+
+        if not any(criteria):
             stopforumspamcache = JSON.load(SFS_CACHE_PATH)
 
             found = False
@@ -410,16 +420,6 @@ class DDoSify:
                         JSON.dump(stopforumspamcache, SFS_CACHE_PATH)
                 else:
                     criteria.append(True)
-        
-        if not any(criteria):
-            if not g.client_ip == "127.0.0.1":
-                try:
-                    ip_info = get_ip_info(g.client_ip)
-                except:
-                    criteria.append(True)
-                else:
-                    if ip_info["proxy"] or ip_info["hosting"]:
-                        criteria.append(True)
         
         if not any(criteria):
             return
