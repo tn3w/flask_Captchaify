@@ -1,446 +1,31 @@
 import os
-import re
 import json
 import random
-import atexit
-import secrets
-import hashlib
 import requests
-import ipaddress
 import pkg_resources
 from time import time
-from threading import Lock
 from base64 import b64encode
 from bs4 import BeautifulSoup
-from googletrans import Translator
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
 from urllib.parse import urlparse, quote
-from base64 import urlsafe_b64encode, urlsafe_b64decode
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes, padding
-from jinja2 import Environment, select_autoescape, Undefined
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from flask import Flask, request, g, abort, send_file, make_response, redirect
-from typing import Union, Optional
-
-def generate_random_string(length: int, with_punctuation: bool = True, with_letters: bool = True):
-    """
-    Generates a random string
-
-    :param length: The length of the string
-    :param with_punctuation: Whether to include special characters
-    :param with_letters: Whether letters should be included
-    """
-
-    characters = "0123456789"
-
-    if with_punctuation:
-        characters += "!\"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"
-
-    if with_letters:
-        characters += "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    
-    random_string = ''.join(secrets.choice(characters) for _ in range(length))
-    return random_string
-
-def get_client_ip() -> str:
-    """
-    Get the client IP in v4 or v6
-    """
-    def shorten_ipv6(ip_address):
-        try:
-            return str(ipaddress.IPv6Address(ip_address).compressed)
-        except:
-            return ip_address
-    
-    headers_to_check = [
-        'X-Forwarded-For',
-        'X-Real-Ip',
-        'CF-Connecting-IP',
-        'True-Client-Ip',
-    ]
-
-    for header in headers_to_check:
-        if header in request.headers:
-            client_ip = request.headers[header]
-            client_ip = client_ip.split(',')[0].strip()
-            client_ip = shorten_ipv6(client_ip)
-            return client_ip
-
-    client_ip = request.remote_addr
-    client_ip = shorten_ipv6(client_ip)
-    return client_ip
-
-class SilentUndefined(Undefined):
-    def _fail_with_undefined_error(self, *args, **kwargs):
-        return None
-
-def render_template(file_name: str, **args) -> str:
-    """
-    Function to load an HTML file and perform optional string replacements.
-    """
-
-    if not os.path.isfile(file_name):
-        raise FileNotFoundError("File '" + file_name + "' not found.")
-
-    env = Environment(
-        autoescape=select_autoescape(['html', 'xml']),
-        undefined=SilentUndefined
-    )
-    
-    with open(file_name, "r") as file:
-        html = file.read()
-
-    template = env.from_string(html)
-
-    language = Language.get_language()
-
-    args["language"] = language
-    
-    html = template.render(**args)
-
-    html = Language.translate_page(html, "en", language)
-
-    html = re.sub(r'<!--(.*?)-->', '', html, flags=re.DOTALL)
-    html = re.sub(r'\s+', ' ', html)
-
-    script_pattern = r'<script\b[^>]*>(.*?)<\/script>'
-    def minimize_script(match):
-        script_content = match.group(1)
-        script_content = re.sub(r'\s+', ' ', script_content)
-        return f'<script>{script_content}</script>'
-    html = re.sub(script_pattern, minimize_script, html, flags=re.DOTALL | re.IGNORECASE)
-
-    style_pattern = r'<style\b[^>]*>(.*?)<\/style>'
-    def minimize_style(match):
-        style_content = match.group(1)
-        style_content = re.sub(r'\s+', ' ', style_content)
-        return f'<style>{style_content}</style>'
-    html = re.sub(style_pattern, minimize_style, html, flags=re.DOTALL | re.IGNORECASE)
-
-    return html
-
-file_locks = dict()
-
-class JSON:
-
-    def load(file_name: str) -> Union[dict, list]:
-        """
-        Function to load a JSON file securely.
-
-        :param file_name: The JSON file you want to load
-        """
-        if not os.path.isfile(file_name):
-            raise FileNotFoundError("File '" + file_name + "' does not exist.")
-        
-        if file_name not in file_locks:
-            file_locks[file_name] = Lock()
-
-        with file_locks[file_name]:
-            with open(file_name, "r") as file:
-                data = json.load(file)
-            return data
-        
-    def dump(data: Union[dict, list], file_name: str) -> None:
-        """
-        Function to save a JSON file securely.
-        
-        :param data: The data to be stored should be either dict or list
-        :param file_name: The file to save to
-        """
-        file_directory = os.path.dirname(file_name)
-        if not os.path.isdir(file_directory):
-            raise FileNotFoundError("Directory '" + file_directory + "' does not exist.")
-        
-        if file_name not in file_locks:
-            file_locks[file_name] = Lock()
-
-        with file_locks[file_name]:
-            with open(file_name, "w") as file:
-                json.dump(data, file)
+from typing import Optional
+from tools import JSON, generate_random_string, WebPage, get_client_ip, Hashing, SymmetricCrypto, get_ip_info
 
 DATA_DIR = pkg_resources.resource_filename('flask_DDoSify', 'data')
-TRANSLATIONS_PATH = os.path.join(DATA_DIR, "translations.json")
-IP_API_CACHE_PATH = os.path.join(DATA_DIR, "ipapi-cache.json")
 TEMPLATE_DIR = pkg_resources.resource_filename('flask_DDoSify', 'templates')
+
 CRAWLER_USER_AGENTS = ["Googlebot", "bingbot", "Yahoo! Slurp", "YandexBot", "Baiduspider", "DuckDuckGo-Favicons-Bot", "AhrefsBot", "SemrushBot", "MJ12bot", "BLEXBot", "SeznamBot", "Exabot", "AhrefsBot", "archive.org_bot", "Applebot", "spbot", "Genieo", "linkdexbot", "Lipperhey Link Explorer", "SISTRIX Crawler", "MojeekBot", "CCBot", "Uptimebot", "XoviBot", "Neevabot", "SEOkicks-Robot", "meanpathbot", "MojeekBot", "RankActiveLinkBot", "CrawlomaticBot", "sentibot", "ExtLinksBot", "Superfeedr bot", "LinkfluenceBot", "Plerdybot", "Statbot", "Brainity", "Slurp", "Barkrowler", "RanksonicSiteAuditor", "rogerbot", "BomboraBot", "RankActiveLinkBot", "mail.ru", "AI Crawler", "Xenu Link Sleuth", "SEMrushBot", "Baiduspider-render", "coccocbot", "Sogou web spider", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler", "CodiBot", "libwww-perl", "Purebot", "Statbot", "iCjobs", "Cliqzbot", "SafeDNSBot", "AhrefsBot", "MetaURI API", "meanpathbot", "ADmantX Platform Semantic Analyzer", "CrawlomaticBot", "moget", "meanpathbot", "FPT-Aibot", "Domains Project", "SimpleCrawler", "YoudaoBot", "SafeDNSBot", "Slurp", "XoviBot", "Baiduspider", "FPT-Aibot", "SiteExplorer", "Lipperhey Link Explorer", "CrawlomaticBot", "SISTRIX Crawler", "SEMrushBot", "meanpathbot", "sentibot", "Dataprovider.com", "BLEXBot", "YoudaoBot", "Superfeedr bot", "moget", "Genieo", "sentibot", "AI Crawler", "Xenu Link Sleuth", "Barkrowler", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler"]
 EMOJIS = JSON.load(os.path.join(DATA_DIR, "emojis.json"))
 TEAEMOJIS = JSON.load(os.path.join(DATA_DIR, "teaemojis.json"))
 LANGUAGES = JSON.load(os.path.join(DATA_DIR, "languages.json"))
 LANGUAGES_CODE = [language["code"] for language in LANGUAGES]
 
-class SymmetricCrypto:
-    """
-    Implementation of symmetric encryption with AES
-    """
-
-    def __init__(self, password: Optional[str] = None, salt_length: int = 32):
-        """
-        :param password: A secure encryption password, should be at least 32 characters long
-        :param salt_length: The length of the salt, should be at least 16
-        """
-
-        if password is None:
-            password = secrets.token_urlsafe(64)
-
-        self.password = password.encode()
-        self.salt_length = salt_length
-
-    def encrypt(self, plain_text: str) -> str:
-        """
-        Encrypts a text
-
-        :param plaintext: The text to be encrypted
-        """
-
-        salt = secrets.token_bytes(self.salt_length)
-
-        kdf_ = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=salt,
-            iterations=100000,
-            backend=default_backend()
-        )
-        key = kdf_.derive(self.password)
-
-        iv = secrets.token_bytes(16)
-
-        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
-        encryptor = cipher.encryptor()
-        padder = padding.PKCS7(algorithms.AES.block_size).padder()
-        padded_data = padder.update(plain_text.encode()) + padder.finalize()
-        ciphertext = encryptor.update(padded_data) + encryptor.finalize()
-
-        return urlsafe_b64encode(salt + iv + ciphertext).decode()
-
-    def decrypt(self, cipher_text: str) -> str:
-        """
-        Decrypts a text
-
-        :param ciphertext: The encrypted text
-        """
-
-        cipher_text = urlsafe_b64decode(cipher_text.encode())
-
-        salt, iv, cipher_text = cipher_text[:self.salt_length], cipher_text[self.salt_length:self.salt_length + 16], cipher_text[self.salt_length + 16:]
-
-        kdf_ = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=salt,
-            iterations=100000,
-            backend=default_backend()
-        )
-        key = kdf_.derive(self.password)
-
-        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
-        decryptor = cipher.decryptor()
-        unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
-        decrypted_data = decryptor.update(cipher_text) + decryptor.finalize()
-        plaintext = unpadder.update(decrypted_data) + unpadder.finalize()
-
-        return plaintext.decode()
-
-class Hashing:
-    "Implementation for fast hashing"
-
-    def __init__(self, salt: Optional[str] = None):
-        ":param salt: The salt, makes the hashing process more secure (Optional)"
-
-        self.salt = salt
-    
-    def hash(self, plain_text: str, hash_length: int = 8) -> str:
-        """
-        Function to hash a plaintext
-
-        :param plain_text: The text to be hashed
-        :param hash_length: The length of the returned hashed value
-        """
-
-        salt = self.salt
-        if salt is None:
-            salt = secrets.token_hex(hash_length)
-        plain_text = salt + plain_text
-        
-        hash_object = hashlib.sha256(plain_text.encode())
-        hex_dig = hash_object.hexdigest()
-
-        return hex_dig + "//" + salt
-    
-    def compare(self, plain_text: str, hash: str) -> bool:
-        """
-        Compares a plaintext with a hashed value
-
-        :param plain_text: The text that was hashed
-        :param hash: The hashed value
-        """
-        
-        salt = self.salt
-        if "//" in hash:
-            hash, salt = hash.split("//")
-        
-        hash_length = len(hash)
-
-        comparison_hash = Hashing(salt=salt).hash(plain_text, hash_length = hash_length).split("//")[0]
-
-        return comparison_hash == hash
-
-IP_INFO_KEYS = ['continent', 'continentCode', 'country', 'countryCode', 'region', 'regionName', 'city', 'district', 'zip', 'lat', 'lon', 'timezone', 'offset', 'currency', 'isp', 'org', 'as', 'asname', 'reverse', 'mobile', 'proxy', 'hosting', 'time']
-
-def get_ip_info(ip_address: str) -> dict:
-    """
-    Function to query IP information with cache con ip-api.com
-    """
-    if os.path.isfile(IP_API_CACHE_PATH):
-        ip_api_cache = JSON.load(IP_API_CACHE_PATH)
-    else:
-        ip_api_cache = {}
-
-    for hashed_ip, crypted_data in ip_api_cache.items():
-        comparison = Hashing().compare(ip_address, hashed_ip)
-        if comparison:
-            data = SymmetricCrypto(ip_address).decrypt(crypted_data)
-
-            data_json = {}
-            for i in range(22):
-                data_json[IP_INFO_KEYS[i]] = {"True": True, "False": False}.get(data.split("-&%-")[i], data.split("-&%-")[i])
-
-            if int(time()) - int(int(data_json["time"])) > 518400:
-                del ip_api_cache[hashed_ip]
-                break
-            return data_json
-        
-    response = requests.get(f"http://ip-api.com/json/{ip_address}?fields=66846719")
-    response.raise_for_status()
-    if response.ok:
-        response_json = response.json()
-        if response_json["status"] == "success":
-            del response_json["status"], response_json["query"]
-            response_json["time"] = time()
-            response_string = '-&%-'.join([str(value) for value in response_json.values()])
-            
-            crypted_response = SymmetricCrypto(ip_address).encrypt(response_string)
-            hashed_ip = Hashing().hash(ip_address)
-
-            ip_api_cache[hashed_ip] = crypted_response
-            JSON.dump(ip_api_cache, IP_API_CACHE_PATH)
-
-            return response_json
-    raise requests.RequestException("ip-api.com could not be requested or did not provide a correct answer")
-    
-class Language:
-
-    def get_language():
-        """
-        Function to get the language of a user
-        """
-
-        if request.args.get("ddosify_language") in LANGUAGES_CODE:
-            return request.args.get("ddosify_language")
-        elif request.args.get("language") in LANGUAGES_CODE:
-            return request.args.get("language")
-        elif request.cookies.get("language") in LANGUAGES_CODE:
-            return request.cookies.get("language")
-        
-        preferred_language = request.accept_languages.best_match(LANGUAGES_CODE)
-
-        if preferred_language != None:
-            return preferred_language
-        
-        return "en"
-
-    @staticmethod
-    def translate(text_to_translate: str, from_lang: str, to_lang: str) -> str:
-        """
-        Function to translate a text 'text_to_translate' from a language 'from_lang' to a language 'to_lang'
-        """
-
-        if from_lang == to_lang:
-            return text_to_translate
-        
-        if os.path.isfile(TRANSLATIONS_PATH):
-            translations = JSON.load(TRANSLATIONS_PATH)
-        else:
-            translations = []
-        
-        for translation in translations:
-            if translation["text_to_translate"] == text_to_translate and translation["from_lang"] == from_lang and translation["to_lang"] == to_lang:
-                return translation["translated_output"]
-        
-        translator = Translator()
-
-        translated_output = translator.translate(text_to_translate, src=from_lang, dest=to_lang).text
-            
-        try:
-            translated_output = translated_output.encode('latin-1').decode('unicode_escape')
-        except:
-            pass
-        
-        translation = {
-            "text_to_translate": text_to_translate, 
-            "from_lang": from_lang,
-            "to_lang": to_lang, 
-            "translated_output": translated_output
-        }
-        translations.append(translation)
-        
-        JSON.dump(translations, TRANSLATIONS_PATH)
-
-        if to_lang in ["de", "en", "es", "fr", "pt", "it"]:
-            translated_output = translated_output[0].upper() + translated_output[1:]
-            
-        return translated_output
-
-    @staticmethod
-    def translate_page(html: str, from_lang: str, to_lang: str) -> str:
-        """
-        Function to translate a page into the correct language
-        """
-        
-        soup = BeautifulSoup(html, 'html.parser')
-
-        def translate_htmlified_text(html_tag):
-            try:
-                new_soup = BeautifulSoup(str(html_tag), 'html.parser')
-                outer_tag = new_soup.find(lambda tag: tag.find_all(recursive=False))
-                text = ''.join(str(tag) for tag in outer_tag.contents)
-            except:
-                text = html_tag.text
-            
-            if "<" in text:
-                pattern = r'(<.*?>)(.*?)(<\/.*?>)'
-        
-                def replace(match):
-                    tag_open, content, tag_close = match.groups()
-                    processed_content = Language.translate(content, from_lang, to_lang)
-                    return f'{tag_open}{processed_content}{tag_close}'
-                
-                modified_text = re.sub(pattern, replace, text)
-            else:
-                modified_text = Language.translate(text, from_lang, to_lang)
-            return modified_text
-        
-        tags = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'p', 'button'])
-        for tag in tags:
-            if 'ntr' not in tag.attrs:
-                tag.string = translate_htmlified_text(tag)
-        
-        inputs = soup.find_all('input')
-        for input_tag in inputs:
-            if input_tag.has_attr('placeholder') and 'ntr' not in input_tag.attrs:
-                input_tag['placeholder'] = Language.translate(input_tag['placeholder'], from_lang, to_lang)
-        
-        head_tag = soup.find('head')
-        if head_tag:
-            title_element = head_tag.find('title')
-            if title_element:
-                title_element.string = Language.translate(title_element.text, from_lang, to_lang)
-        
-        translated_html = str(soup).replace("&lt;", "<").replace("&gt;", ">")
-        return translated_html
+RATE_LIMIT_PATH = os.path.join(DATA_DIR, "rate-limits.json")
+SFS_CACHE_PATH = os.path.join(DATA_DIR, "sfs-cache.json")
+FAILED_CAPTCHAS_PATH = os.path.join(DATA_DIR, "failed-captchas.json")
+SOLVED_CAPTCHAS_PATH = os.path.join(DATA_DIR, "solved-captchas.json")
 
 class DDoSify:
     """
@@ -536,31 +121,8 @@ class DDoSify:
 
         self.CAPTCHA_SECRET = generate_random_string(512)
 
-        RATE_LIMIT_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_rate-limit.json")
-        while os.path.isfile(RATE_LIMIT_PATH):
-            RATE_LIMIT_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_rate-limit.json")
-        self.RATE_LIMIT_PATH = RATE_LIMIT_PATH
-
-        STOP_FORUM_SPAM_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_sfs-cache.json")
-        while os.path.isfile(STOP_FORUM_SPAM_PATH):
-            STOP_FORUM_SPAM_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_sfs-cache.json")
-        self.STOP_FORUM_SPAM_PATH = STOP_FORUM_SPAM_PATH
-
-        FAILED_CAPTCHA_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_failed-captchas.json")
-        while os.path.isfile(FAILED_CAPTCHA_PATH):
-            FAILED_CAPTCHA_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_failed-captchas.json")
-        self.FAILED_CAPTCHA_PATH = FAILED_CAPTCHA_PATH
-
-        CAPTCHA_SOLVED_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_captcha-solved.json")
-        while os.path.isfile(CAPTCHA_SOLVED_PATH):
-            CAPTCHA_SOLVED_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_captcha-solved.json")
-        self.CAPTCHA_SOLVED_PATH = CAPTCHA_SOLVED_PATH
-
         if self.crawler_hints:
-            CRAWLER_HINTS_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_ch-cache.json")
-            while os.path.isfile(CRAWLER_HINTS_PATH):
-                CRAWLER_HINTS_PATH = os.path.join(DATA_DIR, generate_random_string(10, with_punctuation=False) + "_ch-cache.json")
-            self.CRAWLER_HINTS_PATH = CRAWLER_HINTS_PATH
+            self.crawler_hints_cache = list()
 
         app.before_request(self._set_ip)
         app.before_request(self._rate_limit)
@@ -575,8 +137,6 @@ class DDoSify:
 
         if self.crawler_hints:
             app.after_request(self._crawler_hints)
-
-        atexit.register(self._delete_files)
     
     @property
     def _preferences(self):
@@ -651,7 +211,7 @@ class DDoSify:
         page_ext = page_path.split('.')[-1]
         
         if page_ext == "html":
-            html = render_template(page_path, **args)
+            html = WebPage.render_template(page_path, **args)
             return html
         elif page_ext == "json":
             with open(page_path, "r") as file:
@@ -661,35 +221,24 @@ class DDoSify:
                 return file.read()
         else:
             return send_file(page_path)
-    
-    def _delete_files(self):
-        files = [self.RATE_LIMIT_PATH, self.STOP_FORUM_SPAM_PATH, self.FAILED_CAPTCHA_PATH, self.CAPTCHA_SOLVED_PATH]
-        if self.crawler_hints:
-            files.append(self.CRAWLER_HINTS_PATH)
-        for file in files:
-            try:
-                os.remove(file)
-            except:
-                pass
         
     def _set_ip(self):
         g.ddosify_page = False
         g.is_crawler = False
+
         client_ip = get_client_ip()
         client_user_agent = request.user_agent.string
+
         if client_ip is None or client_user_agent is None:
-            g.ddosify_page = True
             emoji = random.choice(EMOJIS)
             return self._correct_template("block", emoji = emoji)
+        
         g.client_ip = client_ip
         g.client_user_agent = client_user_agent
         g.ddosify_captcha = None
     
     def _rate_limit(self):
-        if os.path.isfile(self.RATE_LIMIT_PATH):
-            rate_limited_ips = JSON.load(self.RATE_LIMIT_PATH)
-        else:
-            rate_limited_ips = {}
+        rate_limited_ips = JSON.load(RATE_LIMIT_PATH)
 
         preferences = self._preferences
 
@@ -711,7 +260,6 @@ class DDoSify:
 
         if (ip_request_count >= rate_limit and not rate_limit == 0) or \
             (request_count >= max_rate_limit and not max_rate_limit == 0):
-            g.ddosify_page = True
             emoji = random.choice(TEAEMOJIS)
             return self._correct_template("rate_limited", emoji = emoji), 418
     
@@ -734,21 +282,17 @@ class DDoSify:
 
             for file in os.listdir(template_dir):
                 if file.startswith("change_language") or file.startswith("changelanguage"):
-                    g.ddosify_page = True
-                    return render_template(os.path.join(template_dir, file), search=search, languages=languages)
+                    return WebPage.render_template(os.path.join(template_dir, file), search=search, languages=languages)
                 
     def _fight_bots(self):
         url_path = urlparse(request.url).path
 
         def add_failed_captcha():
-            if os.path.isfile(self.FAILED_CAPTCHA_PATH):
-                seenips = JSON.load(self.FAILED_CAPTCHA_PATH)
-            else:
-                seenips = {}
+            failed_captchas = JSON.load(FAILED_CAPTCHAS_PATH)
 
             is_found = False
 
-            for hashed_ip, ip_records in seenips.items():
+            for hashed_ip, ip_records in failed_captchas.items():
                 comparison = Hashing().compare(g.client_ip, hashed_ip)
                 if comparison:
                     is_found = True
@@ -760,15 +304,15 @@ class DDoSify:
                     records_length += 1
 
                     ip_records.append(str(int(time())))
-                    seenips[hashed_ip] = ip_records
+                    failed_captchas[hashed_ip] = ip_records
 
-                    JSON.dump(seenips, self.FAILED_CAPTCHA_PATH)
+                    JSON.dump(failed_captchas, FAILED_CAPTCHAS_PATH)
 
             if not is_found:
                 hashed_client_ip = Hashing().hash(g.client_ip)
-                seenips[hashed_client_ip] = [str(int(time()))]
+                failed_captchas[hashed_client_ip] = [str(int(time()))]
 
-                JSON.dump(seenips, self.FAILED_CAPTCHA_PATH)
+                JSON.dump(failed_captchas, FAILED_CAPTCHAS_PATH)
         
         def show_captcha(error: bool = False):
             captcha_token = Hashing().hash(url_path) + "-//-" + str(int(time())) + "-//-" + str(hardness) + "-//-" +\
@@ -833,10 +377,7 @@ class DDoSify:
         ]
 
         if not any(criteria):
-            if os.path.isfile(self.STOP_FORUM_SPAM_PATH):
-                stopforumspamcache = JSON.load(self.STOP_FORUM_SPAM_PATH)
-            else:
-                stopforumspamcache = {}
+            stopforumspamcache = JSON.load(SFS_CACHE_PATH)
 
             found = False
             
@@ -866,7 +407,7 @@ class DDoSify:
 
                         stopforumspamcache[hashed_client_ip] = {"spammer": spammer, "time": int(time())}
                         
-                        JSON.dump(stopforumspamcache, self.STOP_FORUM_SPAM_PATH)
+                        JSON.dump(stopforumspamcache, SFS_CACHE_PATH)
                 else:
                     criteria.append(True)
         
@@ -884,14 +425,10 @@ class DDoSify:
             return
         
         if action == "block":
-            g.ddosify_page = True
             emoji = random.choice(EMOJIS)
             return self._correct_template("block", emoji = emoji)
         
-        if os.path.isfile(self.FAILED_CAPTCHA_PATH):
-            failed_captchas = JSON.load(self.FAILED_CAPTCHA_PATH)
-        else:
-            failed_captchas = {}
+        failed_captchas = JSON.load(FAILED_CAPTCHAS_PATH)
 
         for hashed_ip, ip_records in failed_captchas.items():
             comparison = Hashing().compare(g.client_ip, hashed_ip)
@@ -901,7 +438,6 @@ class DDoSify:
                     if not int(time()) - int(record) > 14400:
                         records_length += 1
                 if (action == "fight" or hardness == 3) and records_length > 2 or records_length > 3:
-                    g.ddosify_page = True
                     emoji = random.choice(EMOJIS)
                     return self._correct_template("block", emoji = emoji)
         
@@ -956,12 +492,9 @@ class DDoSify:
                                 id = generate_random_string(16, with_punctuation=False)
                                 token = generate_random_string(40)
 
-                                if os.path.isfile(self.CAPTCHA_SOLVED_PATH):
-                                    captcha_solved = JSON.load(self.CAPTCHA_SOLVED_PATH)
-                                else:
-                                    captcha_solved = {}
+                                solved_captchas = JSON.load(SOLVED_CAPTCHAS_PATH)
                                 
-                                while any([Hashing().compare(id, hashed_id) for hashed_id, _ in captcha_solved.items()]):
+                                while any([Hashing().compare(id, hashed_id) for hashed_id, _ in solved_captchas.items()]):
                                     id = generate_random_string(with_punctuation=False)
 
                                 symcrypto = SymmetricCrypto(self.CAPTCHA_SECRET)
@@ -973,14 +506,11 @@ class DDoSify:
                                     "hardness": symcrypto.encrypt(str(ct_hardness))
                                 }
 
-                                if os.path.isfile(self.CAPTCHA_SOLVED_PATH):
-                                    captcha_solved = JSON.load(self.CAPTCHA_SOLVED_PATH)
-                                else:
-                                    captcha_solved = {}
+                                solved_captchas = JSON.load(SOLVED_CAPTCHAS_PATH)
                                 
-                                captcha_solved[Hashing().hash(id)] = data
+                                solved_captchas[Hashing().hash(id)] = data
 
-                                JSON.dump(captcha_solved, self.CAPTCHA_SOLVED_PATH)
+                                JSON.dump(solved_captchas, SOLVED_CAPTCHAS_PATH)
 
                                 g.ddosify_captcha = id+token
 
@@ -1005,25 +535,20 @@ class DDoSify:
             captcha_token = request.cookies.get("captcha")
 
         if captcha_token is None:
-            g.ddosify_page = True
             if is_failed_captcha:
                 add_failed_captcha()
             return show_captcha(error=is_failed_captcha)
         
         if len(captcha_token) != 56:
-            g.ddosify_page = True
             if is_failed_captcha:
                 add_failed_captcha()
             return show_captcha(error=is_failed_captcha)
             
         id, token = captcha_token[:16], captcha_token[16:]
 
-        if os.path.isfile(self.CAPTCHA_SOLVED_PATH):
-            captcha_solved = JSON.load(self.CAPTCHA_SOLVED_PATH)
-        else:
-            captcha_solved = {}
+        solved_captchas = JSON.load(SOLVED_CAPTCHAS_PATH)
        
-        for hashed_id, ip_data in captcha_solved.items():
+        for hashed_id, ip_data in solved_captchas.items():
             comparison = Hashing().compare(id, hashed_id)
             if comparison:
                 crypto = SymmetricCrypto(self.CAPTCHA_SECRET)
@@ -1040,8 +565,6 @@ class DDoSify:
                             return
                 break
         
-        g.ddosify_page = True
-
         if is_failed_captcha:
             add_failed_captcha()
 
@@ -1051,10 +574,7 @@ class DDoSify:
         rate_limit = self._preferences["rate_limit"]
 
         if not rate_limit == 0:
-            if os.path.isfile(self.RATE_LIMIT_PATH):
-                rate_limited_ips = JSON.load(self.RATE_LIMIT_PATH)
-            else:
-                rate_limited_ips = {}
+            rate_limited_ips = JSON.load(RATE_LIMIT_PATH)
 
             found = False
             for hashed_ip, ip_timestamps in rate_limited_ips.items():
@@ -1075,7 +595,7 @@ class DDoSify:
                 hashed_client_ip = Hashing().hash(g.client_ip, 16)
                 rate_limited_ips[hashed_client_ip] = [str(int(time()))]
             
-            JSON.dump(rate_limited_ips, self.RATE_LIMIT_PATH)
+            JSON.dump(rate_limited_ips, RATE_LIMIT_PATH)
         
         return response
 
@@ -1158,19 +678,14 @@ class DDoSify:
     def _crawler_hints(self, response):
         if not response.content_type == "text/html; charset=utf-8":
             return response
-        
-        if os.path.isfile(self.CRAWLER_HINTS_PATH):
-            crawler_hints = JSON.load(self.CRAWLER_HINTS_PATH)
-        else:
-            crawler_hints = {}
 
         path = request.path
         
         found = None
 
-        copy_crawler_hints = crawler_hints.copy()
+        copy_crawler_hints = self.crawler_hints_cache.copy()
 
-        for hashed_path, path_data in crawler_hints.items():
+        for hashed_path, path_data in self.crawler_hints_cache.items():
             comparison = Hashing().compare(path, hashed_path)
             if comparison:
                 try:
@@ -1202,19 +717,19 @@ class DDoSify:
                 "og_tags": symmetric_crypto.encrypt(og_tags)
             }
 
-        if copy_crawler_hints != crawler_hints:
-            JSON.dump(copy_crawler_hints, self.CRAWLER_HINTS_PATH)
+        if copy_crawler_hints != self.crawler_hints_cache:
+            self.crawler_hints_cache = copy_crawler_hints
         
         if not found is None and g.ddosify_page:
             if g.is_crawler:
                 html = response.data
                 soup = BeautifulSoup(html, 'html.parser')
 
-                title = symmetric_crypto.decrypt(crawler_hints[found]["title"])
+                title = symmetric_crypto.decrypt(self.crawler_hints_cache[found]["title"])
                 if not title == "None":
                     soup.title.string = title
 
-                og_soup = BeautifulSoup(symmetric_crypto.decrypt(crawler_hints[found]["og_tags"]), 'html.parser')
+                og_soup = BeautifulSoup(symmetric_crypto.decrypt(self.crawler_hints_cache[found]["og_tags"]), 'html.parser')
 
                 for tag in og_soup.find_all('meta'):
                     soup.head.append(tag)
