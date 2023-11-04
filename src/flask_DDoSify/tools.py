@@ -88,7 +88,9 @@ class JSON:
         """
 
         if not os.path.isfile(file_name):
-            return default
+            if isinstance(default, list):
+                return list()
+            return dict()
         
         if file_name not in file_locks:
             file_locks[file_name] = threading.Lock()
