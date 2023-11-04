@@ -7,6 +7,7 @@ import os
 import threading
 import json
 from jinja2 import Environment, select_autoescape, Undefined
+from googletrans import Translator
 import re
 from bs4 import BeautifulSoup
 from base64 import urlsafe_b64encode, urlsafe_b64decode
@@ -121,6 +122,7 @@ class JSON:
 LANGUAGES = JSON.load(os.path.join(DATA_DIR, "languages.json"), list())
 LANGUAGE_CODES = [language["code"] for language in LANGUAGES]
 TRANSLATIONS_PATH = os.path.join(DATA_DIR, "translations.json")
+translator = Translator()
 
 
 class SilentUndefined(Undefined):
@@ -200,7 +202,27 @@ class WebPage:
             if translation["text_to_translate"] == text_to_translate and translation["from_lang"] == from_lang and translation["to_lang"] == to_lang:
                 return translation["translated_output"]
         
-        return text_to_translate
+        translated_output = translator.translate(text_to_translate, src=from_lang, dest=to_lang).text
+            
+        try:
+            translated_output = translated_output.encode('latin-1').decode('unicode_escape')
+        except:
+            pass
+        
+        translation = {
+            "text_to_translate": text_to_translate, 
+            "from_lang": from_lang,
+            "to_lang": to_lang, 
+            "translated_output": translated_output
+        }
+        translations.append(translation)
+        
+        JSON.dump(translations, TRANSLATIONS_PATH)
+
+        if to_lang in ["de", "en", "es", "fr", "pt", "it"]:
+            translated_output = translated_output[0].upper() + translated_output[1:]
+        
+        return translated_output
     
     @staticmethod
     def translate(html: str, from_lang: str, to_lang: str) -> str:
