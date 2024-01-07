@@ -27,7 +27,7 @@ SFS_CACHE_PATH = os.path.join(DATA_DIR, "sfs-cache.json")
 FAILED_CAPTCHAS_PATH = os.path.join(DATA_DIR, "failed-captchas.json")
 SOLVED_CAPTCHAS_PATH = os.path.join(DATA_DIR, "solved-captchas.json")
 
-class DDoSify:
+class Captcha:
     """
     Shows the user/bot a captcha before the request first if the request comes from a dangerous IP
     Further function are: Rate Limits, Crawler Hints, Custom Templates, Rules for Specific Routes
@@ -41,7 +41,7 @@ class DDoSify:
         withoutcookies: bool = False, block_crawler: bool = True, crawler_hints: bool = True
         ):
         """
-        Initialize the DDoSify object
+        Initialize the Captcha object
 
         :param app: Your Flask App
         :param actions: Dict with actions for different routes like here: {"urlpath": "fight", "endpoint": "block"}, e.g. {"/": "block", "*/api/*": "let", "/login": "fight"} which blocks all suspicious traffic to "/", allows all traffic to /api/ routes e. e.g. "/api/cats" or "/dogs/api/" if they contain "/api/", and where to "/login" any traffic whether suspicious or not has to solve a captcha. (Default = {})
@@ -223,7 +223,7 @@ class DDoSify:
             return send_file(page_path)
         
     def _set_ip(self):
-        g.ddosify_page = False
+        g.captchaify_page = False
         g.is_crawler = False
 
         client_ip = get_client_ip()
@@ -235,7 +235,7 @@ class DDoSify:
         
         g.client_ip = client_ip
         g.client_user_agent = client_user_agent
-        g.ddosify_captcha = None
+        g.captchaify_captcha = None
     
     def _rate_limit(self):
         rate_limited_ips = JSON.load(RATE_LIMIT_PATH)
@@ -264,19 +264,19 @@ class DDoSify:
             return self._correct_template("rate_limited", emoji = emoji), 418
     
     def _change_language(self):
-        if request.args.get("ddosify_changelanguage") == "1":
+        if request.args.get("captchaify_changelanguage") == "1":
             languages = LANGUAGES
 
             search = None
-            if not request.args.get("ddosify_search") is None:
+            if not request.args.get("captchaify_search") is None:
                 searchlanguages = []
 
                 for lang in languages:
-                    if request.args.get("ddosify_search").lower() in lang["name"].lower():
+                    if request.args.get("captchaify_search").lower() in lang["name"].lower():
                         searchlanguages.append(lang)
 
                 languages = searchlanguages
-                search = request.args.get("ddosify_search")
+                search = request.args.get("captchaify_search")
 
             template_dir = self._preferences["template_dir"]
 
@@ -512,14 +512,14 @@ class DDoSify:
 
                                 JSON.dump(solved_captchas, SOLVED_CAPTCHAS_PATH)
 
-                                g.ddosify_captcha = id+token
+                                g.captchaify_captcha = id+token
 
                                 if self.withoutcookies:
                                     return redirect(request.url.replace("http://", request.scheme + "://")\
                                         .replace("?textCaptcha=" + str(request.args.get("textCaptcha")), "").replace("&textCaptcha=" + str(request.args.get("textCaptcha")), "")\
                                         .replace("?audioCaptcha=" + str(request.args.get("audioCaptcha")), "").replace("&audioCaptcha=" + str(request.args.get("audioCaptcha")), "")\
                                         .replace("?captchatoken=" + str(request.args.get("captchatoken")), "").replace("&captchatoken=" + str(request.args.get("captchatoken")), "")\
-                                        .replace("?captchasolved=1", "").replace("&captchasolved=1", "") + "?captcha=" + quote(g.ddosify_captcha))
+                                        .replace("?captchasolved=1", "").replace("&captchasolved=1", "") + "?captcha=" + quote(g.captchaify_captcha))
                                 return
                         else:
                             is_failed_captcha = True
@@ -601,10 +601,10 @@ class DDoSify:
 
     def _set_cookies(self, response):
         response = make_response(response)
-        if not g.ddosify_captcha is None:
-            response.set_cookie("captcha", g.ddosify_captcha, max_age = self.verificationage, httponly = True, secure = self.app.config.get("HTTPS"))
-        if request.args.get("ddosify_language") in LANGUAGES_CODE:
-            response.set_cookie("language", request.args.get("ddosify_language"), max_age = 60*60*24*30*12*3, httponly = True, secure = self.app.config.get("HTTPS"))
+        if not g.captchaify_captcha is None:
+            response.set_cookie("captcha", g.captchaify_captcha, max_age = self.verificationage, httponly = True, secure = self.app.config.get("HTTPS"))
+        if request.args.get("captchaify_language") in LANGUAGES_CODE:
+            response.set_cookie("language", request.args.get("captchaify_language"), max_age = 60*60*24*30*12*3, httponly = True, secure = self.app.config.get("HTTPS"))
         elif request.args.get("language") in LANGUAGES_CODE:
             response.set_cookie("language", request.args.get("language"), max_age = 60*60*24*30*12*3, httponly = True, secure = self.app.config.get("HTTPS"))
         elif request.cookies.get("language") in LANGUAGES_CODE:
@@ -614,13 +614,13 @@ class DDoSify:
     def _add_args(self, response):
         if response.content_type == "text/html; charset=utf-8":
             args = {}
-            if not g.ddosify_captcha is None:
-                args["captcha"] = g.ddosify_captcha
+            if not g.captchaify_captcha is None:
+                args["captcha"] = g.captchaify_captcha
             elif not request.args.get("captcha") is None:
                 args["captcha"] = request.args.get("captcha")
 
-            if request.args.get("ddosify_language") in LANGUAGES_CODE:
-                args["language"] = request.args.get("ddosify_language")
+            if request.args.get("captchaify_language") in LANGUAGES_CODE:
+                args["language"] = request.args.get("captchaify_language")
             elif request.args.get("language") in LANGUAGES_CODE:
                 args["language"] = request.args.get("language")
             elif request.cookies.get("language") in LANGUAGES_CODE:
@@ -701,7 +701,7 @@ class DDoSify:
 
         symmetric_crypto = SymmetricCrypto(path)
         
-        if found is None and not g.ddosify_page:
+        if found is None and not g.captchaify_page:
             html = response.data
             soup = BeautifulSoup(html, 'html.parser')
 
@@ -720,7 +720,7 @@ class DDoSify:
         if copy_crawler_hints != self.crawler_hints_cache:
             self.crawler_hints_cache = copy_crawler_hints
         
-        if not found is None and g.ddosify_page:
+        if not found is None and g.captchaify_page:
             if g.is_crawler:
                 html = response.data
                 soup = BeautifulSoup(html, 'html.parser')

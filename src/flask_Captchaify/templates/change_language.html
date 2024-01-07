@@ -217,7 +217,7 @@
         <h1>Change Language</h1>
         <div class="search-form">
             <form class="search-form" action="#" method="GET">
-                <input type="text" class="search-input" name="ddosify_search" placeholder="Search Language" value="{{ search if search|default else '' }}">
+                <input type="text" class="search-input" name="captchaify_search" placeholder="Search Language" value="{{ search if search|default else '' }}">
                 <input type="hidden" name="captchaify_changelanguage" value="1">
                 <button type="submit" class="search-button" ntr="1">
                     <img src="" alt="Search">
@@ -228,7 +228,7 @@
         <div class="container">
             {% for language in languages %}
             <div class="item">
-                <a href="?ddosify_language={{ language['code'] }}" ntr="1">
+                <a href="?captchaify_language={{ language['code'] }}" ntr="1">
                     <img src="{{ language['flag'] }}" alt="{{ language['name'] }} Flag">
                     <div class="language">{{ language['name'] }}</div>
                 </a>
