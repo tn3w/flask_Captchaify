@@ -5,7 +5,7 @@ requirements = [str(requirement.req) for requirement in parse_requirements("requ
 
 setup(
     name='flask_Captchaify',
-    version='1.2.5',
+    version='1.2.6',
     description='Protect against bots and DDoS attacks',
     author='TN3W',
     author_email='tn3wA8xxfuVMs2@proton.me',
