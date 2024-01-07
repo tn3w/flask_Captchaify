@@ -119,7 +119,7 @@ class Captcha:
         self.block_crawler = block_crawler
         self.crawler_hints = crawler_hints
 
-        self.CAPTCHA_SECRET = generate_random_string(512)
+        self.CAPTCHA_SECRET = generate_random_string(32)
 
         if self.crawler_hints:
             self.crawler_hints_cache = dict()
