@@ -211,7 +211,7 @@
         </style>
     </head>
     <body>
-        <a class="back-button" href="/" ntr="1">
+        <a class="back-button" href="?captchaify_language={{ language }}" ntr="1">
             <img class="icon" src="" alt="Back">
         </a>
         <h1>Change Language</h1>
@@ -219,6 +219,7 @@
             <form class="search-form" action="#" method="GET">
                 <input type="text" class="search-input" name="captchaify_search" placeholder="Search Language" value="{{ search if search|default else '' }}">
                 <input type="hidden" name="captchaify_changelanguage" value="1">
+                <input type="hidden" name="captchaify_language" value="{{ language }}">
                 <button type="submit" class="search-button" ntr="1">
                     <img src="" alt="Search">
                 </button>
