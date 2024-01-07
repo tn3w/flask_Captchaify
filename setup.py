@@ -1,10 +1,12 @@
 from setuptools import setup, find_packages
+from pip.req import parse_requirements
+
+requirements = [str(requirement.req) for requirement in parse_requirements("requirements.txt")]
 
 setup(
     name='flask_Captchaify',
     version='1.2.5',
     description='Protect against bots and DDoS attacks',
-    long_description='A DDoS defense system for flask applications, first sends users to a captcha page without a javascript script and creates a confirmation cookie/url arg after the captcha.',
     author='TN3W',
     author_email='tn3wA8xxfuVMs2@proton.me',
     url='https://github.com/tn3w/flask_Captchaify',
@@ -24,16 +26,5 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
     keywords='flask, Python, Bot, Captcha, DDoS',
-    install_requires=[
-        'cryptography',
-        'Flask',
-        'googletrans==3.1.0a0',
-        'beautifulsoup4',
-        'ipaddress',
-        'Jinja2',
-        'Pillow',
-        'requests',
-        'bs4',
-        'captcha',
-    ],
+    install_requires=requirements
 )
