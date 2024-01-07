@@ -16,10 +16,10 @@ If needed, a captcha is displayed to the user (or the robot) based on the streng
 An example script could look like this:
 ```python
 from flask import Flask
-from flask_Captchaify.ddosify import DDoSify
+from flask_Captchaify import Captcha
 
 app = Flask(__name__)
-ddosify = DDoSify(app, default_hardness=2)
+captcha = Captcha(app, default_hardness=2)
 
 @app.route("/")
 def index():
@@ -55,11 +55,11 @@ A quick and easy implementation allows even small websites or a small team of de
    ```
    You add the line:
    ```python
-    ddosify = DDoSify(app)
+    captcha = Captcha(app)
    ```
    And at the beginning of the file add the import:
    ```python
-   from flask_Captchaify.ddosify import DDoSify
+   from flask_Captchaify import Captcha
    ```
 For more information, see the sample code above.
 ## Personalization

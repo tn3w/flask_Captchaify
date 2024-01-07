@@ -1,14 +1,11 @@
 from setuptools import setup, find_packages
-try:
-    from pip._internal.req import parse_requirements
-except ImportError:
-    from pip.req import parse_requirements
+from pip._internal.req import parse_requirements
 
 requirements = [str(requirement.requirement) for requirement in list(parse_requirements("requirements.txt", session=False))]
 
 setup(
     name='flask_Captchaify',
-    version='1.2.6',
+    version='1.2.7',
     description='Protect against bots and DDoS attacks',
     author='TN3W',
     author_email='tn3wA8xxfuVMs2@proton.me',
