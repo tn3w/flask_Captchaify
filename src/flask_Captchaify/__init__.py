@@ -11,7 +11,7 @@ from captcha.audio import AudioCaptcha
 from urllib.parse import urlparse, quote
 from flask import Flask, request, g, abort, send_file, make_response, redirect
 from typing import Optional
-from utils import JSON, generate_random_string, WebPage, get_client_ip, Hashing, SymmetricCrypto, get_ip_info
+from .utils import JSON, generate_random_string, WebPage, get_client_ip, Hashing, SymmetricCrypto, get_ip_info
 
 DATA_DIR = pkg_resources.resource_filename('flask_Captchaify', 'data')
 TEMPLATE_DIR = pkg_resources.resource_filename('flask_Captchaify', 'templates')
