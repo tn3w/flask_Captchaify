@@ -1,17 +1,17 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='flask_Captcha',
+    name='flask_Captchaify',
     version='1.2.5',
     description='Protect against bots and DDoS attacks',
     long_description='A DDoS defense system for flask applications, first sends users to a captcha page without a javascript script and creates a confirmation cookie/url arg after the captcha.',
     author='TN3W',
     author_email='tn3wA8xxfuVMs2@proton.me',
-    url='https://github.com/tn3w/flask_Captcha',
+    url='https://github.com/tn3w/flask_Captchaify',
     packages=find_packages(where='src'),
     package_dir={'': 'src'},
     package_data={
-        'flask_DDoSify': ['data/*', 'templates/*']
+        'flask_Captchaify': ['data/*', 'templates/*']
     },
     classifiers=[
         'Environment :: Web Environment',
