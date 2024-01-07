@@ -2,7 +2,7 @@ from flask import Flask
 from flask_Captchaify import Captcha
 
 app = Flask(__name__)
-captcha = Captcha(app, default_hardness=2, default_action = "fight", default_rate_limit = 3)
+captcha = Captcha(app, default_hardness=2, default_action = "fight")
 
 @app.route("/")
 def index():
