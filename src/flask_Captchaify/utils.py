@@ -178,9 +178,6 @@ class WebPage:
         :param default: The value that is returned if no language can be found
         """
 
-        if request.args.get("captchaify_language") in LANGUAGE_CODES:
-            return request.args.get("captchaify_language")
-
         preferred_language = request.accept_languages.best_match(LANGUAGE_CODES)
 
         if preferred_language != None:
@@ -309,8 +306,12 @@ class WebPage:
                 html = file.read()
         
         template = env.from_string(html)
-
-        client_language = WebPage.get_client_language()
+        
+        client_language = (
+            request.cookies.get("language")
+            or request.args.get("captchaify_language")
+            or WebPage.get_client_language()
+        )
         args["language"] = client_language
 
         html = template.render(**args)
