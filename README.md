@@ -11,7 +11,7 @@ A DDoS defense system for flask applications, first sends users to a captcha pag
 \[ \! \] With version 0.7 and 0.9 the syntax of the DDoSify() class has changed. \[ \! \]
 
 ## How does flask_Captchaify work?
-If needed, a captcha is displayed to the user (or the robot) based on the strength set.[^1] Javascript is not needed for this, as the content is rendered on the server.
+If needed, a captcha is displayed to the user (or the robot) based on the strength set.[^1] Javascript is not needed for this, as the content is rendered on the server.[^2]
 
 An example script could look like this:
 ```python
@@ -35,13 +35,13 @@ if __name__ == "__main__":
 
 ## Application purposes
 A few application purposes:
-  - Protect against DDoS attacks
+  - Protect against DDoS attacks [^3]
   - Your website contains content that should not be read by a robot
   - A login website
   - A dark web page that simply needs to be secured a bit
 
 ### Why should you use DDoSify if you host a Flask server?
-A quick and easy implementation allows even small websites or a small team of developers to quickly get robot protection. It also doesn't use third-party providers, which limits data collection from Google, Facebook and the creepy data brokers. Everything is open source, meaning you can rewrite the code yourself and perhaps make it more private.
+A quick and easy implementation allows even small websites or a small team of developers to quickly get robot protection. It also doesn't use third-party providers, which limits data collection from Google, Facebook and the creepy data brokers.[^4] Everything is open source, meaning you can rewrite the code yourself and perhaps make it more private.
 
 # Instructions
 
