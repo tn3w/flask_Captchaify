@@ -1,22 +1,22 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/tn3w/flask_DDoSify/releases/download/v0.3/blocked-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="https://github.com/tn3w/flask_DDoSify/releases/download/v0.3/blocked-light.png">
-  <img alt="Picture from Block Page" src="https://github.com/tn3w/flask_DDoSify/releases/download/v0.3/blocked-dark.png">
+  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/tn3w/flask_Captcha/releases/download/v0.3/blocked-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://github.com/tn3w/flask_Captcha/releases/download/v0.3/blocked-light.png">
+  <img alt="Picture from Block Page" src="https://github.com/tn3w/flask_Captcha/releases/download/v0.3/blocked-dark.png">
 </picture>
-<p align="center"><a rel="noreferrer noopener" href="https://github.com/tn3w/flask_DDoSify"><img alt="Github" src="https://img.shields.io/badge/Github-141e24.svg?&style=for-the-badge&logo=github&logoColor=white"></a>  <a rel="noreferrer noopener" href="https://pypi.org/project/flask-DDoSify/"><img alt="PyPI" src="https://img.shields.io/badge/PyPi-141e24.svg?&style=for-the-badge&logo=python&logoColor=white"></a>  <a rel="noreferrer noopener" href="https://libraries.io/pypi/flask-DDoSify"><img alt="Libraries.io" src="https://img.shields.io/badge/Libraries.io-141e24.svg?&style=for-the-badge&logo=npm&logoColor=white"></a>
+<p align="center"><a rel="noreferrer noopener" href="https://github.com/tn3w/flask_Captcha"><img alt="Github" src="https://img.shields.io/badge/Github-141e24.svg?&style=for-the-badge&logo=github&logoColor=white"></a>  <a rel="noreferrer noopener" href="https://pypi.org/project/flask-Captcha/"><img alt="PyPI" src="https://img.shields.io/badge/PyPi-141e24.svg?&style=for-the-badge&logo=python&logoColor=white"></a>  <a rel="noreferrer noopener" href="https://libraries.io/pypi/flask-Captcha"><img alt="Libraries.io" src="https://img.shields.io/badge/Libraries.io-141e24.svg?&style=for-the-badge&logo=npm&logoColor=white"></a>
   
-# flask_DDoSify
+# flask_Captcha
 A DDoS defense system for flask applications, first sends users to a captcha page without a javascript script and creates a confirmation cookie/url arg after the captcha.
 
 \[ \! \] With version 0.7 and 0.9 the syntax of the DDoSify() class has changed. \[ \! \]
 
-## How does flask_DDoSify work?
+## How does flask_Captcha work?
 If needed, a captcha is displayed to the user (or the robot) based on the strength set.[^1] Javascript is not needed for this, as the content is rendered on the server.[^2]
 
 An example script could look like this:
 ```python
 from flask import Flask
-from flask_DDoSify.ddosify import DDoSify
+from flask_Captcha.ddosify import DDoSify
 
 app = Flask(__name__)
 ddosify = DDoSify(app, default_hardness=2)
@@ -47,8 +47,8 @@ A quick and easy implementation allows even small websites or a small team of de
 
 ## Installation guide
 1. Make sure you have the latest version of Python and Pip installed, you also need git installed.
-2. Install the script with pip `pip install flask_DDoSify` or manually via `git clone https://github.com/tn3w/flask_DDoSify` or download the zip.
-3. If you installed it manually, make sure your python script is in the folder where there is a subfolder flask_DDoSify, and make sure you run `pip install -r requirements.txt` in the flask_DDoSify folder.
+2. Install the script with pip `pip install flask_Captcha` or manually via `git clone https://github.com/tn3w/flask_Captcha` or download the zip.
+3. If you installed it manually, make sure your python script is in the folder where there is a subfolder flask_Captcha, and make sure you run `pip install -r requirements.txt` in the flask_Captcha folder.
 5. Make sure that after:
    ```python
    app = Flask(__name__)
@@ -59,7 +59,7 @@ A quick and easy implementation allows even small websites or a small team of de
    ```
    And at the beginning of the file add the import:
    ```python
-   from flask_DDoSify.ddosify import DDoSify
+   from flask_Captcha.ddosify import DDoSify
    ```
 For more information, see the sample code above.
 ## Personalization
