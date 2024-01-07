@@ -308,8 +308,8 @@ class WebPage:
         template = env.from_string(html)
         
         client_language = next((lang for lang in (
-            request.cookies.get("language"),
             request.args.get("captchaify_language"),
+            request.cookies.get("language"),
             WebPage.get_client_language()
         ) if lang in LANGUAGE_CODES), None)
 
