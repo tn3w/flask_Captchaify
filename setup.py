@@ -11,7 +11,7 @@ long_description = '[![Picture from Block Page](https://github.com/tn3w/flask_Ca
 
 setup(
     name='flask_Captchaify',
-    version='1.3.3',
+    version='1.3.4',
     description='Protect against bots and DDoS attacks',
     long_description=long_description,
     long_description_content_type='text/markdown',
