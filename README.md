@@ -19,7 +19,7 @@ from flask import Flask
 from flask_Captchaify import Captcha
 
 app = Flask(__name__)
-captcha = Captcha(app, default_hardness=2)
+captcha = Captcha(app, default_hardness=2, default_action = "fight", default_rate_limit = 3)
 
 @app.route("/")
 def index():
@@ -55,7 +55,7 @@ A quick and easy implementation allows even small websites or a small team of de
    ```
    You add the line:
    ```python
-    captcha = Captcha(app)
+   captcha = Captcha(app, default_hardness=2, default_action = "fight", default_rate_limit = 3)
    ```
    And at the beginning of the file add the import:
    ```python

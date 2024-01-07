@@ -3,10 +3,15 @@ from pip._internal.req import parse_requirements
 
 requirements = [str(requirement.requirement) for requirement in list(parse_requirements("requirements.txt", session=False))]
 
+with open('README.md', 'r', encoding='utf-8') as readable_file:
+    long_description = readable_file.read()
+
 setup(
     name='flask_Captchaify',
-    version='1.3',
+    version='1.3.1',
     description='Protect against bots and DDoS attacks',
+    long_description=long_description,
+    long_description_content_type='text/markdown',
     author='TN3W',
     author_email='tn3wA8xxfuVMs2@proton.me',
     url='https://github.com/tn3w/flask_Captchaify',
@@ -25,6 +30,7 @@ setup(
         'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
+    license='GPL-3.0',
     keywords='flask, Python, Bot, Captcha, DDoS',
     install_requires=requirements
 )
