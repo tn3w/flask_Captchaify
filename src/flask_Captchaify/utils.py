@@ -20,7 +20,7 @@ from time import time
 import requests
 
 
-DATA_DIR = pkg_resources.resource_filename('flask_DDoSify', 'data')
+DATA_DIR = pkg_resources.resource_filename('flask_Captchaify', 'data')
 
 
 def generate_random_string(length: int, with_punctuation: bool = True, with_letters: bool = True):
