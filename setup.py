@@ -6,9 +6,15 @@ requirements = [str(requirement.requirement) for requirement in list(parse_requi
 with open('README.md', 'r', encoding='utf-8') as readable_file:
     long_description = readable_file.read()
 
+long_description.replace("""<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/tn3w/flask_Captchaify/releases/download/v0.3/blocked-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://github.com/tn3w/flask_Captchaify/releases/download/v0.3/blocked-light.png">
+  <img alt="Picture from Block Page" src="https://github.com/tn3w/flask_Captchaify/releases/download/v0.3/blocked-dark.png">
+<picture>""", '<img alt="Picture from Block Page" src="https://github.com/tn3w/flask_Captchaify/releases/download/v0.3/blocked-dark.png">')
+
 setup(
     name='flask_Captchaify',
-    version='1.3.1',
+    version='1.3.2',
     description='Protect against bots and DDoS attacks',
     long_description=long_description,
     long_description_content_type='text/markdown',
