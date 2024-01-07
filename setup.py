@@ -1,11 +1,10 @@
 from setuptools import setup, find_packages
 try:
-    from pip._internal.req import parse_requirements
+    from pip._internal.req import parse_requirements, PipSession
 except ImportError:
-    from pip.req import parse_requirements
-import pip
+    from pip.req import parse_requirements, PipSession
 
-requirements = [str(requirement.req) for requirement in parse_requirements("requirements.txt", session=pip.download.PipSession)]
+requirements = [str(requirement.req) for requirement in parse_requirements("requirements.txt", session=PipSession())]
 
 setup(
     name='flask_Captchaify',
