@@ -307,11 +307,12 @@ class WebPage:
         
         template = env.from_string(html)
         
-        client_language = (
-            request.cookies.get("language")
-            or request.args.get("captchaify_language")
-            or WebPage.get_client_language()
-        )
+        client_language = next((lang for lang in (
+            request.cookies.get("language"),
+            request.args.get("captchaify_language"),
+            WebPage.get_client_language()
+        ) if lang in LANGUAGE_CODES), None)
+
         args["language"] = client_language
 
         html = template.render(**args)
