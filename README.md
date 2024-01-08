@@ -8,7 +8,7 @@
 # flask_Captchaify
 A DDoS defense system for flask applications, first sends users to a captcha page without a javascript script and creates a confirmation cookie/url arg after the captcha.
 
-\[ \! \] With version 0.7 and 0.9 the syntax of the DDoSify() class has changed. \[ \! \]
+\[ \! \] With version 0.7 and 0.9 the syntax of the Captcha() class has changed. \[ \! \]
 
 ## How does flask_Captchaify work?
 If needed, a captcha is displayed to the user (or the robot) based on the strength set.[^1] Javascript is not needed for this, as the content is rendered on the server.[^2]
