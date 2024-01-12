@@ -70,14 +70,14 @@ For more information, see the sample code above.
    
    Example of a website that allows all bots on the main page, enforces captchas on the login page, and blocks all robots on the registration page:
    ```python
-   ddosify = DDoSify(app, actions={"/": "let", "/login": "fight", "/register": "block"})
+   captcha = Captcha(app, actions={"/": "let", "/login": "fight", "/register": "block"})
    ```
 
    When using "*" before or after the urlpath / endpoint you can address multiple urls.
 
    Example of a website where all urls with /api/ are allowed through, all urls starting with "/dogs/" show everyone a captcha and all urls ending with "/cats/" block bots:
    ```python
-   ddosify = DDoSify(app, actions={"*/api/*": "let", "/dogs/*": "fight", "*/cats/": "block"})
+   captcha = Captcha(app, actions={"*/api/*": "let", "/dogs/*": "fight", "*/cats/": "block"})
    ```
    
    All actions:
@@ -95,7 +95,7 @@ For more information, see the sample code above.
 
    Example of a website that sets the hardness of the main page to 1 (= easy), on the login page to 2 (= normal) and on the register page to 3 (= hard):
    ```python
-   ddosify = DDoSify(app, hardness={"/": 1, "/login": 2, "/register": 3})
+   captcha = Captcha(app, hardness={"/": 1, "/login": 2, "/register": 3})
    ```
 
    When using "*" before or after the urlpath / endpoint you can address multiple urls, like actions.
@@ -115,7 +115,7 @@ For more information, see the sample code above.
 
    Example of a website that has a specific rate_limit on /api/:
    ```python
-   ddosify = DDoSify(app, template_dirs={"/api/*": (60, 600)})
+   captcha = Captcha(app, template_dirs={"/api/*": (60, 600)})
    ```
    <br>
 
@@ -125,7 +125,7 @@ For more information, see the sample code above.
 
    Example of a website that has a specific template directory on /api/:
    ```python
-   ddosify = DDoSify(app, template_dirs={"/api/*": "/path/to/special/template/directory"})
+   captcha = Captcha(app, template_dirs={"/api/*": "/path/to/special/template/directory"})
    ```
 
    A template directory can look like this:
@@ -146,7 +146,7 @@ For more information, see the sample code above.
 
    Example of a very paranoid website that has set its action to "fight" for all routes:
    ```python
-   ddosify = DDoSify(app, default_action="fight")
+   captcha = Captcha(app, default_action="fight")
    ```
    <br>
 
@@ -156,7 +156,7 @@ For more information, see the sample code above.
 
    Example of a very paranoid website that has set its hardness to 3 (= hard) for all routes:
    ```python
-   ddosify = DDoSify(app, default_hardness=3)
+   captcha = Captcha(app, default_hardness=3)
    ```
    <br>
 
@@ -166,7 +166,7 @@ For more information, see the sample code above.
 
    Example of a web page with custom rate_limit:
    ```python
-   ddosify = DDoSify(app, default_rate_limit=60)
+   captcha = Captcha(app, default_rate_limit=60)
    ```
    <br>
 
@@ -176,7 +176,7 @@ For more information, see the sample code above.
 
    Example of a web page with custom max_rate_limit:
    ```python
-   ddosify = DDoSify(app, default_max_rate_limit=600)
+   captcha = Captcha(app, default_max_rate_limit=600)
    ```
    <br>
 
@@ -186,7 +186,7 @@ For more information, see the sample code above.
 
    Example of a web page with custom template_dir:
    ```python
-   ddosify = DDoSify(app, default_template_dir="/path/to/my/custom/template/directory")
+   captcha = Captcha(app, default_template_dir="/path/to/my/custom/template/directory")
    ```
    <br>
 
@@ -196,7 +196,7 @@ For more information, see the sample code above.
 
    Website with 3 hours verificationage:
    ```python
-   ddosify = DDoSify(app, verificationage=10800)
+   captcha = Captcha(app, verificationage=10800)
    ```
    <br>
 
@@ -206,7 +206,7 @@ For more information, see the sample code above.
 
    Website with withoutcookies enabled:
    ```python
-   ddosify = DDoSify(app, withoutcookies=True)
+   captcha = Captcha(app, withoutcookies=True)
    ```
    <br>
 
@@ -216,7 +216,7 @@ For more information, see the sample code above.
 
    Web page with block_crawler enabled:
    ```python
-   ddosify = DDoSify(app, block_crawler=True)
+   captcha = Captcha(app, block_crawler=True)
    ```
    <br>
 
@@ -226,7 +226,7 @@ For more information, see the sample code above.
    
    Web page with crawler_hints disabled:
    ```python
-   ddosify = DDoSify(app, crawler_hints=False)
+   captcha = Captcha(app, crawler_hints=False)
    ```
    <br>
 
