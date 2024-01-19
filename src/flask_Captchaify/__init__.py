@@ -35,7 +35,7 @@ if os.path.isfile(TOR_EXIT_IPS_LIST_PATH):
     if ip_data is not None:
         if isinstance(ip_data.get("time"), int):
             if int(time()) - int(ip_data.get("time")) <= 604800:
-                if isinstance(ip_data.get("ips"), dict):
+                if isinstance(ip_data.get("ips"), list):
                     tor_exit_ips = ip_data.get("ips")
 
 if tor_exit_ips is None:
@@ -57,7 +57,7 @@ if tor_exit_ips is None:
             if not ipv6 is None:
                 tor_exit_ips.append(ipv6)
         
-        JSON.dump({"time": time(), "ips": tor_exit_ips}, TOR_EXIT_IPS_LIST_PATH)
+        JSON.dump({"time": int(time()), "ips": tor_exit_ips}, TOR_EXIT_IPS_LIST_PATH)
 
 
 class Captcha:
