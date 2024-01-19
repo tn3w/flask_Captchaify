@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
 from urllib.parse import urlparse, quote
-from flask import Flask, request, g, abort, send_file, make_response, redirect
+from flask import Flask, request, g, abort, send_file, make_response, redirect, Response
 from typing import Optional
 from .utils import JSON, generate_random_string, WebPage, get_client_ip, Hashing, SymmetricCrypto, get_ip_info
 
@@ -34,20 +34,27 @@ class Captcha:
     """
 
     def __init__ (
-        self, app: Flask, actions: dict = {},
-        hardness: dict = {}, rate_limits: dict = {}, template_dirs: dict = {},
+        self, app: Flask, actions: Optional[dict] = None,
+        hardness: Optional[dict] = None, rate_limits: Optional[dict] = None, template_dirs: Optional[dict] = None,
         default_action: str = "captcha", default_hardness: int = 2, default_rate_limit: Optional[int] = 120, 
         default_max_rate_limit = 1200, default_template_dir: Optional[str] = None, verificationage: int = 3600,
         withoutcookies: bool = False, block_crawler: bool = True, crawler_hints: bool = True
         ):
         """
-        Initialize the Captcha object
-
         :param app: Your Flask App
-        :param actions: Dict with actions for different routes like here: {"urlpath": "fight", "endpoint": "block"}, e.g. {"/": "block", "*/api/*": "let", "/login": "fight"} which blocks all suspicious traffic to "/", allows all traffic to /api/ routes e. e.g. "/api/cats" or "/dogs/api/" if they contain "/api/", and where to "/login" any traffic whether suspicious or not has to solve a captcha. (Default = {})
-        :param hardness: Dict with hardness for different routes like here: {"urlpath": 1, "endpoint": 2}, e.g. {"/": 3, "*/api/*": 1, "/login": 3}. The urlpaths have the same structure as for actions. (Default = {})
-        :param rate_limits: Dict with rate limit and max rate limit for different routes, the rate limit variable indicates how many requests an ip can make per minute, the max rate limit variable specifies the maximum number of requests that can come from all Ips like here: {"urlpath": (180, 1800), "endpoint": (130, 1300)}, e.g. {"/": (120, 1200), "*/api/*": (180, 1800), "/login": (60, 600)}. The urlpaths have the same structure as for actions. (Default = {})
-        :param template_dirs: Dict with template folder for different routes like here: {"urlpath": "/path/to/template/dir", "endpoint": "/path/to/template/dir2"}, e.g. {"/": "/path/to/template/dir", "*/api/*": "/path/to/myapi/template/dir", "/login": "/path/to/login/template/dir"}. The urlpaths have the same structure as for actions. (Default = {})
+        :param actions: Dict with actions for different routes like here: 
+            	        {"urlpath": "fight", "endpoint": "block"}, e.g. {"/": "block", "*/api/*": "let", "/login": "fight"} which blocks all suspicious traffic to "/",
+                        allows all traffic to /api/ routes e. e.g. "/api/cats" or "/dogs/api/" if they contain "/api/", and where to "/login" any traffic whether suspicious
+                        or not has to solve a captcha. (Default = None)
+        :param hardness: Dict with hardness for different routes like here:
+                         {"urlpath": 1, "endpoint": 2}, e.g. {"/": 3, "*/api/*": 1, "/login": 3}. The urlpaths have the same structure as for actions. (Default = None)
+        :param rate_limits: Dict with rate limit and max rate limit for different routes, the rate limit variable indicates how many requests an ip can make per minute,
+                            the max rate limit variable specifies the maximum number of requests that can come from all Ips like here:
+                            {"urlpath": (180, 1800), "endpoint": (130, 1300)}, e.g. {"/": (120, 1200), "*/api/*": (180, 1800), "/login": (60, 600)}.
+                            The urlpaths have the same structure as for actions. (Default = None)
+        :param template_dirs: Dict with template folder for different routes like here: {"urlpath": "/path/to/template/dir", "endpoint": "/path/to/template/dir2"},
+                              e.g. {"/": "/path/to/template/dir", "*/api/*": "/path/to/myapi/template/dir", "/login": "/path/to/login/template/dir"}.
+                              The urlpaths have the same structure as for actions. (Default = None)
         :param default_action: The default value of all pages if no special action is given in actions. (Default = "captcha")
         :param default_hardness: The default value of all pages if no special hardness is given in hardness. (Default = 2)
         :param default_rate_limit: How many requests an ip can make per minute, if nothing is given at rate_limits this value is used. If None, no rate limit is set. (Default = 120)
@@ -61,70 +68,31 @@ class Captcha:
 
         if app is None:
             raise ValueError("The Flask app cannot be None")
-
-        if not isinstance(actions, dict):
-            actions = dict()
-        
-        if not isinstance(hardness, dict):
-            hardness = dict()
-        
-        if not isinstance(rate_limits, dict):
-            rate_limits = {}
-        
-        if not isinstance(template_dirs, dict):
-            template_dirs = dict()
-        
-        if not default_action in ["let", "block", "fight", "captcha"]:
-            default_action = "captcha"
-        
-        if not default_hardness in [1, 2, 3]:
-            default_hardness = 2
-
-        if not isinstance(default_rate_limit, int) and not default_rate_limit is None:
-            default_rate_limit = 120
-        
-        if not isinstance(default_max_rate_limit, int) and not default_max_rate_limit is None:
-            default_max_rate_limit = 1200
-        
-        if default_template_dir is None:
-            default_template_dir = TEMPLATE_DIR
-
-        if not isinstance(verificationage, int):
-            verificationage = 3600
-        
-        if not isinstance(withoutcookies, bool):
-            withoutcookies = False
-        
-        if not isinstance(block_crawler, bool):
-            block_crawler = True
-        
-        if not isinstance(crawler_hints, bool):
-            crawler_hints = True
         
         self.app = app
+        
+        self.actions = actions if isinstance(actions, dict) else dict()
+        self.hardness = hardness if isinstance(hardness, dict) else dict()
+        self.rate_limits = rate_limits if isinstance(rate_limits, dict) else {}
+        self.template_dirs = template_dirs if isinstance(template_dirs, dict) else dict()
 
-        self.actions = actions
-        self.hardness = hardness
-        self.rate_limits = rate_limits
-        self.template_dirs = template_dirs
+        self.default_action = default_action if default_action in ["let", "block", "fight", "captcha"] else "captcha"
+        self.default_hardness = default_hardness if default_hardness in [1, 2, 3] else 2
+        self.default_rate_limit = default_rate_limit if isinstance(default_rate_limit, int) or default_rate_limit is None else 120
+        self.default_max_rate_limit = default_max_rate_limit if isinstance(default_max_rate_limit, int) or default_max_rate_limit is None else 1200
+        self.default_template_dir = default_template_dir if default_template_dir is not None else TEMPLATE_DIR
 
-        self.default_action = default_action
-        self.default_hardness = default_hardness
-        self.default_rate_limit = default_rate_limit
-        self.default_max_rate_limit = default_max_rate_limit
-        self.default_template_dir = default_template_dir
-
-        self.verificationage = verificationage
-        self.withoutcookies = withoutcookies
-        self.block_crawler = block_crawler
-        self.crawler_hints = crawler_hints
+        self.verificationage = verificationage if isinstance(verificationage, int) else 3600
+        self.withoutcookies = withoutcookies if isinstance(withoutcookies, bool) else False
+        self.block_crawler = block_crawler if isinstance(block_crawler, bool) else True
+        self.crawler_hints = crawler_hints if isinstance(crawler_hints, bool) else True
 
         self.CAPTCHA_SECRET = generate_random_string(32)
 
         if self.crawler_hints:
             self.crawler_hints_cache = dict()
 
-        app.before_request(self._set_ip)
+        app.before_request(self._set_client_information)
         app.before_request(self._rate_limit)
         app.before_request(self._change_language)
         app.before_request(self._fight_bots)
@@ -139,8 +107,16 @@ class Captcha:
             app.after_request(self._crawler_hints)
     
     @property
-    def _preferences(self):
+    def _preferences(self) -> dict:
+        "This property returns a dictionary of preferences based on the current route or endpoint."
+
         def is_correct_route(path: str):
+            """
+            Helper function to determine if the provided path matches the current route or endpoint.
+
+            :param path: The path to check against the current route or endpoint
+            """
+
             url_path = urlparse(request.url).path
             url_endpoint = request.endpoint
 
@@ -192,7 +168,38 @@ class Captcha:
         
         return current_url
     
+    @property
+    def _chosen_language(self) -> Optional[str]:
+        "Determines the chosen language."
+
+        language_from_args = request.args.get("captchaify_language")
+        language_from_request_args = request.args.get("language")
+        language_from_request_cookies = request.cookies.get("language")
+
+        chosen_language = (
+            language_from_args
+            if language_from_args in LANGUAGES_CODE
+            else (
+                language_from_request_args
+                if language_from_request_args in LANGUAGES_CODE
+                else (
+                    language_from_request_cookies
+                    if language_from_request_cookies in LANGUAGES_CODE
+                    else None
+                )
+            )
+        )
+
+        return chosen_language
+    
     def _correct_template(self, template_type: str, **args):
+        """
+        Retrieves and renders templates based on the specified template type.
+
+        :param template_type: The type of template to retrieve and render
+        :param **args: Additional keyword arguments to be passed to the template renderer
+        """
+
         if not template_type in ["captcha", "block", "rate_limited"]:
             raise Exception("'" + template_type + "' is not a Template Type.")
         
@@ -214,16 +221,23 @@ class Captcha:
             html = WebPage.render_template(page_path, **args)
             return html
         elif page_ext == "json":
-            with open(page_path, "r") as file:
+            with open(page_path, "r", encoding = "utf-8") as file:
                 return JSON.load(file)
         elif page_ext in ["txt", "xml"]:
-            with open(page_path, "r") as file:
+            with open(page_path, "r", encoding = "utf-8") as file:
                 return file.read()
         else:
             return send_file(page_path)
         
-    def _set_ip(self):
+    def _set_client_information(self):
+        """
+        Set client IP address, user agent, and related properties.
+
+        This method disables captchaify_page and sets is_crawler to False.
+        """
+
         g.captchaify_page = False
+        g.captchaify_captcha = None
         g.is_crawler = False
 
         client_ip = get_client_ip()
@@ -235,9 +249,10 @@ class Captcha:
         
         g.client_ip = client_ip
         g.client_user_agent = client_user_agent
-        g.captchaify_captcha = None
     
     def _rate_limit(self):
+        "This method checks for rate limits based on IP addresses and overall request counts."
+
         rate_limited_ips = JSON.load(RATE_LIMIT_PATH)
 
         preferences = self._preferences
@@ -249,10 +264,8 @@ class Captcha:
         ip_request_count = 0
 
         for hashed_ip, ip_timestamps in rate_limited_ips.items():
-            count = 0
-            for request_time in ip_timestamps:
-                if not int(time()) - int(request_time) > 60:
-                    count += 1
+            count = sum(1 for request_time in ip_timestamps if int(time()) - int(request_time) <= 60)
+
             comparison = Hashing().compare(g.client_ip, hashed_ip)
             if comparison:
                 ip_request_count += count
@@ -263,7 +276,9 @@ class Captcha:
             emoji = random.choice(TEAEMOJIS)
             return self._correct_template("rate_limited", emoji = emoji), 418
     
-    def _change_language(self):
+    def _change_language(self) -> Optional[str]:
+        "Change the language of the web application based on the provided query parameters."
+         
         if request.args.get("captchaify_changelanguage") == "1":
             languages = LANGUAGES
 
@@ -281,13 +296,20 @@ class Captcha:
             template_dir = self._preferences["template_dir"]
 
             for file in os.listdir(template_dir):
-                if file.startswith("change_language") or file.startswith("changelanguage"):
-                    return WebPage.render_template(os.path.join(template_dir, file), search=search, languages=languages)
+                if file.startswith("change_language"):
+                    return WebPage.render_template(os.path.join(template_dir, file), search = search, languages = languages)
                 
     def _fight_bots(self):
+        """
+        This method checks whether the client is a bot and combats it. It checks various criteria, including client information, 
+        IP reputation, and captcha verification, to determine whether to block, show a captcha, or take other actions.
+        """
+        
         url_path = urlparse(request.url).path
 
-        def add_failed_captcha():
+        def add_failed_captcha() -> None:
+            "This function manages the records of failed captcha attempts, updating the records based on the client's IP. It checks existing records and adds new ones as necessary."
+
             failed_captchas = JSON.load(FAILED_CAPTCHAS_PATH)
 
             is_found = False
@@ -314,7 +336,14 @@ class Captcha:
 
                 JSON.dump(failed_captchas, FAILED_CAPTCHAS_PATH)
         
-        def show_captcha(error: bool = False):
+        def show_captcha(error: bool = False) -> str:
+            """
+            This function generates and displays captchas of varying hardness levels. It includes image captchas and, optionally, audio captchas.
+            The generated captchas are encoded and included in the response along with additional information.
+
+            :param error: Indicates whether there was an error in the previous captcha attempt.
+            """
+
             captcha_token = Hashing().hash(url_path) + "-//-" + str(int(time())) + "-//-" + str(hardness) + "-//-" +\
                 Hashing().hash(g.client_ip) + "-//-" + Hashing().hash(g.client_user_agent) + "-//-"
 
@@ -570,7 +599,13 @@ class Captcha:
 
         return show_captcha(error=is_failed_captcha)
 
-    def _add_rate_limit(self, response):
+    def _add_rate_limit(self, response: Response) -> Response:
+        """
+        This method handles rate limiting for incoming requests.
+
+        :param response: The response object to be returned
+        """
+
         rate_limit = self._preferences["rate_limit"]
 
         if not rate_limit == 0:
@@ -599,83 +634,97 @@ class Captcha:
         
         return response
 
-    def _set_cookies(self, response):
+    def _set_cookies(self, response: Response) -> Response:
+        """
+        Set cookies in the response object based on various conditions.
+
+        :param response: The response object to be returned
+        """
+        
         response = make_response(response)
-        if not g.captchaify_captcha is None:
+
+        if g.captchaify_captcha is not None:
             response.set_cookie("captcha", g.captchaify_captcha, max_age = self.verificationage, httponly = True, secure = self.app.config.get("HTTPS"))
-        if request.args.get("captchaify_language") in LANGUAGES_CODE:
-            response.set_cookie("language", request.args.get("captchaify_language"), max_age = 60*60*24*30*12*3, httponly = True, secure = self.app.config.get("HTTPS"))
-        elif request.args.get("language") in LANGUAGES_CODE:
-            response.set_cookie("language", request.args.get("language"), max_age = 60*60*24*30*12*3, httponly = True, secure = self.app.config.get("HTTPS"))
-        elif request.cookies.get("language") in LANGUAGES_CODE:
-            response.set_cookie("language", request.cookies.get("language"), max_age = 60*60*24*30*12*3, httponly = True, secure = self.app.config.get("HTTPS"))
+
+        if self._chosen_language is not None:
+            response.set_cookie("language", self._chosen_language, max_age = 93312000, httponly = True, secure = self.app.config.get("HTTPS"))
+
         return response
 
-    def _add_args(self, response):
-        if response.content_type == "text/html; charset=utf-8":
-            args = {}
-            if not g.captchaify_captcha is None:
-                args["captcha"] = g.captchaify_captcha
-            elif not request.args.get("captcha") is None:
-                args["captcha"] = request.args.get("captcha")
+    def _add_args(self, response: Response) -> Response:
+        """
+        Modifies HTML content of a response by adding arguments to links and forms.
 
-            if request.args.get("captchaify_language") in LANGUAGES_CODE:
-                args["language"] = request.args.get("captchaify_language")
-            elif request.args.get("language") in LANGUAGES_CODE:
-                args["language"] = request.args.get("language")
-            elif request.cookies.get("language") in LANGUAGES_CODE:
-                args["language"] = request.cookies.get("language")
+        :param response: The response object to be returned
+        """
 
-            html = response.data
+        if not response.content_type == "text/html; charset=utf-8":
+            return response
+        
+        args = {}
+        if g.captchaify_captcha is not None:
+            args["captcha"] = g.captchaify_captcha
+        elif request.args.get("captcha") is not None:
+            args["captcha"] = request.args.get("captcha")
 
-            soup = BeautifulSoup(html, 'html.parser')
+        if self._chosen_language is not None:
+            args["language"] = self._chosen_language
 
-            for anchor in soup.find_all('a'):
-                try:
-                    if not anchor['href']:
-                        continue
-                except:
+        html = response.data
+        soup = BeautifulSoup(html, 'html.parser')
+
+        for anchor in soup.find_all('a'):
+            try:
+                if not anchor['href']:
                     continue
+            except:
+                continue
 
-                if "://" in anchor['href']:
-                    anchor_host = urlparse(anchor['href']).netloc
-                    if not anchor_host == request.host:
-                        continue
-                elif not anchor['href'].startswith("/") and \
-                    not anchor['href'].startswith("#") and \
-                        not anchor['href'].startswith("?") and \
-                            not anchor['href'].startswith("&"):
+            if "://" in anchor['href']:
+                anchor_host = urlparse(anchor['href']).netloc
+                if not anchor_host == request.host:
                     continue
+            elif not anchor['href'].startswith("/") and \
+                not anchor['href'].startswith("#") and \
+                    not anchor['href'].startswith("?") and \
+                        not anchor['href'].startswith("&"):
+                continue
 
+            for arg, content in args.items():
+                special_character = "?"
+                if "?" in anchor["href"]:
+                    special_character = "&"
+                anchor['href'] = anchor['href'] + special_character + arg + "=" + quote(content)
+            
+        for form in soup.find_all("form"):
+            added_input = ""
+            for arg, content in args.items():
+                added_input += f'<input type="hidden" name="{arg}" value="{content}">'
+            
+            form_button = form.find('button')
+            if form_button:
+                form_button.insert_before(added_input)
+            else:
+                form.append(added_input)
+            
+            if "action" in form.attrs:
                 for arg, content in args.items():
                     special_character = "?"
-                    if "?" in anchor["href"]:
+                    if "?" in form['action']:
                         special_character = "&"
-                    anchor['href'] = anchor['href'] + special_character + arg + "=" + quote(content)
-                
-            for form in soup.find_all("form"):
-                added_input = ""
-                for arg, content in args.items():
-                    added_input += f'<input type="hidden" name="{arg}" value="{content}">'
-                
-                form_button = form.find('button')
-                if form_button:
-                    form_button.insert_before(added_input)
-                else:
-                    form.append(added_input)
-                
-                if "action" in form.attrs:
-                    for arg, content in args.items():
-                        special_character = "?"
-                        if "?" in form['action']:
-                            special_character = "&"
-                        form['action'] = form['action'] + special_character + arg + "=" + quote(content)
-        
-            response.data = str(soup).replace("&lt;", "<").replace("&gt;", ">")
+                    form['action'] = form['action'] + special_character + arg + "=" + quote(content)
+    
+        response.data = str(soup).replace("&lt;", "<").replace("&gt;", ">")
         
         return response
     
-    def _crawler_hints(self, response):
+    def _crawler_hints(self, response: Response) -> Response:
+        """
+        This method processes a web response, extracts information, and manages a crawler hints cache.
+
+        :param response: The response object to be returned
+        """
+
         if not response.content_type == "text/html; charset=utf-8":
             return response
 

@@ -2,7 +2,7 @@ import pkg_resources
 import secrets
 import ipaddress
 from flask import request, g
-from typing import Union, Optional, Tuple
+from typing import Union, Optional
 import os
 import threading
 import json
@@ -19,9 +19,7 @@ import hashlib
 from time import time
 import requests
 
-
 DATA_DIR = pkg_resources.resource_filename('flask_Captchaify', 'data')
-
 
 def generate_random_string(length: int, with_punctuation: bool = True, with_letters: bool = True):
     """
@@ -42,7 +40,6 @@ def generate_random_string(length: int, with_punctuation: bool = True, with_lett
     
     random_string = ''.join(secrets.choice(characters) for _ in range(length))
     return random_string
-
 
 def get_client_ip() -> str:
     "Get the client IP in v4 or v6"
@@ -71,9 +68,7 @@ def get_client_ip() -> str:
     client_ip = shorten_ipv6(client_ip)
     return client_ip
 
-
 file_locks = dict()
-
 
 class JSON:
     "Class for loading / saving JavaScript Object Notation (= JSON)"
@@ -96,7 +91,7 @@ class JSON:
             file_locks[file_name] = threading.Lock()
 
         with file_locks[file_name]:
-            with open(file_name, "r") as file:
+            with open(file_name, "r", encoding = "utf-8") as file:
                 data = json.load(file)
             return data
     
@@ -117,22 +112,19 @@ class JSON:
             file_locks[file_name] = threading.Lock()
 
         with file_locks[file_name]:
-            with open(file_name, "w") as file:
+            with open(file_name, "w", encoding = "utf-8") as file:
                 json.dump(data, file)
-
 
 LANGUAGES = JSON.load(os.path.join(DATA_DIR, "languages.json"), list())
 LANGUAGE_CODES = [language["code"] for language in LANGUAGES]
 TRANSLATIONS_PATH = os.path.join(DATA_DIR, "translations.json")
 translator = Translator()
 
-
 class SilentUndefined(Undefined):
     "Class to not get an error when specifying a non-existent argument"
 
     def _fail_with_undefined_error(self, *args, **kwargs):
         return None
-
 
 class WebPage:
     "Class with useful tools for WebPages"
@@ -302,7 +294,7 @@ class WebPage:
         )
 
         if html is None:
-            with open(file_path, "r") as file:
+            with open(file_path, "r", encoding = "utf-8") as file:
                 html = file.read()
         
         template = env.from_string(html)
@@ -322,7 +314,6 @@ class WebPage:
         g.ddosify_page = True
 
         return html
-
 
 class SymmetricCrypto:
     """
@@ -397,7 +388,6 @@ class SymmetricCrypto:
 
         return plaintext.decode()
 
-
 class Hashing:
     "Implementation for fast hashing"
 
@@ -442,10 +432,8 @@ class Hashing:
 
         return comparison_hash == hash
 
-
 IP_API_CACHE_PATH = os.path.join(DATA_DIR, "ipapi-cache.json")
 IP_INFO_KEYS = ['continent', 'continentCode', 'country', 'countryCode', 'region', 'regionName', 'city', 'district', 'zip', 'lat', 'lon', 'timezone', 'offset', 'currency', 'isp', 'org', 'as', 'asname', 'reverse', 'mobile', 'proxy', 'hosting', 'time']
-
 
 def get_ip_info(ip_address: str) -> dict:
     """
