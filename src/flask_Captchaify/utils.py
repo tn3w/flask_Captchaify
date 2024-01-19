@@ -41,14 +41,36 @@ def generate_random_string(length: int, with_punctuation: bool = True, with_lett
     random_string = ''.join(secrets.choice(characters) for _ in range(length))
     return random_string
 
+def shorten_ipv6(ip_address: str) -> str:
+    """
+    Minimizes each ipv6 Ip address to be able to compare it with others
+    
+    :param ip_address: An ipv4 or ipv6 Ip address
+    """
+
+    try:
+        return str(ipaddress.IPv6Address(ip_address).compressed)
+    except:
+        return ip_address
+
+def ipv4_to_ipv6(ipv4_address: str) -> Optional[str]:
+    """
+    Converts an ipv4 address to an ipv6 address
+
+    :param ipv4_address: An Ip version 4 address
+    """
+
+    try:
+        ipv4 = ipaddress.IPv4Address(ipv4_address)
+    except ipaddress.AddressValueError:
+        return None
+
+    ipv6_minimized = ipaddress.IPv6Address("::ffff:" + str(ipv4)).compressed
+
+    return str(ipv6_minimized)
+
 def get_client_ip() -> str:
     "Get the client IP in v4 or v6"
-
-    def shorten_ipv6(ip_address):
-        try:
-            return str(ipaddress.IPv6Address(ip_address).compressed)
-        except:
-            return ip_address
     
     headers_to_check = [
         'X-Forwarded-For',

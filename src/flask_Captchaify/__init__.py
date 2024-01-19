@@ -11,14 +11,15 @@ from captcha.audio import AudioCaptcha
 from urllib.parse import urlparse, quote
 from flask import Flask, request, g, abort, send_file, make_response, redirect, Response
 from typing import Optional
-from .utils import JSON, generate_random_string, WebPage, get_client_ip, Hashing, SymmetricCrypto, get_ip_info
+from .utils import JSON, generate_random_string, WebPage, get_client_ip, Hashing, SymmetricCrypto, get_ip_info, ipv4_to_ipv6
 
 DATA_DIR = pkg_resources.resource_filename('flask_Captchaify', 'data')
 TEMPLATE_DIR = pkg_resources.resource_filename('flask_Captchaify', 'templates')
 
 CRAWLER_USER_AGENTS = ["Googlebot", "bingbot", "Yahoo! Slurp", "YandexBot", "Baiduspider", "DuckDuckGo-Favicons-Bot", "AhrefsBot", "SemrushBot", "MJ12bot", "BLEXBot", "SeznamBot", "Exabot", "AhrefsBot", "archive.org_bot", "Applebot", "spbot", "Genieo", "linkdexbot", "Lipperhey Link Explorer", "SISTRIX Crawler", "MojeekBot", "CCBot", "Uptimebot", "XoviBot", "Neevabot", "SEOkicks-Robot", "meanpathbot", "MojeekBot", "RankActiveLinkBot", "CrawlomaticBot", "sentibot", "ExtLinksBot", "Superfeedr bot", "LinkfluenceBot", "Plerdybot", "Statbot", "Brainity", "Slurp", "Barkrowler", "RanksonicSiteAuditor", "rogerbot", "BomboraBot", "RankActiveLinkBot", "mail.ru", "AI Crawler", "Xenu Link Sleuth", "SEMrushBot", "Baiduspider-render", "coccocbot", "Sogou web spider", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler", "CodiBot", "libwww-perl", "Purebot", "Statbot", "iCjobs", "Cliqzbot", "SafeDNSBot", "AhrefsBot", "MetaURI API", "meanpathbot", "ADmantX Platform Semantic Analyzer", "CrawlomaticBot", "moget", "meanpathbot", "FPT-Aibot", "Domains Project", "SimpleCrawler", "YoudaoBot", "SafeDNSBot", "Slurp", "XoviBot", "Baiduspider", "FPT-Aibot", "SiteExplorer", "Lipperhey Link Explorer", "CrawlomaticBot", "SISTRIX Crawler", "SEMrushBot", "meanpathbot", "sentibot", "Dataprovider.com", "BLEXBot", "YoudaoBot", "Superfeedr bot", "moget", "Genieo", "sentibot", "AI Crawler", "Xenu Link Sleuth", "Barkrowler", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler"]
+USER_AGENTS = ["Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.3", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.1", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.3", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1.2 Safari/605.1.1", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.1", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.1"]
 EMOJIS = JSON.load(os.path.join(DATA_DIR, "emojis.json"))
-TEAEMOJIS = JSON.load(os.path.join(DATA_DIR, "teaemojis.json"))
+TEA_EMOJIS = JSON.load(os.path.join(DATA_DIR, "teaemojis.json"))
 LANGUAGES = JSON.load(os.path.join(DATA_DIR, "languages.json"))
 LANGUAGES_CODE = [language["code"] for language in LANGUAGES]
 
@@ -26,6 +27,38 @@ RATE_LIMIT_PATH = os.path.join(DATA_DIR, "rate-limits.json")
 SFS_CACHE_PATH = os.path.join(DATA_DIR, "sfs-cache.json")
 FAILED_CAPTCHAS_PATH = os.path.join(DATA_DIR, "failed-captchas.json")
 SOLVED_CAPTCHAS_PATH = os.path.join(DATA_DIR, "solved-captchas.json")
+TOR_EXIT_IPS_LIST_PATH = os.path.join(DATA_DIR, "tor-exit-ips.json")
+
+tor_exit_ips = None
+if os.path.isfile(TOR_EXIT_IPS_LIST_PATH):
+    ip_data = JSON.load(TOR_EXIT_IPS_LIST_PATH, None)
+    if ip_data is not None:
+        if isinstance(ip_data.get("time"), int):
+            if int(time()) - int(ip_data.get("time")) <= 604800:
+                if isinstance(ip_data.get("ips"), dict):
+                    tor_exit_ips = ip_data.get("ips")
+
+if tor_exit_ips is None:
+    tor_exit_ips = []
+    try:
+        response = requests.get(
+            "https://check.torproject.org/torbulkexitlist",
+            headers = {"User-Agent": random.choice(USER_AGENTS)},
+            timeout = 3
+        )
+    except:
+        pass
+    else:
+        for line in response.text.split('\n'):
+            ipv4 = line.strip()
+            ipv6 = ipv4_to_ipv6(ipv4)
+
+            tor_exit_ips.append(ipv4)
+            if not ipv6 is None:
+                tor_exit_ips.append(ipv6)
+        
+        JSON.dump({"time": time(), "ips": tor_exit_ips}, TOR_EXIT_IPS_LIST_PATH)
+
 
 class Captcha:
     """
@@ -39,7 +72,7 @@ class Captcha:
         default_action: str = "captcha", default_hardness: int = 2, default_rate_limit: Optional[int] = 120, 
         default_max_rate_limit = 1200, default_template_dir: Optional[str] = None, verificationage: int = 3600,
         withoutcookies: bool = False, block_crawler: bool = True, crawler_hints: bool = True
-        ):
+        ) -> "Captcha":
         """
         :param app: Your Flask App
         :param actions: Dict with actions for different routes like here: 
@@ -192,7 +225,13 @@ class Captcha:
 
         return chosen_language
     
-    def _correct_template(self, template_type: str, **args):
+    @property
+    def _is_tor(self) -> bool:
+        "Checks whether the client uses Tor to request the website"
+
+        return g.client_ip in tor_exit_ips
+    
+    def _correct_template(self, template_type: str, **args) -> any:
         """
         Retrieves and renders templates based on the specified template type.
 
@@ -229,7 +268,7 @@ class Captcha:
         else:
             return send_file(page_path)
         
-    def _set_client_information(self):
+    def _set_client_information(self) -> None:
         """
         Set client IP address, user agent, and related properties.
 
@@ -250,7 +289,7 @@ class Captcha:
         g.client_ip = client_ip
         g.client_user_agent = client_user_agent
     
-    def _rate_limit(self):
+    def _rate_limit(self) -> Optional[str]:
         "This method checks for rate limits based on IP addresses and overall request counts."
 
         rate_limited_ips = JSON.load(RATE_LIMIT_PATH)
@@ -273,7 +312,7 @@ class Captcha:
 
         if (ip_request_count >= rate_limit and not rate_limit == 0) or \
             (request_count >= max_rate_limit and not max_rate_limit == 0):
-            emoji = random.choice(TEAEMOJIS)
+            emoji = random.choice(TEA_EMOJIS)
             return self._correct_template("rate_limited", emoji = emoji), 418
     
     def _change_language(self) -> Optional[str]:
@@ -283,7 +322,7 @@ class Captcha:
             languages = LANGUAGES
 
             search = None
-            if not request.args.get("captchaify_search") is None:
+            if request.args.get("captchaify_search") is not None:
                 searchlanguages = []
 
                 for lang in languages:
@@ -401,6 +440,7 @@ class Captcha:
         g.is_crawler = is_crawler
         
         criteria = [
+            self._is_tor,
             is_crawler and self.block_crawler,
             action == "fight"
         ]
@@ -499,7 +539,7 @@ class Captcha:
                                 if str(audio_captcha) != str(ct_audio):
                                     is_failing = True
                         else:
-                            if not audio_captcha is None:
+                            if audio_captcha is not None:
                                 if not str(audio_captcha) != str(ct_audio):
                                     ct_hardness = hardness
                             else:
@@ -558,9 +598,9 @@ class Captcha:
                 is_failed_captcha = True
         
         captcha_token = None
-        if not request.args.get("captcha") is None:
+        if request.args.get("captcha") is not None:
             captcha_token = request.args.get("captcha")
-        elif not request.cookies.get("captcha") is None:
+        elif request.cookies.get("captcha") is not None:
             captcha_token = request.cookies.get("captcha")
 
         if captcha_token is None:
@@ -769,7 +809,7 @@ class Captcha:
         if copy_crawler_hints != self.crawler_hints_cache:
             self.crawler_hints_cache = copy_crawler_hints
         
-        if not found is None and g.captchaify_page:
+        if found is not None and g.captchaify_page:
             if g.is_crawler:
                 html = response.data
                 soup = BeautifulSoup(html, 'html.parser')
