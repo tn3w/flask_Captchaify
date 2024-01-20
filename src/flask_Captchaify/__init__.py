@@ -787,9 +787,9 @@ class Captcha:
             
             form_button = form.find('button')
             if form_button:
-                form_button.insert_before(added_input)
+                form_button.insert_before(BeautifulSoup(added_input, 'html.parser'))
             else:
-                form.append(added_input)
+                form.append(BeautifulSoup(added_input, 'html.parser'))
             
             if "action" in form.attrs:
                 for arg, content in args.items():
