@@ -1,5 +1,5 @@
 from flask import Flask
-from flask_Captchaify import Captcha
+from src.flask_Captchaify import Captcha
 
 app = Flask(__name__)
 captcha = Captcha(app, default_hardness=2, default_action = "fight")

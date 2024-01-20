@@ -13,8 +13,8 @@ from flask import Flask, request, g, abort, send_file, make_response, redirect, 
 from typing import Optional
 from .utils import JSON, generate_random_string, WebPage, get_client_ip, Hashing, SymmetricCrypto, get_ip_info, ipv4_to_ipv6
 
-DATA_DIR = pkg_resources.resource_filename('flask_Captchaify', 'data')
-TEMPLATE_DIR = pkg_resources.resource_filename('flask_Captchaify', 'templates')
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
 
 CRAWLER_USER_AGENTS = ["Googlebot", "bingbot", "Yahoo! Slurp", "YandexBot", "Baiduspider", "DuckDuckGo-Favicons-Bot", "AhrefsBot", "SemrushBot", "MJ12bot", "BLEXBot", "SeznamBot", "Exabot", "AhrefsBot", "archive.org_bot", "Applebot", "spbot", "Genieo", "linkdexbot", "Lipperhey Link Explorer", "SISTRIX Crawler", "MojeekBot", "CCBot", "Uptimebot", "XoviBot", "Neevabot", "SEOkicks-Robot", "meanpathbot", "MojeekBot", "RankActiveLinkBot", "CrawlomaticBot", "sentibot", "ExtLinksBot", "Superfeedr bot", "LinkfluenceBot", "Plerdybot", "Statbot", "Brainity", "Slurp", "Barkrowler", "RanksonicSiteAuditor", "rogerbot", "BomboraBot", "RankActiveLinkBot", "mail.ru", "AI Crawler", "Xenu Link Sleuth", "SEMrushBot", "Baiduspider-render", "coccocbot", "Sogou web spider", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler", "CodiBot", "libwww-perl", "Purebot", "Statbot", "iCjobs", "Cliqzbot", "SafeDNSBot", "AhrefsBot", "MetaURI API", "meanpathbot", "ADmantX Platform Semantic Analyzer", "CrawlomaticBot", "moget", "meanpathbot", "FPT-Aibot", "Domains Project", "SimpleCrawler", "YoudaoBot", "SafeDNSBot", "Slurp", "XoviBot", "Baiduspider", "FPT-Aibot", "SiteExplorer", "Lipperhey Link Explorer", "CrawlomaticBot", "SISTRIX Crawler", "SEMrushBot", "meanpathbot", "sentibot", "Dataprovider.com", "BLEXBot", "YoudaoBot", "Superfeedr bot", "moget", "Genieo", "sentibot", "AI Crawler", "Xenu Link Sleuth", "Barkrowler", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler"]
 USER_AGENTS = ["Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.3", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.1", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.3", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1.2 Safari/605.1.1", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.1", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.1"]
@@ -42,7 +42,7 @@ if tor_exit_ips is None:
     tor_exit_ips = []
     try:
         response = requests.get(
-            "https://check.torproject.org/torbulkexitlist",
+            "https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst",
             headers = {"User-Agent": random.choice(USER_AGENTS)},
             timeout = 3
         )
@@ -58,7 +58,6 @@ if tor_exit_ips is None:
                 tor_exit_ips.append(ipv6)
         
         JSON.dump({"time": int(time()), "ips": tor_exit_ips}, TOR_EXIT_IPS_LIST_PATH)
-
 
 class Captcha:
     """
@@ -226,6 +225,38 @@ class Captcha:
         return chosen_language
     
     @property
+    def _theme(self) -> str:
+        "Checks which theme the client would like to have"
+
+        THEMES = ["light", "dark"]
+
+        theme_from_args = request.args.get("captchaify_theme")
+        theme_from_request_args = request.args.get("theme")
+        theme_from_request_cookies = request.cookies.get("theme")
+
+        theme = (
+            theme_from_args
+            if theme_from_args in THEMES
+            else (
+                theme_from_request_args
+                if theme_from_request_args in THEMES
+                else (
+                    theme_from_request_cookies
+                    if theme_from_request_cookies in THEMES
+                    else None
+                )
+            )
+        )
+
+        return theme
+    
+    @property
+    def _use_dark_theme(self) -> bool:
+        "Checks whether the client wants to use dark theme"
+
+        return self._theme == "dark"
+
+    @property
     def _is_tor(self) -> bool:
         "Checks whether the client uses Tor to request the website"
 
@@ -284,7 +315,7 @@ class Captcha:
 
         if client_ip is None or client_user_agent is None:
             emoji = random.choice(EMOJIS)
-            return self._correct_template("block", emoji = emoji, is_tor = self._is_tor)
+            return self._correct_template("block", emoji = emoji, use_dark_theme = self._use_dark_theme)
         
         g.client_ip = client_ip
         g.client_user_agent = client_user_agent
@@ -313,7 +344,7 @@ class Captcha:
         if (ip_request_count >= rate_limit and not rate_limit == 0) or \
             (request_count >= max_rate_limit and not max_rate_limit == 0):
             emoji = random.choice(TEA_EMOJIS)
-            return self._correct_template("rate_limited", emoji = emoji, is_tor = self._is_tor), 418
+            return self._correct_template("rate_limited", emoji = emoji, use_dark_theme = self._use_dark_theme), 418
     
     def _change_language(self) -> Optional[str]:
         "Change the language of the web application based on the provided query parameters."
@@ -336,7 +367,7 @@ class Captcha:
 
             for file in os.listdir(template_dir):
                 if file.startswith("change_language"):
-                    return WebPage.render_template(os.path.join(template_dir, file), search = search, languages = languages, is_tor = self._is_tor)
+                    return WebPage.render_template(os.path.join(template_dir, file), search = search, languages = languages, use_dark_theme = self._use_dark_theme)
                 
     def _fight_bots(self):
         """
@@ -427,7 +458,7 @@ class Captcha:
             return self._correct_template(
                 "captcha", error = error, textCaptcha = captcha_image_data, 
                 audioCaptcha = captcha_audio_data, captchatoken = coded_captcha_token, 
-                is_tor = self._is_tor
+                use_dark_theme = self._use_dark_theme
             )
 
         action = self._preferences["action"]
@@ -499,7 +530,7 @@ class Captcha:
         
         if action == "block":
             emoji = random.choice(EMOJIS)
-            return self._correct_template("block", emoji = emoji, is_tor = self._is_tor)
+            return self._correct_template("block", emoji = emoji, use_dark_theme = self._use_dark_theme)
         
         failed_captchas = JSON.load(FAILED_CAPTCHAS_PATH)
 
@@ -512,7 +543,7 @@ class Captcha:
                         records_length += 1
                 if (action == "fight" or hardness == 3) and records_length > 2 or records_length > 3:
                     emoji = random.choice(EMOJIS)
-                    return self._correct_template("block", emoji = emoji, is_tor = self._is_tor)
+                    return self._correct_template("block", emoji = emoji, use_dark_theme = self._use_dark_theme)
         
         is_failed_captcha = False
         
@@ -687,11 +718,17 @@ class Captcha:
         
         response = make_response(response)
 
+        if self.withoutcookies:
+            return response
+
         if g.captchaify_captcha is not None:
             response.set_cookie("captcha", g.captchaify_captcha, max_age = self.verificationage, httponly = True, secure = self.app.config.get("HTTPS"))
 
         if self._chosen_language is not None:
             response.set_cookie("language", self._chosen_language, max_age = 93312000, httponly = True, secure = self.app.config.get("HTTPS"))
+        
+        if self._theme is not None:
+            response.set_cookie("theme", self._theme, max_age = 93312000, httponly = True, secure = self.app.config.get("HTTPS"))
 
         return response
 
@@ -713,6 +750,9 @@ class Captcha:
 
         if self._chosen_language is not None:
             args["language"] = self._chosen_language
+        
+        if self._theme is not None:
+            args["theme"] = self._theme
 
         html = response.data
         soup = BeautifulSoup(html, 'html.parser')
@@ -758,7 +798,7 @@ class Captcha:
                         special_character = "&"
                     form['action'] = form['action'] + special_character + arg + "=" + quote(content)
     
-        response.data = str(soup).replace("&lt;", "<").replace("&gt;", ">")
+        response.data = soup.prettify()
         
         return response
     

@@ -19,7 +19,7 @@ import hashlib
 from time import time
 import requests
 
-DATA_DIR = pkg_resources.resource_filename('flask_Captchaify', 'data')
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 def generate_random_string(length: int, with_punctuation: bool = True, with_letters: bool = True):
     """
@@ -260,7 +260,7 @@ class WebPage:
                 text = ''.join(str(tag) for tag in outer_tag.contents)
             except:
                 text = html_tag.text
-            
+                        
             if "<" in text:
                 pattern = r'(<.*?>)(.*?)(<\/.*?>)'
         
@@ -277,7 +277,9 @@ class WebPage:
         tags = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'p', 'button'])
         for tag in tags:
             if 'ntr' not in tag.attrs:
-                tag.string = translate_htmlified_text(tag)
+                translated_html = translate_htmlified_text(tag)
+                tag.clear()
+                tag.append(BeautifulSoup(translated_html, 'html.parser'))
         
         inputs = soup.find_all('input')
         for input_tag in inputs:
@@ -290,7 +292,7 @@ class WebPage:
             if title_element:
                 title_element.string = WebPage._translate_text(title_element.text, from_lang, to_lang)
         
-        translated_html = str(soup).replace("&lt;", "<").replace("&gt;", ">")
+        translated_html = soup.prettify()
         return translated_html
     
     @staticmethod
@@ -318,7 +320,7 @@ class WebPage:
         if html is None:
             with open(file_path, "r", encoding = "utf-8") as file:
                 html = file.read()
-        
+                
         template = env.from_string(html)
         
         client_language = next((lang for lang in (

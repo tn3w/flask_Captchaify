@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ language }}"{% if is_tor %} style="color-scheme: dark;" data-theme="dark"{% endif %}>
+<html lang="{{ language }}"{% if use_dark_theme %} style="color-scheme: dark;" data-theme="dark"{% endif %}>
     <head>
         <meta charset="UTF-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -22,6 +22,16 @@
                 --ancher-color: #999;
             }
 
+            {% if use_dark_theme %}
+            #choose-dark {
+                display: none;
+            }
+            {% else %}
+            #choose-light {
+                display: none;
+            }
+            {% endif %}
+
             @media (prefers-color-scheme: dark) {
                 :root {
                     --background: #121212;
@@ -29,6 +39,14 @@
                     --box-shadow: #2e2e2e;
                     --captcha-background: #1f1f1f;
                     --ancher-color: #999;
+                }
+
+                #choose-dark {
+                    display: none;
+                }
+
+                #choose-light {
+                    display: none;
                 }
             }
 
@@ -157,6 +175,7 @@
             </form>
             <div class="captchaify-text">
                 <a href="?captchaify_changelanguage=1&captchaify_language={{ language }}">Change Language</a> - 
+                <span id="choose-dark"><a class="captchaify-link" href="?captchaify_theme=dark">Dark Mode</a> - </span><span id="choose-light"><a class="captchaify-link" href="?captchaify_theme=light">Light Mode</a> - </span>
                 <a href="https://github.com/tn3w/flask_Captchaify" target="_blank">About Captchaify</a>
             </div>
         </div>
