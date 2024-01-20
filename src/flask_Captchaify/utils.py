@@ -19,7 +19,7 @@ import hashlib
 from time import time
 import requests
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+DATA_DIR = pkg_resources.resource_filename('flask_Captchaify', 'data')
 
 def generate_random_string(length: int, with_punctuation: bool = True, with_letters: bool = True):
     """
