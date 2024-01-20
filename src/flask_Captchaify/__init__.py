@@ -284,7 +284,7 @@ class Captcha:
 
         if client_ip is None or client_user_agent is None:
             emoji = random.choice(EMOJIS)
-            return self._correct_template("block", emoji = emoji)
+            return self._correct_template("block", emoji = emoji, is_tor = self._is_tor)
         
         g.client_ip = client_ip
         g.client_user_agent = client_user_agent
@@ -313,7 +313,7 @@ class Captcha:
         if (ip_request_count >= rate_limit and not rate_limit == 0) or \
             (request_count >= max_rate_limit and not max_rate_limit == 0):
             emoji = random.choice(TEA_EMOJIS)
-            return self._correct_template("rate_limited", emoji = emoji), 418
+            return self._correct_template("rate_limited", emoji = emoji, is_tor = self._is_tor), 418
     
     def _change_language(self) -> Optional[str]:
         "Change the language of the web application based on the provided query parameters."
@@ -336,7 +336,7 @@ class Captcha:
 
             for file in os.listdir(template_dir):
                 if file.startswith("change_language"):
-                    return WebPage.render_template(os.path.join(template_dir, file), search = search, languages = languages)
+                    return WebPage.render_template(os.path.join(template_dir, file), search = search, languages = languages, is_tor = self._is_tor)
                 
     def _fight_bots(self):
         """
@@ -424,7 +424,11 @@ class Captcha:
 
             error = "That was not right, try again!" if error else None
 
-            return self._correct_template("captcha", error = error, textCaptcha=captcha_image_data, audioCaptcha = captcha_audio_data, captchatoken=coded_captcha_token)
+            return self._correct_template(
+                "captcha", error = error, textCaptcha = captcha_image_data, 
+                audioCaptcha = captcha_audio_data, captchatoken = coded_captcha_token, 
+                is_tor = self._is_tor
+            )
 
         action = self._preferences["action"]
         hardness = self._preferences["hardness"]
@@ -495,7 +499,7 @@ class Captcha:
         
         if action == "block":
             emoji = random.choice(EMOJIS)
-            return self._correct_template("block", emoji = emoji)
+            return self._correct_template("block", emoji = emoji, is_tor = self._is_tor)
         
         failed_captchas = JSON.load(FAILED_CAPTCHAS_PATH)
 
@@ -508,7 +512,7 @@ class Captcha:
                         records_length += 1
                 if (action == "fight" or hardness == 3) and records_length > 2 or records_length > 3:
                     emoji = random.choice(EMOJIS)
-                    return self._correct_template("block", emoji = emoji)
+                    return self._correct_template("block", emoji = emoji, is_tor = self._is_tor)
         
         is_failed_captcha = False
         

@@ -1,11 +1,27 @@
 <!DOCTYPE html>
-<html lang="{{ language }}">
+<html lang="{{ language }}"{% if is_tor %} style="color-scheme: dark;" data-theme="dark"{% endif %}>
     <head>
         <meta charset="UTF-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Beep beop Boop?</title>
         <style>
+            :root {
+                --background: #f2f2f2;
+                --text: #181818;
+                --box-shadow: #e2e2e2;
+                --captcha-background: #c0c0c0;
+                --ancher-color: #222;
+            }
+
+            [data-theme="dark"] {
+                --background: #121212;
+                --text: #f2f2f2;
+                --box-shadow: #2e2e2e;
+                --captcha-background: #1f1f1f;
+                --ancher-color: #999;
+            }
+
             body, h1, form {
                 margin: 0;
                 padding: 0;
@@ -13,8 +29,8 @@
 
             body {
                 font-family: Arial, sans-serif;
-                background-color: #f2f2f2;
-                color: #1f1f1f;
+                background-color: var(--background);
+                color: var(--text);
                 display: flex;
                 justify-content: center;
                 align-items: center;
@@ -23,9 +39,9 @@
             }
 
             .captcha-container {
-                background-color: #c0c0c0;
+                background-color: var(--captcha-background);
                 border-radius: 5px;
-                box-shadow: 5px 5px 5px #e2e2e2;
+                box-shadow: 5px 5px 5px var(--box-shadow);
                 padding: 20px;
                 max-width: 400px;
                 width: 100%;
@@ -66,8 +82,8 @@
                 border-radius: 4px;
                 margin-bottom: 10px;
                 width: 300px;
-                background-color: #f2f2f2;
-                color: #181818;
+                background-color: var(--background);
+                color: var(--text);
             }
 
             button {
@@ -93,33 +109,12 @@
                 font-size: 12px;
                 margin-top: 10px;
                 text-align: center;
-                color: #141414;
+                color: var(--ancher-color);
                 text-decoration: none;
             }
             
             a:hover {
                 text-decoration: underline;
-            }
-
-            @media (prefers-color-scheme: dark) {
-                body {
-                    background-color: #181818;
-                    color: #f2f2f2;
-                }
-
-                .captcha-container {
-                    box-shadow: 5px 5px 5px #000000;
-                    background-color: #1f1f1f;
-                }
-
-                input {
-                    background-color: #1f1f1f;
-                    color: #f2f2f2;
-                }
-
-                .captchaify-text, a {
-                    color: #999;
-                }
             }
         </style>
     </head>

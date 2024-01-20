@@ -1,15 +1,37 @@
 <!DOCTYPE html>
-<html lang="{{ language }}">
+<html lang="{{ language }}"{% if is_tor %} style="color-scheme: dark;" data-theme="dark"{% endif %}>
     <head>
         <meta charset="UTF-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Enjoy a cup of tea</title>
         <style>
+            :root {
+                --background: #f2f2f2;
+                --text: #181818;
+                --main-ancher-color: #0000ad;
+                --ancher-color: #222;
+            }
+
+            [data-theme="dark"] {
+                --background: #121212;
+                --text: #f2f2f2;
+                --main-ancher-color: #00BFFF;
+                --ancher-color: #999;
+            }
+
             body {
                 font-family: Arial, sans-serif;
-                background-color: #f2f2f2;
-                color: #181818;
+                background-color: var(--background);
+                color: var(--text);
+            }
+
+            a {
+                text-decoration: none;
+            }
+
+            a:hover {
+                text-decoration: underline;
             }
     
             .container {
@@ -35,6 +57,10 @@
                 margin-top: 20px;
                 text-align: center;
             }
+
+            .main-link a {
+                color: var(--main-ancher-color);
+            }
     
             p {
                 text-align: center;
@@ -46,31 +72,7 @@
                 margin-top: 10px;
                 text-align: center;
                 font-weight: lighter;
-                color: #222;
-                text-decoration: none;
-            }
-            
-            .captchaify-link:hover {
-                text-decoration: underline;
-            }
-    
-            @media (prefers-color-scheme: dark) {
-                body {
-                    background-color: #121212;
-                    color: #f2f2f2;
-                }
-    
-                .error-text {
-                    color: #f2f2f2;
-                }
-    
-                .main-link a {
-                    color: #00BFFF;
-                }
-    
-                .captchaify-text, .captchaify-link {
-                    color: #999;
-                }
+                color: var(--ancher-color);
             }
         </style>
     </head>
@@ -82,7 +84,9 @@
             <div class="main-link">
                 <a href="">Refresh webpage</a>
             </div>
-            <h1 class="captchaify-text" ntr="1">DDoS protection from <a class="captchaify-link" href="https://github.com/tn3w/flask_Captchaify" target="_blank">Captchaify</a></h1>
+            <span class="captchaify-text">
+                <a class="captchaify-link" href="?captchaify_changelanguage=1&captchaify_language={{ language }}">Change Language</a> - DDoS protection from <a class="captchaify-link" href="https://github.com/tn3w/flask_Captchaify" target="_blank">Captchaify</a>
+            </span>
         </div>
     </body>
 </html>
