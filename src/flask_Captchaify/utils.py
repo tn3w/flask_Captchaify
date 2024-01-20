@@ -1,5 +1,6 @@
 import pkg_resources
 import secrets
+from urllib.parse import urlparse, urlunparse, parse_qs
 import ipaddress
 from flask import request, g
 from typing import Union, Optional
@@ -89,6 +90,24 @@ def get_client_ip() -> str:
     client_ip = request.remote_addr
     client_ip = shorten_ipv6(client_ip)
     return client_ip
+
+def remove_args_from_url(url: str) -> str:
+    """
+    Removes query parameters from the given URL and returns the modified URL.
+
+    :param url: The input URL
+    """
+
+    parsed_url = urlparse(url)
+
+    scheme, netloc, path, params, query, fragment = parsed_url
+
+    query_args = parse_qs(query)
+    query_args.clear()
+
+    url_without_args = urlunparse((scheme, netloc, path, params, '', fragment))
+
+    return url_without_args
 
 file_locks = dict()
 

@@ -8,8 +8,6 @@
 # flask_Captchaify
 A DDoS defense system for flask applications, first sends users to a captcha page without a javascript script and creates a confirmation cookie/url arg after the captcha.
 
-\[ \! \] With version 0.7 and 0.9 the syntax of the Captcha() class has changed. \[ \! \]
-
 ## How does flask_Captchaify work?
 If needed, a captcha is displayed to the user (or the robot) based on the strength set.[^1] Javascript is not needed for this, as the content is rendered on the server.[^2]
 
@@ -190,23 +188,23 @@ For more information, see the sample code above.
    ```
    <br>
 
-9. `verificationage` Arg
+9. `verification_age` Arg
 
    Indicates the time in seconds how long a solved captcha is valid (Default: 3600 = 1 hour)
 
-   Website with 3 hours verificationage:
+   Website with 3 hours verification_age:
    ```python
-   captcha = Captcha(app, verificationage=10800)
+   captcha = Captcha(app, verification_age=10800)
    ```
    <br>
 
-9. `withoutcookies` Arg
+9. `without_cookies` Arg
 
    If True, no cookies are created, and verification is proven via URL args (Default: False)
 
-   Website with withoutcookies enabled:
+   Website with without_cookies enabled:
    ```python
-   captcha = Captcha(app, withoutcookies=True)
+   captcha = Captcha(app, without_cookies=True)
    ```
    <br>
 

@@ -11,7 +11,7 @@ from captcha.audio import AudioCaptcha
 from urllib.parse import urlparse, quote
 from flask import Flask, request, g, abort, send_file, make_response, redirect, Response
 from typing import Optional
-from .utils import JSON, generate_random_string, WebPage, get_client_ip, Hashing, SymmetricCrypto, get_ip_info, ipv4_to_ipv6
+from .utils import JSON, generate_random_string, WebPage, get_client_ip, Hashing, SymmetricCrypto, get_ip_info, ipv4_to_ipv6, remove_args_from_url
 
 DATA_DIR = pkg_resources.resource_filename('flask_Captchaify', 'data')
 TEMPLATE_DIR = pkg_resources.resource_filename('flask_Captchaify', 'templates')
@@ -19,7 +19,7 @@ TEMPLATE_DIR = pkg_resources.resource_filename('flask_Captchaify', 'templates')
 CRAWLER_USER_AGENTS = ["Googlebot", "bingbot", "Yahoo! Slurp", "YandexBot", "Baiduspider", "DuckDuckGo-Favicons-Bot", "AhrefsBot", "SemrushBot", "MJ12bot", "BLEXBot", "SeznamBot", "Exabot", "AhrefsBot", "archive.org_bot", "Applebot", "spbot", "Genieo", "linkdexbot", "Lipperhey Link Explorer", "SISTRIX Crawler", "MojeekBot", "CCBot", "Uptimebot", "XoviBot", "Neevabot", "SEOkicks-Robot", "meanpathbot", "MojeekBot", "RankActiveLinkBot", "CrawlomaticBot", "sentibot", "ExtLinksBot", "Superfeedr bot", "LinkfluenceBot", "Plerdybot", "Statbot", "Brainity", "Slurp", "Barkrowler", "RanksonicSiteAuditor", "rogerbot", "BomboraBot", "RankActiveLinkBot", "mail.ru", "AI Crawler", "Xenu Link Sleuth", "SEMrushBot", "Baiduspider-render", "coccocbot", "Sogou web spider", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler", "CodiBot", "libwww-perl", "Purebot", "Statbot", "iCjobs", "Cliqzbot", "SafeDNSBot", "AhrefsBot", "MetaURI API", "meanpathbot", "ADmantX Platform Semantic Analyzer", "CrawlomaticBot", "moget", "meanpathbot", "FPT-Aibot", "Domains Project", "SimpleCrawler", "YoudaoBot", "SafeDNSBot", "Slurp", "XoviBot", "Baiduspider", "FPT-Aibot", "SiteExplorer", "Lipperhey Link Explorer", "CrawlomaticBot", "SISTRIX Crawler", "SEMrushBot", "meanpathbot", "sentibot", "Dataprovider.com", "BLEXBot", "YoudaoBot", "Superfeedr bot", "moget", "Genieo", "sentibot", "AI Crawler", "Xenu Link Sleuth", "Barkrowler", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler"]
 USER_AGENTS = ["Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.3", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.1", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.3", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1.2 Safari/605.1.1", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.1", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.1"]
 EMOJIS = JSON.load(os.path.join(DATA_DIR, "emojis.json"))
-TEA_EMOJIS = JSON.load(os.path.join(DATA_DIR, "teaemojis.json"))
+TEA_EMOJIS = JSON.load(os.path.join(DATA_DIR, "tea_emojis.json"))
 LANGUAGES = JSON.load(os.path.join(DATA_DIR, "languages.json"))
 LANGUAGES_CODE = [language["code"] for language in LANGUAGES]
 
@@ -69,8 +69,8 @@ class Captcha:
         self, app: Flask, actions: Optional[dict] = None,
         hardness: Optional[dict] = None, rate_limits: Optional[dict] = None, template_dirs: Optional[dict] = None,
         default_action: str = "captcha", default_hardness: int = 2, default_rate_limit: Optional[int] = 120, 
-        default_max_rate_limit = 1200, default_template_dir: Optional[str] = None, verificationage: int = 3600,
-        withoutcookies: bool = False, block_crawler: bool = True, crawler_hints: bool = True
+        default_max_rate_limit = 1200, default_template_dir: Optional[str] = None, verification_age: int = 3600,
+        without_cookies: bool = False, block_crawler: bool = True, crawler_hints: bool = True
         ) -> "Captcha":
         """
         :param app: Your Flask App
@@ -92,8 +92,8 @@ class Captcha:
         :param default_rate_limit: How many requests an ip can make per minute, if nothing is given at rate_limits this value is used. If None, no rate limit is set. (Default = 120)
         :param default_max_rate_limit: How many requests all Ips can make per minute, if nothing is given at rate_limits this value is used. If None, no max rate limit is set. (Default = 1200)
         :param default_template_dir: The default value of all pages if no special template_dir is given in template_dirs. (Default = None)
-        :param verificationage: How long the captcha verification is valid, in seconds (Default = 3600 [1 hour])
-        :param withoutcookies: If True, no cookie is created after the captcha is fulfilled, but only an Arg is appended to the URL (Default = False)
+        :param verification_age: How long the captcha verification is valid, in seconds (Default = 3600 [1 hour])
+        :param without_cookies: If True, no cookie is created after the captcha is fulfilled, but only an Arg is appended to the URL (Default = False)
         :param block_crawler: If True, known crawlers based on their user agent will also need to solve a captcha (Default = False)
         :param crawler_hints: If True, crawlers will cache a page with no content only with meta content of the real web page that is already in the cache.
         """
@@ -114,8 +114,8 @@ class Captcha:
         self.default_max_rate_limit = default_max_rate_limit if isinstance(default_max_rate_limit, int) or default_max_rate_limit is None else 1200
         self.default_template_dir = default_template_dir if default_template_dir is not None else TEMPLATE_DIR
 
-        self.verificationage = verificationage if isinstance(verificationage, int) else 3600
-        self.withoutcookies = withoutcookies if isinstance(withoutcookies, bool) else False
+        self.verification_age = verification_age if isinstance(verification_age, int) else 3600
+        self.without_cookies = without_cookies if isinstance(without_cookies, bool) else False
         self.block_crawler = block_crawler if isinstance(block_crawler, bool) else True
         self.crawler_hints = crawler_hints if isinstance(crawler_hints, bool) else True
 
@@ -130,7 +130,7 @@ class Captcha:
         app.before_request(self._fight_bots)
 
         app.after_request(self._add_rate_limit)
-        if self.withoutcookies:
+        if self.without_cookies:
             app.after_request(self._add_args)
         else:
             app.after_request(self._set_cookies)
@@ -618,12 +618,16 @@ class Captcha:
 
                                 g.captchaify_captcha = id+token
 
-                                if self.withoutcookies:
-                                    return redirect(request.url.replace("http://", request.scheme + "://")\
-                                        .replace("?textCaptcha=" + str(request.args.get("textCaptcha")), "").replace("&textCaptcha=" + str(request.args.get("textCaptcha")), "")\
-                                        .replace("?audioCaptcha=" + str(request.args.get("audioCaptcha")), "").replace("&audioCaptcha=" + str(request.args.get("audioCaptcha")), "")\
-                                        .replace("?captchatoken=" + str(request.args.get("captchatoken")), "").replace("&captchatoken=" + str(request.args.get("captchatoken")), "")\
-                                        .replace("?captchasolved=1", "").replace("&captchasolved=1", "") + "?captcha=" + quote(g.captchaify_captcha))
+                                if self.without_cookies:
+                                    url = remove_args_from_url(request.url)
+                                    url += "?captcha=" + quote(g.captchaify_captcha)
+
+                                    if self._theme != None:
+                                        url += "&theme=" + self._theme
+                                    if self._chosen_language != None:
+                                        url += "&language=" + self._chosen_language
+                                    
+                                    return redirect(url)
                                 return
                         else:
                             is_failed_captcha = True
@@ -664,7 +668,7 @@ class Captcha:
                 except:
                     pass
                 else:
-                    if not int(time()) - int(datatime) > self.verificationage and hardness >= captcha_hardness:
+                    if not int(time()) - int(datatime) > self.verification_age and hardness >= captcha_hardness:
                         if ip == g.client_ip and useragent == g.client_user_agent:
                             return
                 break
@@ -718,11 +722,11 @@ class Captcha:
         
         response = make_response(response)
 
-        if self.withoutcookies:
+        if self.without_cookies:
             return response
 
         if g.captchaify_captcha is not None:
-            response.set_cookie("captcha", g.captchaify_captcha, max_age = self.verificationage, httponly = True, secure = self.app.config.get("HTTPS"))
+            response.set_cookie("captcha", g.captchaify_captcha, max_age = self.verification_age, httponly = True, secure = self.app.config.get("HTTPS"))
 
         if self._chosen_language is not None:
             response.set_cookie("language", self._chosen_language, max_age = 93312000, httponly = True, secure = self.app.config.get("HTTPS"))
