@@ -228,6 +228,24 @@ For more information, see the sample code above.
    ```
    <br>
 
+9. `third_parties` Arg:
+
+   Specifies which third parties are used to check the IP addresses. By default, all 3 third parties are used. (See list)
+
+   Web page that only asks a third party for Tor Ip addresses:
+   ```python
+   captcha = Captcha(app, third_parties=["tor"])
+   ```
+
+   Possible entries would be:
+   | Abbreviation         | Who is requested and how does the evaluation mechanism work?                                                                           |
+   | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+   | tor                  | [SecOps-Institute/Tor-IP-Addresses](https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst) on GitHub is asked for Tor Ipv4 and Ipv6 addresses and the Ip address is compared with this list |
+   | ipapi                | [Ipapi](https://ipapi.com) is requested with the Ip and the result of the fields "proxy" and "hosting" is used                                              |
+   | stopforumspam        | [StopForumSpam](https://stopforumspam.com) is requested and the result is used                                                         |
+
+   <br>
+
 [^1]: Text and, if the set strength is above 2, audio captchas can already be partially solved by robots, this is a solution for small websites or, e.g. dark web sites that cannot use third party solutions. However, it should still provide sufficient protection.
 [^2]: For a captcha to work, however, the user's IP and user agent must normally be stored. The website may also collect data such as language to translate the website. Cookies can also be used, this is decided by the server administrator.
 [^3]: Only if you have a large server that is supposed to protect a small server from DDoS attacks.

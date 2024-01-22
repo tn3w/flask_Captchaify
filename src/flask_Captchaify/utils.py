@@ -42,6 +42,13 @@ def generate_random_string(length: int, with_punctuation: bool = True, with_lett
     random_string = ''.join(secrets.choice(characters) for _ in range(length))
     return random_string
 
+USER_AGENTS = ["Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.3", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.1", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.3", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1.2 Safari/605.1.1", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.1", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.1"]
+
+def random_user_agent() -> str:
+    "Generates a random user agent to bypass Python blockades"
+
+    return secrets.choice(USER_AGENTS)
+
 def shorten_ipv6(ip_address: str) -> str:
     """
     Minimizes each ipv6 Ip address to be able to compare it with others
@@ -501,9 +508,16 @@ def get_ip_info(ip_address: str) -> dict:
                 break
 
             return data_json
-        
-    response = requests.get(f"http://ip-api.com/json/{ip_address}?fields=66846719")
-    response.raise_for_status()
+    try:
+        response = requests.get(
+            f"http://ip-api.com/json/{ip_address}?fields=66846719",
+            headers = {"User-Agent": random_user_agent()},
+            timeout = 3
+        )
+        response.raise_for_status()
+    except:
+        raise requests.RequestException("ip-api.com could not be requested or did not provide a correct answer")
+
     if response.ok:
         response_json = response.json()
         if response_json["status"] == "success":

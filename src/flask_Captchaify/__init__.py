@@ -11,13 +11,13 @@ from captcha.audio import AudioCaptcha
 from urllib.parse import urlparse, quote
 from flask import Flask, request, g, abort, send_file, make_response, redirect, Response
 from typing import Optional
-from .utils import JSON, generate_random_string, WebPage, get_client_ip, Hashing, SymmetricCrypto, get_ip_info, ipv4_to_ipv6, remove_args_from_url
+from .utils import JSON, generate_random_string, WebPage, get_client_ip, Hashing, SymmetricCrypto, get_ip_info, ipv4_to_ipv6,\
+                   remove_args_from_url, random_user_agent
 
 DATA_DIR = pkg_resources.resource_filename('flask_Captchaify', 'data')
 TEMPLATE_DIR = pkg_resources.resource_filename('flask_Captchaify', 'templates')
 
 CRAWLER_USER_AGENTS = ["Googlebot", "bingbot", "Yahoo! Slurp", "YandexBot", "Baiduspider", "DuckDuckGo-Favicons-Bot", "AhrefsBot", "SemrushBot", "MJ12bot", "BLEXBot", "SeznamBot", "Exabot", "AhrefsBot", "archive.org_bot", "Applebot", "spbot", "Genieo", "linkdexbot", "Lipperhey Link Explorer", "SISTRIX Crawler", "MojeekBot", "CCBot", "Uptimebot", "XoviBot", "Neevabot", "SEOkicks-Robot", "meanpathbot", "MojeekBot", "RankActiveLinkBot", "CrawlomaticBot", "sentibot", "ExtLinksBot", "Superfeedr bot", "LinkfluenceBot", "Plerdybot", "Statbot", "Brainity", "Slurp", "Barkrowler", "RanksonicSiteAuditor", "rogerbot", "BomboraBot", "RankActiveLinkBot", "mail.ru", "AI Crawler", "Xenu Link Sleuth", "SEMrushBot", "Baiduspider-render", "coccocbot", "Sogou web spider", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler", "CodiBot", "libwww-perl", "Purebot", "Statbot", "iCjobs", "Cliqzbot", "SafeDNSBot", "AhrefsBot", "MetaURI API", "meanpathbot", "ADmantX Platform Semantic Analyzer", "CrawlomaticBot", "moget", "meanpathbot", "FPT-Aibot", "Domains Project", "SimpleCrawler", "YoudaoBot", "SafeDNSBot", "Slurp", "XoviBot", "Baiduspider", "FPT-Aibot", "SiteExplorer", "Lipperhey Link Explorer", "CrawlomaticBot", "SISTRIX Crawler", "SEMrushBot", "meanpathbot", "sentibot", "Dataprovider.com", "BLEXBot", "YoudaoBot", "Superfeedr bot", "moget", "Genieo", "sentibot", "AI Crawler", "Xenu Link Sleuth", "Barkrowler", "proximic", "Yahoo Link Preview", "Cliqzbot", "woobot", "Barkrowler"]
-USER_AGENTS = ["Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.3", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.1", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.3", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1.2 Safari/605.1.1", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.1", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.1"]
 EMOJIS = JSON.load(os.path.join(DATA_DIR, "emojis.json"))
 TEA_EMOJIS = JSON.load(os.path.join(DATA_DIR, "tea_emojis.json"))
 LANGUAGES = JSON.load(os.path.join(DATA_DIR, "languages.json"))
@@ -28,36 +28,6 @@ SFS_CACHE_PATH = os.path.join(DATA_DIR, "sfs-cache.json")
 FAILED_CAPTCHAS_PATH = os.path.join(DATA_DIR, "failed-captchas.json")
 SOLVED_CAPTCHAS_PATH = os.path.join(DATA_DIR, "solved-captchas.json")
 TOR_EXIT_IPS_LIST_PATH = os.path.join(DATA_DIR, "tor-exit-ips.json")
-
-tor_exit_ips = None
-if os.path.isfile(TOR_EXIT_IPS_LIST_PATH):
-    ip_data = JSON.load(TOR_EXIT_IPS_LIST_PATH, None)
-    if ip_data is not None:
-        if isinstance(ip_data.get("time"), int):
-            if int(time()) - int(ip_data.get("time")) <= 604800:
-                if isinstance(ip_data.get("ips"), list):
-                    tor_exit_ips = ip_data.get("ips")
-
-if tor_exit_ips is None:
-    tor_exit_ips = []
-    try:
-        response = requests.get(
-            "https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst",
-            headers = {"User-Agent": random.choice(USER_AGENTS)},
-            timeout = 3
-        )
-    except:
-        pass
-    else:
-        for line in response.text.split('\n'):
-            ipv4 = line.strip()
-            ipv6 = ipv4_to_ipv6(ipv4)
-
-            tor_exit_ips.append(ipv4)
-            if not ipv6 is None:
-                tor_exit_ips.append(ipv6)
-        
-        JSON.dump({"time": int(time()), "ips": tor_exit_ips}, TOR_EXIT_IPS_LIST_PATH)
 
 class Captcha:
     """
@@ -70,8 +40,8 @@ class Captcha:
         hardness: Optional[dict] = None, rate_limits: Optional[dict] = None, template_dirs: Optional[dict] = None,
         default_action: str = "captcha", default_hardness: int = 2, default_rate_limit: Optional[int] = 120, 
         default_max_rate_limit = 1200, default_template_dir: Optional[str] = None, verification_age: int = 3600,
-        without_cookies: bool = False, block_crawler: bool = True, crawler_hints: bool = True
-        ) -> "Captcha":
+        without_cookies: bool = False, block_crawler: bool = True, crawler_hints: bool = True,
+        third_parties: Optional[list] = None) -> "Captcha":
         """
         :param app: Your Flask App
         :param actions: Dict with actions for different routes like here: 
@@ -96,6 +66,7 @@ class Captcha:
         :param without_cookies: If True, no cookie is created after the captcha is fulfilled, but only an Arg is appended to the URL (Default = False)
         :param block_crawler: If True, known crawlers based on their user agent will also need to solve a captcha (Default = False)
         :param crawler_hints: If True, crawlers will cache a page with no content only with meta content of the real web page that is already in the cache.
+        :param third_parties: List of third parties that are also used. All are used by default.
         """
 
         if app is None:
@@ -118,8 +89,44 @@ class Captcha:
         self.without_cookies = without_cookies if isinstance(without_cookies, bool) else False
         self.block_crawler = block_crawler if isinstance(block_crawler, bool) else True
         self.crawler_hints = crawler_hints if isinstance(crawler_hints, bool) else True
+        self.third_parties = third_parties if isinstance(third_parties, list) else ["tor", "ipapi", "stopforumspam"]
 
         self.CAPTCHA_SECRET = generate_random_string(32)
+
+        if "tor" in self.third_parties:
+            tor_exit_ips = None
+            if os.path.isfile(TOR_EXIT_IPS_LIST_PATH):
+                ip_data = JSON.load(TOR_EXIT_IPS_LIST_PATH, None)
+                if ip_data is not None:
+                    if isinstance(ip_data.get("time"), int):
+                        if int(time()) - int(ip_data.get("time")) <= 604800:
+                            if isinstance(ip_data.get("ips"), list):
+                                tor_exit_ips = ip_data.get("ips")
+
+            if tor_exit_ips is None:
+                tor_exit_ips = []
+                try:
+                    response = requests.get(
+                        "https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst",
+                        headers = {"User-Agent": random_user_agent()},
+                        timeout = 3
+                    )
+                except:
+                    pass
+                else:
+                    for line in response.text.split('\n'):
+                        ipv4 = line.strip()
+                        ipv6 = ipv4_to_ipv6(ipv4)
+
+                        tor_exit_ips.append(ipv4)
+                        if not ipv6 is None:
+                            tor_exit_ips.append(ipv6)
+                    
+                    JSON.dump({"time": int(time()), "ips": tor_exit_ips}, TOR_EXIT_IPS_LIST_PATH)
+        else:
+            tor_exit_ips = []
+
+        self.tor_exit_ips = tor_exit_ips
 
         if self.crawler_hints:
             self.crawler_hints_cache = dict()
@@ -260,7 +267,7 @@ class Captcha:
     def _is_tor(self) -> bool:
         "Checks whether the client uses Tor to request the website"
 
-        return g.client_ip in tor_exit_ips
+        return g.client_ip in self.tor_exit_ips
     
     def _correct_template(self, template_type: str, **args) -> any:
         """
@@ -480,50 +487,59 @@ class Captcha:
             action == "fight"
         ]
 
-        if not any(criteria):
-            if not g.client_ip == "127.0.0.1":
+        if not g.client_ip == "127.0.0.1":
+            if not any(criteria) and "ipapi" in self.third_parties:
                 try:
                     ip_info = get_ip_info(g.client_ip)
                 except Exception as e:
                     criteria.append(True)
                 else:
-                    if ip_info["proxy"] or ip_info["hosting"]:
+                    if ip_info.get("proxy", False) or ip_info.get("hosting", False):
                         criteria.append(True)
 
-        if not any(criteria):
-            stopforumspamcache = JSON.load(SFS_CACHE_PATH)
+            if not any(criteria) and "stopforumspam" in self.third_parties:
+                stopforumspam_cache = JSON.load(SFS_CACHE_PATH)
 
-            found = False
-            
-            for hashed_ip, ip_content in stopforumspamcache.items():
-                comparison = Hashing().compare(g.client_ip, hashed_ip)
-                if comparison:
-                    found = True
-                    
-                    if ip_content["spammer"] and not int(time()) - int(ip_content["time"]) > 604800:
-                        criteria.append(True)
-                    break
-
-            if not found:
-                response = requests.get(f"https://api.stopforumspam.org/api?ip={g.client_ip}&json")
-                if response.ok:
-                    try:
-                        content = response.json()
-                    except:
-                        criteria.append(True)
-                    else:
-                        spammer = False
-                        if content["ip"]["appears"] > 0:
-                            spammer = True
-                            criteria.append(True)
-
-                        hashed_client_ip = Hashing().hash(g.client_ip)
-
-                        stopforumspamcache[hashed_client_ip] = {"spammer": spammer, "time": int(time())}
+                found = False
+                
+                for hashed_ip, ip_content in stopforumspam_cache.items():
+                    comparison = Hashing().compare(g.client_ip, hashed_ip)
+                    if comparison:
+                        found = True
                         
-                        JSON.dump(stopforumspamcache, SFS_CACHE_PATH)
-                else:
-                    criteria.append(True)
+                        if ip_content["spammer"] and not int(time()) - int(ip_content["time"]) > 604800:
+                            criteria.append(True)
+                        break
+
+                if not found:
+                    try:
+                        response = requests.get(
+                            f"https://api.stopforumspam.org/api?ip={g.client_ip}&json",
+                            headers = {"User-Agent": random_user_agent()},
+                            timeout = 3
+                        )
+                        response.raise_for_status()
+                    except:
+                        pass
+                    else:
+                        if response.ok:
+                            try:
+                                content = response.json()
+                            except:
+                                criteria.append(True)
+                            else:
+                                spammer = False
+                                if content["ip"]["appears"] > 0:
+                                    spammer = True
+                                    criteria.append(True)
+
+                                hashed_client_ip = Hashing().hash(g.client_ip)
+
+                                stopforumspam_cache[hashed_client_ip] = {"spammer": spammer, "time": int(time())}
+                                
+                                JSON.dump(stopforumspam_cache, SFS_CACHE_PATH)
+                        else:
+                            criteria.append(True)
         
         if not any(criteria):
             return
