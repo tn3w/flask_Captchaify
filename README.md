@@ -28,7 +28,7 @@ if __name__ == "__main__":
 ```
 
 > [!NOTE]
-> 1. When testing DDoSify you should note that calling it from localhost gives the script a wrong IP in this case "127.0.0.1", which the script considers legitimate. When testing, use a service like cloudflared tunnel to connect to your script.
+> 1. When testing Captchaify you should note that calling it from localhost gives the script a wrong IP in this case "127.0.0.1", which the script considers legitimate. When testing, use a service like cloudflared tunnel to connect to your script.
 
 
 ## Application purposes
@@ -38,7 +38,7 @@ A few application purposes:
   - A login website
   - A dark web page that simply needs to be secured a bit
 
-### Why should you use DDoSify if you host a Flask server?
+### Why should you use Captchaify if you host a Flask server?
 A quick and easy implementation allows even small websites or a small team of developers to quickly get robot protection. It also doesn't use third-party providers, which limits data collection from Google, Facebook and the creepy data brokers.[^4] Everything is open source, meaning you can rewrite the code yourself and perhaps make it more private.
 
 # Instructions
