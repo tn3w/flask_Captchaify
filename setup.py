@@ -24,7 +24,7 @@ setup(
     packages=find_packages(where='src'),
     package_dir={'': 'src'},
     package_data={
-        'flask_Captchaify': ['data/*', 'templates/*']
+        'flask_Captchaify': ['assets/*', 'templates/*']
     },
     classifiers=[
         'Environment :: Web Environment',

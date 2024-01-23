@@ -21,6 +21,7 @@ from time import time
 import requests
 
 DATA_DIR = pkg_resources.resource_filename('flask_Captchaify', 'data')
+ASSETS_DIR = pkg_resources.resource_filename('flask_Captchaify', 'assets')
 
 def generate_random_string(length: int, with_punctuation: bool = True, with_letters: bool = True):
     """
@@ -163,7 +164,7 @@ class JSON:
             with open(file_name, "w", encoding = "utf-8") as file:
                 json.dump(data, file)
 
-LANGUAGES = JSON.load(os.path.join(DATA_DIR, "languages.json"), list())
+LANGUAGES = JSON.load(os.path.join(ASSETS_DIR, "languages.json"), list())
 LANGUAGE_CODES = [language["code"] for language in LANGUAGES]
 TRANSLATIONS_PATH = os.path.join(DATA_DIR, "translations.json")
 translator = Translator()
