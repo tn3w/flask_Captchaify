@@ -857,14 +857,15 @@ class Captcha:
                 break
 
         symmetric_crypto = SymmetricCrypto(path)
+        is_captchaify_page = getattr(g, 'captchaify_page', False)
         
-        if found is None and not g.captchaify_page:
+        if found is None and not is_captchaify_page:
             html = response.data
             soup = BeautifulSoup(html, 'html.parser')
 
             title_tag = soup.title
             title = title_tag.string if title_tag else None
-            og_tags = ''.join(str(og_tag) for og_tag in soup.find_all('meta', attrs={'property': 'og'}))
+            og_tags = ''.join(og_tag.prettify() for og_tag in soup.find_all('meta', attrs={'property': 'og'}))
 
             hashed_path = Hashing().hash(path)
 
@@ -877,7 +878,7 @@ class Captcha:
         if copy_crawler_hints != self.crawler_hints_cache:
             self.crawler_hints_cache = copy_crawler_hints
         
-        if found is not None and g.captchaify_page:
+        if found is not None and is_captchaify_page:
             if g.is_crawler:
                 html = response.data
                 soup = BeautifulSoup(html, 'html.parser')
@@ -886,10 +887,11 @@ class Captcha:
                 if not title == "None":
                     soup.title.string = title
 
-                og_soup = BeautifulSoup(symmetric_crypto.decrypt(self.crawler_hints_cache[found]["og_tags"]), 'html.parser')
+                og_tags = symmetric_crypto.decrypt(self.crawler_hints_cache[found]["og_tags"])
 
-                for tag in og_soup.find_all('meta'):
-                    soup.head.append(tag)
+                for tag in og_tags:
+                    og_soup = BeautifulSoup(tag, 'html.parser')
+                    soup.head.append(og_soup)
                 
                 response = make_response(response)
         
