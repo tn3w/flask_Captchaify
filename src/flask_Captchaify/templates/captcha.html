@@ -56,7 +56,7 @@
                 }
 
                 #choose-light {
-                    display: block;
+                    display: unset;
                 }
             }
             {% endif %}
@@ -166,7 +166,7 @@
                 {{ error }}
             </p>
             {% endif %}
-            <form action="#" method="GET">
+            <form method="POST">
                 <div class="captcha-image">
                     <img src="{{ textCaptcha }}" alt="Captcha Image">
                     <input type="text" name="textCaptcha" placeholder="Enter what you see in the picture." required>

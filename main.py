@@ -2,11 +2,15 @@ from flask import Flask
 from flask_Captchaify import Captcha
 
 app = Flask(__name__)
-captcha = Captcha(app, default_hardness=2, default_rate_limit = 2)
+captcha = Captcha(app)
 
-@app.route("/")
+@app.route('/')
 def index():
+    """
+    Very good protected Route
+    """
+
     return 'Hello Human!'
 
-if __name__ == "__main__":
-    app.run(host = "localhost", port = 8080)
+if __name__ == '__main__':
+    app.run(host = 'localhost', port = 8080)

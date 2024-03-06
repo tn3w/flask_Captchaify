@@ -16,7 +16,7 @@ import json
 import random
 from typing import Tuple, Optional, Final
 from time import time
-from urllib.parse import urlparse, quote
+from urllib.parse import urlparse, parse_qs, quote
 from base64 import b64encode
 import pkg_resources
 import requests
@@ -713,10 +713,10 @@ class Captcha:
 
         is_failed_captcha = False
 
-        if request.args.get('captchasolved') == '1':
-            text_captcha = request.args.get('textCaptcha')
-            audio_captcha = request.args.get('audioCaptcha')
-            captcha_token = request.args.get('captchatoken')
+        if request.form.get('captchasolved', '0') == '1':
+            text_captcha = request.form.get('textCaptcha')
+            audio_captcha = request.form.get('audioCaptcha')
+            captcha_token = request.form.get('captchatoken')
 
             if not None in [text_captcha, captcha_token]:
                 captcha_token_decrypted = SymmetricCrypto(self.captcha_secret)\
@@ -940,6 +940,11 @@ class Captcha:
         html = response.data
         soup = BeautifulSoup(html, 'html.parser')
 
+        def has_argument(url, arg):
+            parsed_url = urlparse(url)
+            query_params = parse_qs(parsed_url.query)
+            return arg in query_params
+
         for anchor in soup.find_all('a'):
             if not 'href' in anchor.attrs:
                 continue
@@ -955,28 +960,28 @@ class Captcha:
                 continue
 
             for arg, content in args.items():
-                special_character = '?'
-                if '?' in anchor['href']:
-                    special_character = '&'
-                anchor['href'] = anchor['href'] + special_character + arg + '=' + quote(content)
+                if not has_argument(anchor['href'], arg):
+                    special_character = '?' if '?' not in anchor['href'] else '&'
+                    anchor['href'] = anchor['href'] + special_character + arg + '=' + quote(content)
 
         for form in soup.find_all('form'):
+            action = form.get('action')
+            if action:
+                for arg, content in args.items():
+                    if not has_argument(action, arg):
+                        special_character = '?' if '?' not in action else '&'
+                        form['action'] = action + special_character + arg + '=' + quote(content)
+
             added_input = ''
             for arg, content in args.items():
-                added_input += f'<input type="hidden" name="{arg}" value="{content}">'
+                if not has_argument(action, arg):
+                    added_input += f'<input type="hidden" name="{arg}" value="{content}">'
 
             form_button = form.find('button')
             if form_button:
                 form_button.insert_before(BeautifulSoup(added_input, 'html.parser'))
             else:
                 form.append(BeautifulSoup(added_input, 'html.parser'))
-
-            if 'action' in form.attrs:
-                for arg, content in args.items():
-                    special_character = '?'
-                    if '?' in form['action']:
-                        special_character = '&'
-                    form['action'] = form['action'] + special_character + arg + '=' + quote(content)
 
         response.data = soup.prettify()
 
