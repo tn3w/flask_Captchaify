@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="{{ language }}"{% if use_dark_theme %} style="color-scheme: dark;" data-theme="dark"{% endif %}>
+<html lang="{{ language }}">
     <head>
         <meta charset="UTF-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Enjoy a cup of tea</title>
-        <style>
+        <style>{% if theme == "light" and not is_default_theme %}
             :root {
                 --background: #f2f2f2;
                 --text: #181818;
@@ -13,22 +13,31 @@
                 --ancher-color: #222;
             }
 
-            [data-theme="dark"] {
+            #choose-light {
+                display: none;
+            }
+            {% elif theme == "dark" and not is_default_theme %}
+            :root {
                 --background: #121212;
                 --text: #f2f2f2;
                 --main-ancher-color: #00BFFF;
                 --ancher-color: #999;
             }
 
-            {% if use_dark_theme %}
             #choose-dark {
                 display: none;
             }
             {% else %}
+            :root {
+                --background: #f2f2f2;
+                --text: #181818;
+                --main-ancher-color: #0000ad;
+                --ancher-color: #222;
+            }
+
             #choose-light {
                 display: none;
             }
-            {% endif %}
 
             @media (prefers-color-scheme: dark) {
                 :root {
@@ -43,9 +52,10 @@
                 }
 
                 #choose-light {
-                    display: none;
+                    display: block;
                 }
             }
+            {% endif %}
 
             body {
                 font-family: Arial, sans-serif;
@@ -112,7 +122,7 @@
                 <a href="">Refresh webpage</a>
             </div>
             <span class="captchaify-text">
-                <a class="captchaify-link" href="?captchaify_changelanguage=1&captchaify_language={{ language }}">Change Language</a> - <span id="choose-dark"><a class="captchaify-link" href="?captchaify_theme=dark">Dark Mode</a> - </span><span id="choose-light"><a class="captchaify-link" href="?captchaify_theme=light">Light Mode</a> - </span>DDoS protection from <a class="captchaify-link" href="https://github.com/tn3w/flask_Captchaify" target="_blank">Captchaify</a>
+                <a class="captchaify-link" href="?captchaify_changelanguage=1&language={{ language }}">Change Language</a> - <span id="choose-dark"><a class="captchaify-link" href="?theme=dark">Dark Mode</a> - </span><span id="choose-light"><a class="captchaify-link" href="?theme=light">Light Mode</a> - </span>DDoS protection from <a class="captchaify-link" href="https://github.com/tn3w/flask_Captchaify" target="_blank">Captchaify</a>
             </span>
         </div>
     </body>

@@ -27,9 +27,8 @@ if __name__ == "__main__":
     app.run(host = "localhost", port = 8080)
 ```
 
-> [!NOTE]
-> 1. When testing Captchaify you should note that calling it from localhost gives the script a wrong IP in this case "127.0.0.1", which the script considers legitimate. When testing, use a service like cloudflared tunnel to connect to your script.
-
+> [!TIP]
+> 🎉 flask_Captchaify will soon have a new type of captcha [Preview](https://github.com/tn3w/flask_Captchaify/releases/tag/prev_v1.7)
 
 ## Application purposes
 A few application purposes:
