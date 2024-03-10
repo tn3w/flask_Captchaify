@@ -64,8 +64,11 @@ CRAWLER_USER_AGENTS: Final[list] = [
     'sentibot', 'AI Crawler', 'Xenu Link Sleuth', 'Barkrowler', 'proximic',
     'Yahoo Link Preview', 'Cliqzbot', 'woobot', 'Barkrowler'
 ]
+ALL_CAPTCHA_TYPES: Final[list] = ['default'] # + emojis, animals
 ALL_ACTIONS: Final[list] = ['let', 'block', 'fight', 'captcha']
 ALL_THIRD_PARTIES: Final[list] = ['tor', 'ipapi', 'stopforumspam']
+ALL_TEMPLATE_TYPES: Final[list] = ['captcha', 'captcha_choose',
+                                   'block', 'rate_limited', 'change_language']
 ALL_THEMES: Final[list] = ['dark', 'light']
 TOR_EXIT_IPS_URL: Final[str] = 'https://raw.githubusercontent.com/SecOps-Institute/'+\
                                'Tor-IP-Addresses/master/tor-exit-nodes.lst'
@@ -81,7 +84,7 @@ class Captcha:
     """
 
     def __init__ (
-        self, app: Flask, actions: Optional[dict] = None,
+        self, app: Flask, captcha_type: str = 'default', actions: Optional[dict] = None,
         hardness: Optional[dict] = None, rate_limits: Optional[dict] = None,
         template_dirs: Optional[dict] = None, default_action: str = 'captcha',
         default_hardness: int = 2, default_rate_limit: Optional[int] = 120,
@@ -93,6 +96,7 @@ class Captcha:
         Configures security settings for a Flask app.
 
         :param app: Your Flask App.
+        :param captcha_type: Which type of captcha should be used.
         :param actions: Dict with actions for different routes.
                         Example: {"urlpath": "fight", "endpoint": "block"}. Default is None.
         :param hardness: Dict with hardness for different routes.
@@ -129,11 +133,12 @@ class Captcha:
             app = Flask(__name__)
 
         self.app = app
+        self.captcha_type = captcha_type if captcha_type in ALL_CAPTCHA_TYPES else 'default'
 
-        self.actions = actions if isinstance(actions, dict) else dict()
-        self.hardness = hardness if isinstance(hardness, dict) else dict()
+        self.actions = actions if isinstance(actions, dict) else {}
+        self.hardness = hardness if isinstance(hardness, dict) else {}
         self.rate_limits = rate_limits if isinstance(rate_limits, dict) else {}
-        self.template_dirs = template_dirs if isinstance(template_dirs, dict) else dict()
+        self.template_dirs = template_dirs if isinstance(template_dirs, dict) else {}
 
         self.default_action = default_action if default_action in ALL_ACTIONS else 'captcha'
         self.default_hardness = default_hardness if default_hardness in [1, 2, 3] else 2
@@ -184,7 +189,7 @@ class Captcha:
         self.tor_exit_ips = tor_exit_ips
 
         if self.crawler_hints:
-            self.crawler_hints_cache = dict()
+            self.crawler_hints_cache = {}
 
         app.before_request(self._set_client_information)
         app.before_request(self._change_language)
@@ -365,6 +370,27 @@ class Captcha:
         return is_invalid_ip
 
     @property
+    def _client_ip_info(self) -> dict:
+        """
+        The information about the Ip address of the client
+        """
+
+        ip_info = None
+        if hasattr(g, 'client_ip_info'):
+            if isinstance(g.client_ip_info, dict):
+                return g.client_ip_info
+            else:
+                ip_info = g.client_ip_info
+
+        if ip_info is None:
+            if self._client_invalid_ip:
+                ip_info = None
+            else:
+                ip_info = get_ip_info(self._client_ip)
+
+        return ip_info
+
+    @property
     def _client_use_tor(self) -> bool:
         """
         Checks whether the client uses Tor to request the website
@@ -387,7 +413,6 @@ class Captcha:
         if client_ip is None or client_user_agent is None:
             emoji = random.choice(EMOJIS)
             theme, is_default_theme = self._client_theme
-            print(theme, is_default_theme)
             return self._correct_template('block', emoji = emoji,
                                           theme = theme, is_default_theme = is_default_theme)
 
@@ -409,7 +434,7 @@ class Captcha:
         :param **args: Additional keyword arguments to be passed to the template renderer
         """
 
-        if not template_type in ['captcha', 'block', 'rate_limited']:
+        if not template_type in ALL_TEMPLATE_TYPES[:4]:
             template_type = 'block'
 
         template_dir = self._preferences['template_dir']
@@ -602,7 +627,7 @@ class Captcha:
             return self._correct_template(
                 'captcha', error = error, textCaptcha = captcha_image_data, 
                 audioCaptcha = captcha_audio_data, captchatoken = coded_captcha_token,
-                theme = theme, is_default_theme = is_default_theme
+                theme = theme, is_default_theme = is_default_theme, current_url = request.url
             )
 
         action = self._preferences['action']
@@ -626,17 +651,13 @@ class Captcha:
         ]
 
         if not any(criteria) and 'ipapi' in self.third_parties:
-            ip_info = None
-            if hasattr(g, 'client_ip_info'):
-                ip_info = g.client_ip_info
-            if ip_info is None:
-                ip_info = get_ip_info(self._client_ip)
+            ip_info = self._client_ip_info
 
-            if ip_info is None:
-                ip_info = {}
-
-            if ip_info.get('proxy', False) or ip_info.get('hosting', False):
+            if not isinstance(ip_info, dict):
                 criteria.append(True)
+            else:
+                if ip_info.get('proxy', False) or ip_info.get('hosting', False):
+                    criteria.append(True)
 
         if not any(criteria) and 'stopforumspam' in self.third_parties:
             stopforumspam_cache = JSON.load(STOPFORUMSPAN_CACHE_PATH)
@@ -713,10 +734,10 @@ class Captcha:
 
         is_failed_captcha = False
 
-        if request.form.get('captchasolved', '0') == '1':
-            text_captcha = request.form.get('textCaptcha')
-            audio_captcha = request.form.get('audioCaptcha')
-            captcha_token = request.form.get('captchatoken')
+        if request.args.get('captchasolved', '0') == '1':
+            text_captcha = request.args.get('textCaptcha')
+            audio_captcha = request.args.get('audioCaptcha')
+            captcha_token = request.args.get('captchatoken')
 
             if not None in [text_captcha, captcha_token]:
                 captcha_token_decrypted = SymmetricCrypto(self.captcha_secret)\
@@ -895,10 +916,11 @@ class Captcha:
         if self.without_cookies:
             return response
 
-        if g.captchaify_captcha is not None:
-            response.set_cookie('captcha', g.captchaify_captcha,
-                                max_age = self.verification_age, httponly = True,
-                                secure = self.app.config.get('HTTPS'))
+        if hasattr(g, 'captchaify_captcha'):
+            if g.captchaify_captcha is not None:
+                response.set_cookie('captcha', g.captchaify_captcha,
+                                    max_age = self.verification_age, httponly = True,
+                                    secure = self.app.config.get('HTTPS'))
 
         theme, is_default_theme = self._client_theme
         if not is_default_theme:
@@ -924,9 +946,13 @@ class Captcha:
             return response
 
         args = {}
-        if g.captchaify_captcha is not None:
-            args['captcha'] = g.captchaify_captcha
-        elif request.args.get('captcha') is not None:
+        is_captcha_set = False
+        if hasattr(g, 'captchaify_captcha'):
+            if g.captchaify_captcha is not None:
+                args['captcha'] = g.captchaify_captcha
+                is_captcha_set = True
+
+        if request.args.get('captcha') is not None and not is_captcha_set:
             args['captcha'] = request.args.get('captcha')
 
         theme, is_default_theme = self._client_theme
