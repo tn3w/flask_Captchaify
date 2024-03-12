@@ -17,6 +17,7 @@ from base64 import urlsafe_b64encode, urlsafe_b64decode
 from urllib.parse import urlparse, urlunparse, parse_qs
 import hashlib
 import os
+import unicodedata
 import threading
 import json
 from typing import Union, Optional, Final
@@ -235,6 +236,73 @@ def remove_args_from_url(url: str) -> str:
     url_without_args = urlunparse((scheme, netloc, path, params, '', fragment))
 
     return url_without_args
+
+
+def normalize_string(text: str) -> str:
+    """
+    Normalize a string by removing diacritics and converting to lowercase.
+
+    :param text: The input text to normalize.
+    :return: The normalized text without diacritics and in lowercase.
+    """
+
+    return ''.join(char for char in unicodedata.normalize('NFD', text)\
+                   if unicodedata.category(char) != 'Mn').lower()
+
+
+def levenshtein_distance(text1: str, text2: str) -> int:
+    """
+    Compute the Levenshtein distance between two strings.
+
+    :param text1: The first input string.
+    :param text2: The second input string.
+    :return: The Levenshtein distance between the two input strings.
+    """
+
+    if len(text1) < len(text2):
+        return levenshtein_distance(text1 = text2, text2 = text1)
+
+    if len(text2) == 0:
+        return len(text1)
+
+    previous_row = range(len(text2) + 1)
+    for i, c1 in enumerate(text1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(text2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+
+    return previous_row[-1]
+
+
+def search_languages(query: str, languages: list[dict]) -> list[dict]:
+    """
+    Search for languages in the list based on the similarity of their names to the query.
+
+    :param query: The query string to search for.
+    :param languages: The list of dictionaries containing language information.
+    :return: A list of dictionaries containing the languages sorted by similarity to the query.
+    """
+
+    normalized_query = normalize_string(query)
+    if normalized_query.strip() == '':
+        return languages
+
+    results = []
+    for language in languages:
+        normalized_language_name = normalize_string(language['name'])
+        distance = levenshtein_distance(normalized_query, normalized_language_name)
+
+        if normalized_query in normalized_language_name\
+            or (distance <= 2 and not language['code'] == 'ja'):
+            results.append(language)
+
+    results.sort(key=lambda x: levenshtein_distance(normalized_query, normalize_string(x['name'])))
+
+    return results
 
 
 file_locks = {}

@@ -24,7 +24,7 @@ from captcha.audio import AudioCaptcha
 from flask import Flask, request, g, abort, send_file, make_response, redirect, Response
 from .utils import JSON, generate_random_string, WebPage, get_client_ip, Hashing,\
                    SymmetricCrypto, get_ip_info, remove_args_from_url, request_tor_ips,\
-                   is_stopforumspam_spammer, SSES
+                   is_stopforumspam_spammer, SSES, search_languages
 
 
 DATA_DIR: Final[str] = pkg_resources.resource_filename('flask_Captchaify', 'data')
@@ -518,14 +518,8 @@ class Captcha:
 
             search = None
             if request.args.get('captchaify_search') is not None:
-                searchlanguages = []
-
-                for lang in languages:
-                    if request.args.get('captchaify_search').lower() in lang['name'].lower():
-                        searchlanguages.append(lang)
-
-                languages = searchlanguages
                 search = request.args.get('captchaify_search')
+                languages = search_languages(request.args.get('captchaify_search'), LANGUAGES)
 
             template_dir = self._preferences['template_dir']
 
