@@ -37,6 +37,9 @@ import requests
 
 DATA_DIR: Final[str] = pkg_resources.resource_filename('flask_Captchaify', 'data')
 ASSETS_DIR: Final[str] = pkg_resources.resource_filename('flask_Captchaify', 'assets')
+
+TOR_EXIT_IPS_LIST_PATH: Final[str] = os.path.join(DATA_DIR, 'tor-exit-ips.json')
+STOPFORUMSPAM_CACHE_PATH: Final[str] = os.path.join(DATA_DIR, 'stopforumspam-cache.json')
 IP_API_CACHE_PATH: Final[str] = os.path.join(DATA_DIR, 'ipapi-cache.json')
 
 UNWANTED_IPS: Final[list] = ['127.0.0.1', '192.168.0.1', '10.0.0.1',
@@ -80,6 +83,7 @@ IP_INFO_KEYS: Final[list] = ['continent', 'continentCode', 'country', 'countryCo
                 'region', 'regionName', 'city', 'district', 'zip', 'lat',
                 'lon', 'timezone', 'offset', 'currency', 'isp', 'org', 'as',
                 'asname', 'reverse', 'mobile', 'proxy', 'hosting', 'time']
+TOR_EXIT_IPS_URL: Final[str] = 'https://check.torproject.org/torbulkexitlist'
 
 
 def generate_random_string(length: int, with_punctuation: bool = True, with_letters: bool = True):
@@ -213,6 +217,7 @@ def get_client_ip() -> Union[Optional[str], bool]:
 
     return None, False
 
+
 def remove_args_from_url(url: str) -> str:
     """
     Removes query parameters from the given URL and returns the modified URL.
@@ -231,7 +236,8 @@ def remove_args_from_url(url: str) -> str:
 
     return url_without_args
 
-file_locks = dict()
+
+file_locks = {}
 
 class JSON:
     """
@@ -259,6 +265,7 @@ class JSON:
             with open(file_name, 'r', encoding = 'utf-8') as file:
                 data = json.load(file)
             return data
+
 
     @staticmethod
     def dump(data: Union[dict, list], file_name: str) -> bool:
@@ -320,6 +327,7 @@ class WebPage:
 
         return re.sub(tag_pattern, minimize_tag_content, html, flags=re.DOTALL | re.IGNORECASE)
 
+
     @staticmethod
     def minimize(html: str) -> str:
         """
@@ -335,6 +343,7 @@ class WebPage:
         html = WebPage._minimize_tag_content(html, 'style')
         return html
 
+
     @staticmethod
     def get_client_language(default: str = 'en') -> str:
         """
@@ -349,6 +358,7 @@ class WebPage:
             return preferred_language
 
         return default
+
 
     @staticmethod
     def _translate_text(text_to_translate: str, from_lang: str, to_lang: str) -> str:
@@ -392,6 +402,7 @@ class WebPage:
             translated_output = translated_output[0].upper() + translated_output[1:]
 
         return translated_output
+
 
     @staticmethod
     def translate(html: str, from_lang: str, to_lang: str) -> str:
@@ -450,13 +461,17 @@ class WebPage:
         translated_html = soup.prettify()
         return translated_html
 
+
     @staticmethod
-    def render_template(file_path: Optional[str] = None, html: Optional[str] = None, client_language: str = 'en', **args) -> str:
+    def render_template(file_path: Optional[str] = None,
+                        html: Optional[str] = None,
+                        client_language: str = 'en', **args) -> str:
         """
         Function to render a HTML template (= insert arguments / translation / minimization)
 
         :param file_path: From which file HTML code should be loaded (Optional)
         :param html: The content of the page as html (Optional)
+        :param client_language: The client's language (Default `en`)
         :param args: Arguments to be inserted into the WebPage with Jinja2
         """
 
@@ -488,6 +503,7 @@ class WebPage:
 
         return html
 
+
 class SymmetricCrypto:
     """
     Implementation of symmetric encryption with AES
@@ -504,6 +520,7 @@ class SymmetricCrypto:
 
         self.password = password.encode()
         self.salt_length = salt_length
+
 
     def encrypt(self, plain_text: str) -> Optional[str]:
         """
@@ -532,6 +549,7 @@ class SymmetricCrypto:
         ciphertext = encryptor.update(padded_data) + encryptor.finalize()
 
         return urlsafe_b64encode(salt + iv + ciphertext).decode()
+
 
     def decrypt(self, cipher_text: str) -> Optional[str]:
         """
@@ -566,6 +584,7 @@ class SymmetricCrypto:
         except (ValueError, TypeError, InvalidKey):
             return None
 
+
 class Hashing:
     """
     Implementation for hashing
@@ -577,6 +596,7 @@ class Hashing:
         """
 
         self.salt = salt
+
 
     def hash(self, plain_text: str, hash_length: int = 8) -> str:
         """
@@ -596,6 +616,7 @@ class Hashing:
 
         return hex_dig + '//' + salt
 
+
     def compare(self, plain_text: str, hash_string: str) -> bool:
         """
         Compares a plaintext with a hashed value
@@ -614,6 +635,161 @@ class Hashing:
                                                   hash_length = hash_length).split('//')[0]
 
         return comparison_hash == hash_string
+
+
+class SSES:
+    """
+    Space-saving encryption scheme (SSES) for encrypting data without keys and decrypting with keys.
+    """
+
+    def __init__(self, symmetric_crypto: SymmetricCrypto, separator: str = '--') -> None:
+        """
+        Initializes the SSES instance with the specified symmetric cryptography object and separator
+
+        :param symmetric_crypto: The symmetric cryptography object to
+                                 use for encryption and decryption.
+        :param separator: The separator string to use for joining
+                          values before encryption. Defaults to '--'.
+        """
+
+        self.symmetric_crypto = symmetric_crypto
+        self.separator = separator
+
+
+    def encrypt(self, data_dict: dict) -> str:
+        """
+        Encrypts the provided values.
+
+        :param data_dict: Keyword arguments containing key-value pairs to encrypt.
+        :return: The encrypted data.
+        """
+
+        values = list(data_dict.values())
+
+        text_data = self.separator.join(values)
+        encrypted_data = self.symmetric_crypto.encrypt(text_data)
+
+        return encrypted_data
+
+
+    def decrypt(self, encrypted_data: str, dict_keys: Optional[list] = None) -> Union[dict, list]:
+        """
+        Decrypts the provided encrypted data.
+
+        :param encrypted_data: The encrypted data to decrypt.
+        :param dict_keys: A list of keys to use for forming a dictionary from decrypted values.
+        :return: Decrypted data as either a dictionary (if dict_keys is provided) or a list.
+        """
+
+        decrypted_data = self.symmetric_crypto.decrypt(encrypted_data)
+        if decrypted_data is None:
+            return None
+
+        values = decrypted_data.split(self.separator)
+
+        if not isinstance(dict_keys, list) or len(dict_keys) == 0:
+            return values
+
+        data_dict = {}
+        for i, dict_key in enumerate(dict_keys):
+            if len(values) - 1 < i:
+                break
+            data_dict[dict_key] = values[i]
+
+        return data_dict
+
+
+def request_tor_ips() -> list | None:
+    """
+    Requests and returns a list of Tor exit IPs. If the list has been recently fetched and cached,
+    it returns the cached list, otherwise it fetches the list from the specified URL.
+
+    :return: A list of Tor exit IPs.
+    """
+
+    tor_exit_ips = None
+    if os.path.isfile(TOR_EXIT_IPS_LIST_PATH):
+        ip_data = JSON.load(TOR_EXIT_IPS_LIST_PATH, None)
+        if ip_data is not None:
+            if isinstance(ip_data.get('time'), int):
+                if int(time()) - int(ip_data.get('time', time())) <= 604800:
+                    if isinstance(ip_data.get('ips'), list):
+                        tor_exit_ips = ip_data.get('ips')
+
+    if tor_exit_ips is None:
+        tor_exit_ips = []
+        try:
+            response = requests.get(
+                TOR_EXIT_IPS_URL,
+                headers = {'User-Agent': random_user_agent()},
+                timeout = 3
+            )
+        except (requests.exceptions.Timeout, requests.exceptions.RequestException):
+            pass
+        else:
+            for line in response.text.split('\n'):
+                tor_exit_ips.append(line.strip())
+
+            JSON.dump(
+                {'time': int(time()), 'ips': tor_exit_ips}
+                , TOR_EXIT_IPS_LIST_PATH
+            )
+
+    return tor_exit_ips
+
+
+def is_stopforumspam_spammer(ip_address: str) -> bool:
+    """
+    Checks if the given IP address is listed as a spammer on StopForumSpam.
+
+    :param ip_address: The IP address to check.
+    :return: True if the IP address is listed as a spammer, False otherwise.
+    """
+
+    stopforumspam_cache = JSON.load(STOPFORUMSPAM_CACHE_PATH)
+
+    for hashed_ip, ip_content in stopforumspam_cache.items():
+        comparison = Hashing().compare(ip_address, hashed_ip)
+        if comparison:
+
+            if not int(time()) - int(ip_content['time']) > 604800:
+                return ip_content['spammer']
+            break
+
+    url = f'https://api.stopforumspam.org/api?ip={ip_address}&json'
+    try:
+        response = requests.get(
+            url,
+            headers = {'User-Agent': random_user_agent()},
+            timeout = 3
+        )
+        response.raise_for_status()
+
+        if response.status_code == 200:
+            content = response.json()
+
+            is_spammer = False
+            if content.get('ip') is not None:
+                if content['ip'].get('appears') is not None:
+                    if content['ip']['appears'] > 0:
+                        is_spammer = True
+
+            hashed_ip_address = Hashing().hash(ip_address)
+
+            stopforumspam_cache[hashed_ip_address] = {
+                'spammer': is_spammer,
+                'time': int(time())
+            }
+
+            JSON.dump(stopforumspam_cache, STOPFORUMSPAM_CACHE_PATH)
+            return is_spammer
+
+    except (requests.exceptions.Timeout, requests.exceptions.RequestException,
+            json.JSONDecodeError):
+        pass
+
+    return False
+
 
 def get_ip_info(ip_address: str) -> dict:
     """

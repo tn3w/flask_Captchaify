@@ -168,19 +168,19 @@
             {% endif %}
             <form action="{{ current_url }}" method="GET">
                 <div class="captcha-image">
-                    <img src="{{ textCaptcha }}" alt="Captcha Image">
+                    <img src="{{ text_captcha }}" alt="Captcha Image">
                     <input type="text" name="textCaptcha" placeholder="Enter what you see in the picture." required>
                 </div>
-                {% if audioCaptcha|default %}
+                {% if audio_captcha|default %}
                 <div class="captcha-audio">
                     <audio controls>
-                        <source src="{{ audioCaptcha }}" type="audio/wav">
+                        <source src="{{ audio_captcha }}" type="audio/wav">
                         Your browser does not support the audio element.
                     </audio>
                     <input type="text" name="audioCaptcha" placeholder="Enter what you hear." required>
                 </div>
                 {% endif %}
-                <input type="hidden" name="captchatoken" value="{{ captchatoken }}">
+                <input type="hidden" name="captchatoken" value="{{ captcha_token }}">
                 <input type="hidden" name="captchasolved" value="1">
                 <button type="submit">Check</button>
             </form>

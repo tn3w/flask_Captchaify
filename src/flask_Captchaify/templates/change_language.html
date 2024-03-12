@@ -278,7 +278,7 @@
         </a>
         <h1>Change Language</h1>
         <div class="search-form">
-            <form class="search-form" action="#" method="GET">
+            <form class="search-form" action="{{ current_url }}" method="GET">
                 <input type="text" class="search-input" name="captchaify_search" placeholder="Search Language" value="{{ search if search|default else '' }}">
                 <input type="hidden" name="captchaify_changelanguage" value="1">
                 <input type="hidden" name="language" value="{{ language }}">
