@@ -415,9 +415,12 @@ class Captcha:
         Gets the correct client URL
         """
 
-        scheme = request.headers.get('X-Forwarded-Proto', 'https')
+        scheme = request.headers.get('X-Forwarded-Proto', '')
         if scheme not in ['https', 'http']:
-            scheme = 'https'
+            if request.is_secure:
+                scheme = 'https'
+            else:
+                scheme = 'http'
 
         return request.url.replace('http', scheme)
 
@@ -583,14 +586,14 @@ class Captcha:
                             records_length += 1
                     records_length += 1
 
-                    ip_records.append(str(int(time())))
+                    ip_records.append(int(time()))
                     failed_captchas[hashed_ip] = ip_records
 
                     JSON.dump(failed_captchas, FAILED_CAPTCHAS_PATH)
 
             if not is_found:
                 hashed_client_ip = Hashing().hash(client_ip)
-                failed_captchas[hashed_client_ip] = [str(int(time()))]
+                failed_captchas[hashed_client_ip] = [int(time())]
 
                 JSON.dump(failed_captchas, FAILED_CAPTCHAS_PATH)
 
