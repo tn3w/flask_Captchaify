@@ -88,7 +88,7 @@
                 transition: transform 0.2s ease-in-out;
             }
 
-            h1 {
+            h1, p {
                 text-align: center;
                 margin-top: 20px;
             }
@@ -287,6 +287,9 @@
                 </button>
             </form>
         </div>
+        {% if languages is none or languages|length == 0 %}
+        <p>No language found that matches your search.</p>
+        {% endif %}
         {% if languages|default %}
         <div class="container">
             {% for language in languages %}

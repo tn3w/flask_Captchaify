@@ -409,6 +409,19 @@ class Captcha:
         return self._client_ip in self.tor_exit_ips
 
 
+    @property
+    def _client_url(self) -> bool:
+        """
+        Gets the correct client URL
+        """
+
+        scheme = request.headers.get('X-Forwarded-Proto', 'https')
+        if scheme not in ['https', 'http']:
+            scheme = 'https'
+
+        return request.url.replace('http', scheme)
+
+
     def _set_client_information(self) -> None:
         """
         Sets the client information for certain requests
@@ -532,7 +545,7 @@ class Captcha:
                                                    search = search, languages = languages,
                                                    theme = theme,
                                                    is_default_theme = is_default_theme,
-                                                   current_url = request.url)
+                                                   current_url = self._client_url)
 
 
     def _fight_bots(self):
@@ -639,7 +652,7 @@ class Captcha:
             return self._correct_template(
                 'captcha', error = error, text_captcha = captcha_image_data, 
                 audio_captcha = captcha_audio_data, captcha_token = captcha_token,
-                theme = theme, is_default_theme = is_default_theme, current_url = request.url
+                theme = theme, is_default_theme = is_default_theme, current_url = self._client_url
             )
 
 
@@ -677,7 +690,7 @@ class Captcha:
             g.captchaify_captcha = captcha_id + captcha_token
 
             if self.without_cookies:
-                url = remove_args_from_url(request.url)
+                url = remove_args_from_url(self._client_url)
                 url += '?captcha=' + quote(g.captchaify_captcha)
 
                 theme, is_default_theme = self._client_theme
@@ -732,8 +745,8 @@ class Captcha:
         if action == 'block':
             emoji = random.choice(EMOJIS)
             theme, is_default_theme = self._client_theme
-            return self._correct_template('block', emoji = emoji,
-                                          theme = theme, is_default_theme = is_default_theme)
+            return self._correct_template('block', emoji = emoji, theme = theme,
+                                          is_default_theme = is_default_theme)
 
         failed_captchas = JSON.load(FAILED_CAPTCHAS_PATH)
 

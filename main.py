@@ -9,7 +9,7 @@ from flask import Flask
 from flask_Captchaify import Captcha
 
 app = Flask(__name__)
-captcha = Captcha(app, without_cookies = True)
+captcha = Captcha(app, default_action = 'fight', without_cookies = True)
 
 @app.route('/')
 def index():

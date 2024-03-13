@@ -247,7 +247,7 @@ def normalize_string(text: str) -> str:
     """
 
     return ''.join(char for char in unicodedata.normalize('NFD', text)\
-                   if unicodedata.category(char) != 'Mn').lower()
+                   if unicodedata.category(char) != 'Mn' and char.isalnum()).lower()
 
 
 def levenshtein_distance(text1: str, text2: str) -> int:
