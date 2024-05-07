@@ -183,7 +183,9 @@ def convert_image_to_base64(image_data: bytes) -> str:
     :param image_data: The data of an image file in webp format
     """
 
-    data_url = f'data:image/webp;base64,{b64encode(image_data).decode('utf-8')}'
+    encoded_image = b64encode(image_data).decode('utf-8')
+
+    data_url = f'data:image/webp;base64,{encoded_image}'
 
     return data_url
 
