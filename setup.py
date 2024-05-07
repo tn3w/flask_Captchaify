@@ -30,7 +30,7 @@ long_description = long_description.replace("[^1]", "").replace("[^2]", "")\
 
 setup(
     name='flask_Captchaify',
-    version='1.6.7.3',
+    version='1.6.7.4',
     description='Protect against bots and DDoS attacks',
     long_description=long_description,
     long_description_content_type='text/markdown',
@@ -40,7 +40,7 @@ setup(
     packages=find_packages(where='src'),
     package_dir={'': 'src'},
     package_data={
-        'flask_Captchaify': ['assets/*', 'templates/*']
+        'flask_Captchaify': ['assets/*', 'templates/*', 'datasets/*']
     },
     classifiers=[
         'Environment :: Web Environment',

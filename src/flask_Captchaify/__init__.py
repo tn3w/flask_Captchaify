@@ -13,7 +13,7 @@ Under the open source license GPL-3.0 license, supported by Open Source Software
 
 import os
 import random
-from typing import Tuple, Optional, Final
+from typing import Tuple, Optional, Final, Union
 from time import time
 from urllib.parse import urlparse, parse_qs, quote
 from base64 import b64encode
@@ -27,9 +27,16 @@ from .utils import JSON, generate_random_string, WebPage, get_client_ip, Hashing
                    is_stopforumspam_spammer, SSES, search_languages
 
 
-DATA_DIR: Final[str] = pkg_resources.resource_filename('flask_Captchaify', 'data')
-ASSETS_DIR: Final[str] = pkg_resources.resource_filename('flask_Captchaify', 'assets')
-TEMPLATE_DIR: Final[str] = pkg_resources.resource_filename('flask_Captchaify', 'templates')
+WORK_DIR: Final[str] = pkg_resources.resource_filename('flask_Captchaify', '')
+DATA_DIR: Final[str] = os.path.join(WORK_DIR, 'data')
+ASSETS_DIR: Final[str] = os.path.join(WORK_DIR, 'assets')
+TEMPLATE_DIR: Final[str] = os.path.join(WORK_DIR, 'templates')
+DATASETS_DIR: Final[str] = os.path.join(WORK_DIR, 'datasets')
+
+DATASET_PATHS: Final[dict] = {
+    'default': os.path.join(DATASETS_DIR, 'oneclick_keys.json'),
+    'oneclick_keys': os.path.join(DATASETS_DIR, 'oneclick_keys.json')
+}
 
 RATE_LIMIT_PATH: Final[str] = os.path.join(DATA_DIR, 'rate-limits.json')
 FAILED_CAPTCHAS_PATH: Final[str] = os.path.join(DATA_DIR, 'failed-captchas.json')
@@ -61,7 +68,16 @@ CRAWLER_USER_AGENTS: Final[list] = [
     'sentibot', 'AI Crawler', 'Xenu Link Sleuth', 'Barkrowler', 'proximic',
     'Yahoo Link Preview', 'Cliqzbot', 'woobot', 'Barkrowler'
 ]
-ALL_CAPTCHA_TYPES: Final[list] = ['default'] # + emojis, animals
+ALL_CAPTCHA_TYPES: Final[list] = ['default', 'oneclick_keys'] # + emojis, animals
+DATASET_SIZES: Final[dict] = {
+    'largest': (200, 140),
+    'large': (20, 140),
+    'medium': (100, 100),
+    'normal': (20, 100),
+    'small': (20, 36),
+    'smaller': (20, 6),
+    'little': (1, 6)
+}
 ALL_ACTIONS: Final[list] = ['let', 'block', 'fight', 'captcha']
 ALL_THIRD_PARTIES: Final[list] = ['tor', 'ipapi', 'stopforumspam']
 ALL_TEMPLATE_TYPES: Final[list] = ['captcha', 'captcha_choose',
@@ -81,19 +97,24 @@ class Captcha:
     """
 
     def __init__ (
-        self, app: Flask, captcha_types: str = 'default', actions: Optional[dict] = None,
-        hardness: Optional[dict] = None, rate_limits: Optional[dict] = None,
-        template_dirs: Optional[dict] = None, default_captcha_type: Optional[dict] = None,
-        default_action: str = 'captcha', default_hardness: int = 2,
-        default_rate_limit: Optional[int] = 120, default_max_rate_limit = 1200,
-        default_template_dir: Optional[str] = None, verification_age: int = 3600,
-        without_cookies: bool = False, block_crawler: bool = True,
-        crawler_hints: bool = True, third_parties: Optional[list] = None) -> None:
+        self, app: Flask, captcha_types: Optional[dict] = None,
+        dataset_size: Union[tuple[int], str] = 'normal', actions: Optional[dict] = None,
+        dataset_dir: Optional[str] = None, hardness: Optional[dict] = None,
+        rate_limits: Optional[dict] = None, template_dirs: Optional[dict] = None,
+        default_captcha_type: str = 'default', default_action: str = 'captcha',
+        default_hardness: int = 2, default_rate_limit: Optional[int] = 120,
+        default_max_rate_limit = 1200, default_template_dir: Optional[str] = None,
+        verification_age: int = 3600, without_cookies: bool = False,
+        block_crawler: bool = True, crawler_hints: bool = True,
+        third_parties: Optional[list] = None) -> None:
         """
         Configures security settings for a Flask app.
 
         :param app: Your Flask App.
-        :param captcha_types: Which type of captcha should be used.
+        :param captcha_types: Dict with which type of captcha should be used.
+            	              Example: {"urlpath": "oneclick", "endpoint": "default"}
+        :param dataset_size: Tuple containing the number of images of each keyword and the
+                             number of keywords or a string with predefined sizes.
         :param actions: Dict with actions for different routes.
                         Example: {"urlpath": "fight", "endpoint": "block"}. Default is None.
         :param hardness: Dict with hardness for different routes.
@@ -130,13 +151,25 @@ class Captcha:
         if app is None:
             app = Flask(__name__)
 
+        if isinstance(dataset_size, str):
+            self.dataset_images, self.dataset_keys = DATASET_SIZES.get(dataset_size, (20, 100))
+        elif isinstance(dataset_size, tuple):
+            self.dataset_images, self.dataset_keys = dataset_size
+        else:
+            self.dataset_images = 20
+            self.dataset_keys = 100
+
         self.app = app
 
         self.captcha_types = captcha_types if isinstance(captcha_types, dict) else {}
+        self.dataset_dir = dataset_dir if isinstance(dataset_dir, str) else None
         self.actions = actions if isinstance(actions, dict) else {}
         self.hardness = hardness if isinstance(hardness, dict) else {}
         self.rate_limits = rate_limits if isinstance(rate_limits, dict) else {}
         self.template_dirs = template_dirs if isinstance(template_dirs, dict) else {}
+
+        if default_captcha_type == 'oneclick':
+            default_captcha_type = 'oneclick_keys'
 
         self.default_captcha_type = default_captcha_type if default_captcha_type\
                                     in ALL_CAPTCHA_TYPES else 'default'
@@ -188,7 +221,6 @@ class Captcha:
         if self.crawler_hints:
             app.after_request(self._crawler_hints)
 
-
     @property
     def _preferences(self) -> dict:
         """
@@ -228,30 +260,40 @@ class Captcha:
 
         current_url = {
             'captcha_type': self.default_captcha_type,
+            'dataset_dir': self.dataset_dir,
             'action': self.default_action,
             'hardness': self.default_hardness,
             'rate_limit': self.default_rate_limit,
             'max_rate_limit': self.default_max_rate_limit,
-            'template_dir': self.default_template_dir
+            'template_dir': self.default_template_dir,
         }
 
-        preferences = [
-            {'name': 'captcha_type', 'list': self.captcha_types},
-            {'name': 'action', 'list': self.actions},
-            {'name': 'hardness', 'list': self.hardness},
-            {'name': 'rate_limits', 'list': self.rate_limits},
-            {'name': 'template_dir', 'list': self.template_dirs}
-        ]
+        preferences = {
+            'captcha_type': self.captcha_types,
+            'action': self.actions,
+            'hardness': self.hardness,
+            'rate_limit': self.rate_limits,
+            'template_dir': self.template_dirs
+        }
 
-        for preference in preferences:
-            if len(preference['list']) == 0:
+        for preference_name, preference in preferences.items():
+            if len(preference) == 0:
                 continue
             for path, path_preference in preference.items():
                 if is_correct_route(path):
-                    if preference['name'] != 'rate_limits':
-                        current_url[preference['name']] = path_preference
+                    if preference_name != 'rate_limit':
+                        if path_preference == 'oneclick':
+                            path_preference = 'oneclick_keys'
+                        current_url[preference_name] = path_preference
                     else:
                         current_url['rate_limit'], current_url['max_rate_limit'] = path_preference
+
+        if current_url['dataset_dir'] is None\
+            or self.default_captcha_type != current_url['captcha_type']:
+
+            current_url['dataset_dir'] = DATASET_PATHS.get(
+                current_url['captcha_type'], os.path.join(DATASETS_DIR, 'oneclick_keys.json')
+            )
 
         return current_url
 

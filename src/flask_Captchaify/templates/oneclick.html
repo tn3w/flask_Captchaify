@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Beep beop Boop?</title>
+        <style>{% if theme == "light" and not is_default_theme %}
+            :root {
+                --background: #f2f2f2;
+                --text: #181818;
+                --border: rgba(0, 0, 0, 0.1);
+            }
+
+            #choose-light {
+                display: none;
+            }
+            {% elif theme == "dark" and not is_default_theme %}
+            :root {
+                --background: #121212;
+                --text: #f2f2f2;
+                --border: rgba(255, 255, 255, 0.1);
+            }
+
+            #choose-dark {
+                display: none;
+            }
+            {% else %}
+            :root {
+                --background: #f2f2f2;
+                --text: #181818;
+                --border: rgba(0, 0, 0, 0.1);
+            }
+
+            #choose-light {
+                display: none;
+            }
+
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --background: #121212;
+                    --text: #f2f2f2;
+                    --border: rgba(255, 255, 255, 0.1);
+                }
+
+                #choose-dark {
+                    display: none;
+                }
+
+                #choose-light {
+                    display: unset;
+                }
+            }
+            {% endif %}
+
+            body {
+                margin: 0;
+                font-family: Arial, sans-serif;
+                background-color: var(--background);
+                color: var(--text);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                text-align: center;
+            }
+
+            .square-image {
+                width: 200px;
+                height: 200px;
+                display: block;
+                margin: 0 auto;
+                border-radius: 50%;
+                box-shadow: 0 0 10px var(--border);
+            }
+
+            .description {
+                margin-top: 20px;
+                font-size: 18px;
+            }
+            
+            .image-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+                grid-gap: 10px;
+                margin-top: 20px;
+            }
+
+            .grid-image {
+                width: 100px;
+                height: 100px;
+                border-radius: 5px;
+                box-shadow: 0 0 5px var(--border);
+            }
+
+            footer {
+                text-align: center;
+                padding: 20px;
+            }
+
+            footer nav ul {
+                list-style-type: none;
+                padding: 0;
+            }
+
+            footer nav ul li {
+                display: inline;
+                margin-right: 20px;
+            }
+
+            footer nav ul li a {
+                color: var(--text);
+                text-decoration: none;
+            }
+
+            footer nav ul li a:hover {
+                text-decoration: underline;
+            }
+
+            @media only screen and (min-width: 601px) and (max-width: 900px) {
+                .image-grid {
+                    grid-template-columns: repeat(3, 1fr);
+                }
+            }
+
+            @media only screen and (max-width: 600px) {
+                .image-grid {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <img src="{{ original_image }}" alt="Square Image" class="square-image">
+            <p class="description">Choose the image that looks the same</p>
+            <div class="image-grid">
+                {% for image in captcha_images %}
+                <a href="{{ current_url }}{% if '?' in current_url %}?{% else %}&{% endif %}captchasolved=1&captchatoken={{ captcha_token }}&choosen_image={{ image.id }}"><img src="{{ image.src }}" alt="Image {{ image.id }}" class="grid-image"></a>
+                {% endif %}
+            </div>
+        </main>
+        <footer>
+            <nav>
+                <ul>
+                    <li><a href="{{ current_url }}{% if '?' in current_url %}?{% else %}&{% endif %}captchaify_changelanguage=1{% if not is_default_language %}&language={{ language }}{% endif %}">🌐Change Language</a></li>
+                    <li class="choose-light"><a href="{{ current_url }}{% if '?' in current_url %}?{% else %}&{% endif %}theme=light">Light Mode</a></li>
+                    <li class="choose-dark"><a href="{{ current_url }}{% if '?' in current_url %}?{% else %}&{% endif %}theme=dark">Dark Mode</a></li>
+                    <li><a href="https://github.com/tn3w/flask_Captchaify" target="_blank">About Captchaify</a></li>
+                </ul>
+            </nav>
+        </footer>
+    </body>
+</html>
