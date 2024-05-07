@@ -13,6 +13,7 @@ Under the open source license GPL-3.0 license, supported by Open Source Software
 
 import os
 import random
+import secrets
 from typing import Tuple, Optional, Final, Union
 from time import time
 from urllib.parse import urlparse, parse_qs, quote
@@ -24,7 +25,8 @@ from captcha.audio import AudioCaptcha
 from flask import Flask, request, g, abort, send_file, make_response, redirect, Response
 from .utils import JSON, generate_random_string, WebPage, get_client_ip, Hashing,\
                    SymmetricCrypto, get_ip_info, remove_args_from_url, request_tor_ips,\
-                   is_stopforumspam_spammer, SSES, search_languages
+                   is_stopforumspam_spammer, SSES, search_languages, get_random_image,\
+                   manipulate_image_bytes, convert_image_to_base64
 
 
 WORK_DIR: Final[str] = pkg_resources.resource_filename('flask_Captchaify', '')
@@ -81,7 +83,8 @@ DATASET_SIZES: Final[dict] = {
 ALL_ACTIONS: Final[list] = ['let', 'block', 'fight', 'captcha']
 ALL_THIRD_PARTIES: Final[list] = ['tor', 'ipapi', 'stopforumspam']
 ALL_TEMPLATE_TYPES: Final[list] = ['captcha', 'captcha_choose',
-                                   'block', 'rate_limited', 'change_language']
+                                   'block', 'rate_limited', 'oneclick',
+                                   'change_language']
 ALL_THEMES: Final[list] = ['dark', 'light']
 CAPTCHA_TOKEN_KEYS: Final[list] = ['hardness', 'ip', 'user_agent',
                                    'path', 'time', 'text', 'audio']
@@ -152,12 +155,12 @@ class Captcha:
             app = Flask(__name__)
 
         if isinstance(dataset_size, str):
-            self.dataset_images, self.dataset_keys = DATASET_SIZES.get(dataset_size, (20, 100))
+            self.max_dataset_images, self.max_dataset_keys = DATASET_SIZES.get(dataset_size, (20, 100))
         elif isinstance(dataset_size, tuple):
-            self.dataset_images, self.dataset_keys = dataset_size
+            self.max_dataset_images, self.max_dataset_keys = dataset_size
         else:
-            self.dataset_images = 20
-            self.dataset_keys = 100
+            self.max_dataset_images = 20
+            self.max_dataset_keys = 100
 
         self.app = app
 
@@ -206,6 +209,9 @@ class Captcha:
 
         if self.crawler_hints:
             self.crawler_hints_cache = {}
+
+        self.used_captcha_ids = {}
+        self.loaded_datasets = {}
 
         app.before_request(self._set_client_information)
         app.before_request(self._change_language)
@@ -260,7 +266,6 @@ class Captcha:
 
         current_url = {
             'captcha_type': self.default_captcha_type,
-            'dataset_dir': self.dataset_dir,
             'action': self.default_action,
             'hardness': self.default_hardness,
             'rate_limit': self.default_rate_limit,
@@ -288,10 +293,11 @@ class Captcha:
                     else:
                         current_url['rate_limit'], current_url['max_rate_limit'] = path_preference
 
-        if current_url['dataset_dir'] is None\
-            or self.default_captcha_type != current_url['captcha_type']:
+        if self.dataset_dir is not None:
+            current_url['dataset_file'] = os.path.join(self.dataset_dir, current_url['captcha_type'] + '.json')
 
-            current_url['dataset_dir'] = DATASET_PATHS.get(
+        if self.dataset_dir is None or self.default_captcha_type != current_url['captcha_type']:
+            current_url['dataset_file'] = DATASET_PATHS.get(
                 current_url['captcha_type'], os.path.join(DATASETS_DIR, 'oneclick_keys.json')
             )
 
@@ -467,6 +473,34 @@ class Captcha:
         return request.url.replace('http', scheme)
 
 
+    def _load_dataset(self, dataset_path: str) -> dict:
+        """
+        Loads a dataset from the specified path.
+
+        :param dataset_path: The path to the dataset.
+        :return: Returns the dataset dict
+        """
+
+        if dataset_path in self.loaded_datasets:
+            return self.loaded_datasets[dataset_path]
+
+        dataset = JSON.load(dataset_path)
+
+        new_dataset = {}
+        if not len(dataset.keys()) == self.max_dataset_keys:
+            max_dataset_keys = min(len(dataset.keys()), self.max_dataset_keys)
+            for _ in range(max_dataset_keys):
+                random_keyword = secrets.choice(list(dataset.keys()))
+                while random_keyword in list(new_dataset.keys()):
+                    random_keyword = secrets.choice(list(dataset.keys()))
+                new_dataset[random_keyword] = dataset[random_keyword]
+
+        dataset = {keyword: images[:self.max_dataset_images] for keyword, images in new_dataset.items()}
+
+        self.loaded_datasets[dataset_path] = dataset
+        return dataset
+
+
     def _set_client_information(self) -> None:
         """
         Sets the client information for certain requests
@@ -504,7 +538,7 @@ class Captcha:
         :param **args: Additional keyword arguments to be passed to the template renderer
         """
 
-        if not template_type in ALL_TEMPLATE_TYPES[:4]:
+        if not template_type in ALL_TEMPLATE_TYPES[:5]:
             template_type = 'block'
 
         template_dir = self._preferences['template_dir']
@@ -585,12 +619,12 @@ class Captcha:
                 if file.startswith('change_language'):
                     theme, is_default_theme = self._client_theme
                     client_language, _ = self._client_language
-                    return WebPage.render_template(os.path.join(template_dir, file),
-                                                   client_language = client_language,
-                                                   search = search, languages = languages,
-                                                   theme = theme,
-                                                   is_default_theme = is_default_theme,
-                                                   current_url = self._client_url)
+
+                    return WebPage.render_template(
+                        os.path.join(template_dir, file), client_language = client_language,
+                        search = search, languages = languages, theme = theme,
+                        is_default_theme = is_default_theme, current_url = self._client_url
+                    )
 
 
     def _fight_bots(self):
@@ -604,6 +638,12 @@ class Captcha:
 
         url_path = urlparse(request.url).path
         client_ip = self._client_ip
+
+        preferences = self._preferences
+        captcha_type = preferences['captcha_type']
+        dataset_file = preferences['dataset_file']
+        action = preferences['action']
+        hardness = preferences['hardness']
 
 
         def add_failed_captcha() -> None:
@@ -640,10 +680,10 @@ class Captcha:
                 JSON.dump(failed_captchas, FAILED_CAPTCHAS_PATH)
 
 
-        def show_captcha(error: bool = False) -> str:
+        def display_captcha_default(error: bool = False) -> str:
             """
-            This function generates and displays captchas of varying hardness levels.
-            It includes image captchas and, optionally, audio captchas.
+            This function generates and displays text captchas of varying hardness levels.
+            It includes text captchas and, optionally, audio captchas.
             The generated captchas are encoded and included in the response
             along with additional information.
 
@@ -701,6 +741,71 @@ class Captcha:
             )
 
 
+        def display_captcha_oneclick(error: bool = False) -> str:
+            captcha_id = generate_random_string(30)
+
+            captcha_token_data = {
+                'id': captcha_id,
+                'hardness': str(hardness), 'ip': Hashing().hash(client_ip),
+                'user_agent': Hashing().hash(self._client_user_agent),
+                'path': Hashing().hash(url_path), 'time': str(int(time()))
+            }
+
+            dataset = self._load_dataset(dataset_file)
+
+            keywords = list(dataset.keys())
+
+            keyword = secrets.choice(keywords)
+            captcha_token_data['keyword'] = keyword
+
+            images = dataset[keyword]
+            original_image = get_random_image(images)
+
+            other_keywords = []
+            for _ in range(5):
+                random_keyword = secrets.choice(keywords)
+                while random_keyword == keyword or random_keyword in other_keywords:
+                    random_keyword = secrets.choice(keywords)
+
+                other_keywords.append(random_keyword)
+
+            random_index = secrets.choice([0, 1, 2, 3, 4])
+            other_keywords.insert(random_index, keyword)
+
+            captcha_token_data['other_keywords'] = other_keywords
+
+            captcha_images = []
+            for keyword in other_keywords:
+                images = dataset[keyword]
+
+                random_image = get_random_image(images)
+                while random_image in captcha_images or random_image == original_image:
+                    random_image = get_random_image(images)
+                captcha_images.append(random_image)
+
+            original_image = convert_image_to_base64(manipulate_image_bytes(original_image))
+
+            captcha_images = [convert_image_to_base64(manipulate_image_bytes(image)) for image in captcha_images]
+            captcha_images = [{'id': str(i), 'src': image_data} for i, image_data in enumerate(captcha_images)]
+
+            captcha_token = self.sses.encrypt(captcha_token_data)
+
+            error = 'That was not right, try again!' if error else None
+
+            theme, is_default_theme = self._client_theme
+            return self._correct_template(
+                'oneclick', error = error, original_image = original_image, 
+                captcha_images = captcha_images, captcha_token = captcha_token,
+                theme = theme, is_default_theme = is_default_theme,
+                current_url = self._client_url
+            )
+
+        captcha_display_functions = {
+            'default': display_captcha_default,
+            'oneclick_keys': display_captcha_oneclick
+        }
+        captcha_display_function = captcha_display_functions.get(captcha_type, display_captcha_default)
+
         def valid_captcha(hardness: str):
             """
             Generates a token to verify that the captcha has been completed.
@@ -748,11 +853,6 @@ class Captcha:
 
                 return redirect(url)
             return
-
-
-        preferences = self._preferences
-        action = preferences['action']
-        hardness = preferences['hardness']
 
         if action == 'let':
             return
@@ -884,12 +984,12 @@ class Captcha:
         if captcha_string is None:
             if is_failed_captcha:
                 add_failed_captcha()
-            return show_captcha(error=is_failed_captcha)
+            return captcha_display_function(error=is_failed_captcha)
 
         if len(captcha_string) != 22:
             if is_failed_captcha:
                 add_failed_captcha()
-            return show_captcha(error=is_failed_captcha)
+            return captcha_display_function(error=is_failed_captcha)
 
         captcha_id = captcha_string[:6]
 
@@ -915,7 +1015,7 @@ class Captcha:
         if is_failed_captcha:
             add_failed_captcha()
 
-        return show_captcha(error = is_failed_captcha)
+        return captcha_display_function(error = is_failed_captcha)
 
 
     def _add_rate_limit(self, response: Response) -> Response:

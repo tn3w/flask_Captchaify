@@ -70,7 +70,7 @@
                 height: 200px;
                 display: block;
                 margin: 0 auto;
-                border-radius: 50%;
+                border-radius: 5px;
                 box-shadow: 0 0 10px var(--border);
             }
 
@@ -81,7 +81,7 @@
             
             .image-grid {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+                grid-template-columns: repeat(6, 1fr);
                 grid-gap: 10px;
                 margin-top: 20px;
             }
@@ -93,37 +93,13 @@
                 box-shadow: 0 0 5px var(--border);
             }
 
-            footer {
-                text-align: center;
-                padding: 20px;
-            }
-
-            footer nav ul {
-                list-style-type: none;
-                padding: 0;
-            }
-
-            footer nav ul li {
-                display: inline;
-                margin-right: 20px;
-            }
-
-            footer nav ul li a {
-                color: var(--text);
-                text-decoration: none;
-            }
-
-            footer nav ul li a:hover {
-                text-decoration: underline;
-            }
-
-            @media only screen and (min-width: 601px) and (max-width: 900px) {
+            @media only screen and (max-width: 670px) {
                 .image-grid {
                     grid-template-columns: repeat(3, 1fr);
                 }
             }
 
-            @media only screen and (max-width: 600px) {
+            @media only screen and (max-width: 400px) {
                 .image-grid {
                     grid-template-columns: repeat(2, 1fr);
                 }
@@ -132,23 +108,13 @@
     </head>
     <body>
         <main>
-            <img src="{{ original_image }}" alt="Square Image" class="square-image">
-            <p class="description">Choose the image that looks the same</p>
+            <img src="{{ original_image }}" alt="Original Image" class="square-image">
+            <p class="description">Select the picture that contains the same motif</p>
             <div class="image-grid">
                 {% for image in captcha_images %}
                 <a href="{{ current_url }}{% if '?' in current_url %}?{% else %}&{% endif %}captchasolved=1&captchatoken={{ captcha_token }}&choosen_image={{ image.id }}"><img src="{{ image.src }}" alt="Image {{ image.id }}" class="grid-image"></a>
-                {% endif %}
+                {% endfor %}
             </div>
         </main>
-        <footer>
-            <nav>
-                <ul>
-                    <li><a href="{{ current_url }}{% if '?' in current_url %}?{% else %}&{% endif %}captchaify_changelanguage=1{% if not is_default_language %}&language={{ language }}{% endif %}">🌐Change Language</a></li>
-                    <li class="choose-light"><a href="{{ current_url }}{% if '?' in current_url %}?{% else %}&{% endif %}theme=light">Light Mode</a></li>
-                    <li class="choose-dark"><a href="{{ current_url }}{% if '?' in current_url %}?{% else %}&{% endif %}theme=dark">Dark Mode</a></li>
-                    <li><a href="https://github.com/tn3w/flask_Captchaify" target="_blank">About Captchaify</a></li>
-                </ul>
-            </nav>
-        </footer>
     </body>
 </html>

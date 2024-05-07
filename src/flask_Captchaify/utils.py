@@ -13,8 +13,11 @@ Under the open source license GPL-3.0 license, supported by Open Source Software
 
 import secrets
 import re
-from base64 import urlsafe_b64encode, urlsafe_b64decode
+import io
+import random
+from base64 import urlsafe_b64encode, urlsafe_b64decode, b64decode, b64encode
 from urllib.parse import urlparse, urlunparse, parse_qs
+import gzip
 import hashlib
 import os
 import unicodedata
@@ -22,6 +25,8 @@ import threading
 import json
 from typing import Union, Optional, Final
 from time import time
+from PIL import Image, ImageFilter
+import numpy as np
 import ipaddress
 import pkg_resources
 from flask import request, g
@@ -154,6 +159,75 @@ def is_valid_ip(ip_address: Optional[str] = None,
         return True
 
     return False
+
+
+def get_random_image(all_images: list[str]) -> str:
+    """
+    Retrieve a random image path from the list, decode it from base64, and return it.
+
+    :param all_images: A list of image paths encoded as base64 strings.
+    :return: The decoded image data as a string.
+    """
+
+    random_image = random.choice(all_images)
+    decoded_image = b64decode(random_image.encode('utf-8'))
+    decompressed_data = gzip.decompress(decoded_image)
+
+    return decompressed_data
+
+
+def convert_image_to_base64(image_data: bytes) -> str:
+    """
+    Converts an image into Base64 Web Format
+
+    :param image_data: The data of an image file in webp format
+    """
+
+    data_url = f'data:image/webp;base64,{b64encode(image_data).decode('utf-8')}'
+
+    return data_url
+
+
+def manipulate_image_bytes(image_data: bytes) -> bytes:
+    """
+    Manipulates an image represented by bytes to create a distorted version.
+
+    :param image_data: The bytes representing the original image.
+    :return: The bytes of the distorted image.
+    """
+
+    img = Image.open(io.BytesIO(image_data))
+
+    img_array = np.array(img)
+
+    distorted_img_array = img_array.copy()
+    height, width, _ = distorted_img_array.shape
+    for y in range(height):
+        for x in range(width):
+            x_shift = np.random.randint(-2, 3)
+            y_shift = np.random.randint(-2, 3)
+            distorted_img_array[y, x] = img_array[(y + y_shift) % height, (x + x_shift) % width]
+
+    distorted_img = Image.fromarray(distorted_img_array)
+
+    distorted_img = distorted_img.convert('HSV')
+    distorted_img = Image.merge('HSV', [distorted_img.getchannel('H'), 
+                                distorted_img.getchannel('S').point(lambda i: min(255, i * 1.02)), 
+                                distorted_img.getchannel('V').point(lambda i: max(0, i * 0.99))])
+
+    distorted_img = distorted_img.convert('RGB')
+    distorted_img = distorted_img.filter(ImageFilter.GaussianBlur(radius=0.2))
+
+    distorted_img = distorted_img.resize(
+        (int(distorted_img.width // 1.5), int(distorted_img.height // 1.5)), Image.LANCZOS
+    ).resize(
+        (int(distorted_img.width * 1.5), int(distorted_img.height * 1.5)), Image.LANCZOS
+    )
+
+    output_bytes = io.BytesIO()
+    distorted_img.save(output_bytes, format='WebP')
+    output_bytes.seek(0)
+    return output_bytes.read()
 
 
 def get_client_ip() -> Union[Optional[str], bool]:
@@ -734,7 +808,13 @@ class SSES:
 
         values = list(data_dict.values())
 
-        text_data = self.separator.join(values)
+        new_values = []
+        for value in values:
+            if isinstance(value, list) or isinstance(value, dict):
+                value = '--json--' + json.dumps(value)
+            new_values.append(value)
+
+        text_data = self.separator.join(new_values)
         encrypted_data = self.symmetric_crypto.encrypt(text_data)
 
         return encrypted_data
@@ -762,7 +842,12 @@ class SSES:
         for i, dict_key in enumerate(dict_keys):
             if len(values) - 1 < i:
                 break
-            data_dict[dict_key] = values[i]
+
+            value = values[i]
+            if value.startswith('--json--'):
+                value = json.loads(value[9:])
+
+            data_dict[dict_key] = value
 
         return data_dict
 

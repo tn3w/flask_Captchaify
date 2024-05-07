@@ -5,6 +5,7 @@ beautifulsoup4
 ipaddress
 Jinja2
 Pillow
+opencv-python
 requests
 bs4
 captcha
