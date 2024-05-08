@@ -30,7 +30,7 @@ long_description = long_description.replace("[^1]", "").replace("[^2]", "")\
 
 setup(
     name='flask_Captchaify',
-    version='1.6.8',
+    version='1.6.8.1',
     description='Protect against bots and DDoS attacks',
     long_description=long_description,
     long_description_content_type='text/markdown',

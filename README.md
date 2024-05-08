@@ -8,10 +8,12 @@
 # flask_Captchaify
 A DDoS defense system for flask applications, first sends users to a captcha page without a javascript script and creates a confirmation cookie/url arg after the captcha.
 
+
 > [!CAUTION]
 > Captchaify must now no longer be imported as Captcha, i.e. `from flask_Captchaify import Captcha`, but as Captchaify (`from flask_Captchaify import Captchaify`)
-> The normal captcha page has changed and from version 1.6.8 uses a one-click method instead of text captchas
-> Use the `default_captcha_type` argument to set the captcha with `text` back to text
+> 
+> The normal captcha page has changed and from version 1.6.8 uses a one-click method instead of text captchas,
+> use the `default_captcha_type` argument to set the captcha with `text` back to text
 
 Todos:
 - [ ] Captcha type with animals or emojis
