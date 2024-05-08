@@ -14,22 +14,20 @@ Under the open source license GPL-3.0 license, supported by Open Source Software
 import os
 import random
 import secrets
-from typing import Tuple, Optional, Final, Union
+from typing import Optional, Final, Union
 from time import time
 from urllib.parse import urlparse, parse_qs, quote
 from base64 import b64encode
-import pkg_resources
 from bs4 import BeautifulSoup
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
-from flask import Flask, request, g, abort, send_file, make_response, redirect, Response
-from .utils import JSON, generate_random_string, WebPage, get_client_ip, Hashing,\
-                   SymmetricCrypto, get_ip_info, remove_args_from_url, request_tor_ips,\
-                   is_stopforumspam_spammer, SSES, search_languages, get_random_image,\
-                   manipulate_image_bytes, convert_image_to_base64
+from flask import Flask, Response, request, g, abort, send_file, make_response, redirect
+from .utils import JSON, Hashing, SymmetricCrypto, SSES, WebPage, get_work_dir, generate_random_string,\
+    get_client_ip, get_ip_info, remove_args_from_url, request_tor_ips, is_stopforumspam_spammer,\
+    search_languages, get_random_image, manipulate_image_bytes, convert_image_to_base64, render_template
 
 
-WORK_DIR: Final[str] = pkg_resources.resource_filename('flask_Captchaify', '')
+WORK_DIR: Final[str] = get_work_dir()
 DATA_DIR: Final[str] = os.path.join(WORK_DIR, 'data')
 ASSETS_DIR: Final[str] = os.path.join(WORK_DIR, 'assets')
 TEMPLATE_DIR: Final[str] = os.path.join(WORK_DIR, 'templates')
@@ -70,30 +68,35 @@ CRAWLER_USER_AGENTS: Final[list] = [
     'sentibot', 'AI Crawler', 'Xenu Link Sleuth', 'Barkrowler', 'proximic',
     'Yahoo Link Preview', 'Cliqzbot', 'woobot', 'Barkrowler'
 ]
-ALL_CAPTCHA_TYPES: Final[list] = ['default', 'oneclick_keys'] # + emojis, animals
+ALL_CAPTCHA_TYPES: Final[list] = ['text', 'oneclick_keys'] # + emojis, animals
 DATASET_SIZES: Final[dict] = {
     'largest': (200, 140),
     'large': (20, 140),
     'medium': (100, 100),
     'normal': (20, 100),
     'small': (20, 36),
-    'smaller': (20, 6),
-    'little': (1, 6)
+    'smaller': (20, 8),
+    'little': (6, 8)
 }
 ALL_ACTIONS: Final[list] = ['let', 'block', 'fight', 'captcha']
 ALL_THIRD_PARTIES: Final[list] = ['tor', 'ipapi', 'stopforumspam']
-ALL_TEMPLATE_TYPES: Final[list] = ['captcha', 'captcha_choose',
-                                   'block', 'rate_limited', 'oneclick',
-                                   'change_language']
+ALL_TEMPLATE_TYPES: Final[list] = [
+    'captcha_text', 'captcha_multiclick', 'captcha_oneclick',
+    'block', 'rate_limited', 'change_language'
+]
 ALL_THEMES: Final[list] = ['dark', 'light']
 CAPTCHA_TOKEN_KEYS: Final[list] = ['hardness', 'ip', 'user_agent',
                                    'path', 'time', 'text', 'audio']
+CAPTCHA_TOKEN_KEYS_ONECLICK: Final[list] = [
+    'id', 'hardness', 'ip', 'user_agent',
+    'path', 'time', 'keyword', 'other_keywords'
+]
 
 if not os.path.isdir(DATA_DIR):
     os.mkdir(DATA_DIR)
 
 
-class Captcha:
+class Captchaify:
     """
     Shows the user/bot a captcha before the request first if the request comes from a dangerous IP
     Further function are: Rate Limits, Crawler Hints, Custom Templates, Rules for Specific Routes
@@ -101,10 +104,10 @@ class Captcha:
 
     def __init__ (
         self, app: Flask, captcha_types: Optional[dict] = None,
-        dataset_size: Union[tuple[int], str] = 'normal', actions: Optional[dict] = None,
-        dataset_dir: Optional[str] = None, hardness: Optional[dict] = None,
+        dataset_size: Union[tuple[int], str] = 'normal', dataset_dir: Optional[str] = None,
+        actions: Optional[dict] = None, hardness: Optional[dict] = None,
         rate_limits: Optional[dict] = None, template_dirs: Optional[dict] = None,
-        default_captcha_type: str = 'default', default_action: str = 'captcha',
+        default_captcha_type: str = 'oneclick', default_action: str = 'captcha',
         default_hardness: int = 2, default_rate_limit: Optional[int] = 120,
         default_max_rate_limit = 1200, default_template_dir: Optional[str] = None,
         verification_age: int = 3600, without_cookies: bool = False,
@@ -305,77 +308,6 @@ class Captcha:
 
 
     @property
-    def _client_language(self) -> Tuple[str, bool]:
-        """
-        Which language the client prefers
-
-        :return language: The client languge
-        :return is_default: Is Default Value
-        """
-
-        language_from_args = request.args.get('language')
-        language_from_cookies = request.cookies.get('language')
-        language_from_form = request.form.get('language')
-
-        chosen_language = (
-            language_from_args
-            if language_from_args in LANGUAGE_CODES
-            else (
-                language_from_cookies
-                if language_from_cookies in LANGUAGE_CODES
-                else (
-                    language_from_form
-                    if language_from_form in LANGUAGE_CODES
-                    else None
-                )
-            )
-        )
-
-        if chosen_language is None:
-            preferred_language = request.accept_languages.best_match(LANGUAGE_CODES)
-
-            if preferred_language is not None:
-                return preferred_language, False
-        else:
-            return chosen_language, False
-
-        return 'en', True
-
-
-    @property
-    def _client_theme(self) -> Tuple[str, bool]:
-        """
-        Which color theme the user prefers
-        
-        :return theme: The client theme
-        :return is_default: Is default Value
-        """
-
-        theme_from_args = request.args.get('theme')
-        theme_from_cookies = request.cookies.get('theme')
-        theme_from_form = request.form.get('theme')
-
-        theme = (
-            theme_from_args
-            if theme_from_args in ALL_THEMES
-            else (
-                theme_from_cookies
-                if theme_from_cookies in ALL_THEMES
-                else (
-                    theme_from_form
-                    if theme_from_form in ALL_THEMES
-                    else None
-                )
-            )
-        )
-
-        if theme is None:
-            return 'light', True
-
-        return theme, False
-
-
-    @property
     def _client_ip(self) -> str:
         """
         The IP address of the client
@@ -501,6 +433,45 @@ class Captcha:
         return dataset
 
 
+    def _clean_used_captcha_ids(self) -> None:
+        """
+        Clean up the expired entries from the used_captcha_ids dictionary.
+        """
+
+        cleaned_used_captcha_ids = {}
+        for hashed_captcha_id, timestamp in self.used_captcha_ids.items():
+            if int(time()) - timestamp <= 200:
+                cleaned_used_captcha_ids[hashed_captcha_id] = timestamp
+        self.used_captcha_ids = cleaned_used_captcha_ids
+
+
+    def _add_used_captcha_id(self, captcha_id: str) -> None:
+        """
+        Add a new captcha id to the used_captcha_ids dictionary.
+
+        :param captcha_id: The captcha id to be added.
+        """
+
+        self._clean_used_captcha_ids()
+        hashed_captcha_id = Hashing().hash(captcha_id)
+        self.used_captcha_ids[hashed_captcha_id] = int(time())
+
+
+    def _check_used_captcha_id(self, captcha_id: str) -> bool:
+        """
+        Check if a captcha id has been previously used.
+
+        :param captcha_id: The captcha id to be checked.
+        :return: True if the captcha id has been used, False otherwise.
+        """
+
+        self._clean_used_captcha_ids()
+        for hashed_captcha_id, _ in self.used_captcha_ids.items():
+            if Hashing().compare(captcha_id, hashed_captcha_id):
+                return True
+        return False
+
+
     def _set_client_information(self) -> None:
         """
         Sets the client information for certain requests
@@ -515,9 +486,7 @@ class Captcha:
 
         if client_ip is None or client_user_agent is None:
             emoji = random.choice(EMOJIS)
-            theme, is_default_theme = self._client_theme
-            return self._correct_template('block', emoji = emoji,
-                                          theme = theme, is_default_theme = is_default_theme)
+            return self._correct_template('block', emoji = emoji)
 
         g.client_ip = client_ip
         g.is_invalid_ip = is_invalid_ip
@@ -545,9 +514,9 @@ class Captcha:
 
         page_path = None
 
-        for file in os.listdir(template_dir):
-            if file.startswith(template_type):
-                page_path = os.path.join(template_dir, file)
+        for file_name in os.listdir(template_dir):
+            if file_name.startswith(template_type):
+                page_path = os.path.join(template_dir, file_name)
                 break
 
         if page_path is None:
@@ -556,9 +525,7 @@ class Captcha:
         page_ext = page_path.split('.')[-1]
 
         if page_ext == 'html':
-            client_language, _ = self._client_language
-            html = WebPage.render_template(page_path, client_language = client_language,  **args)
-            return html
+            return render_template(template_dir, file_name, request, **args)
         if page_ext == 'json':
             with open(page_path, 'r', encoding = 'utf-8') as file:
                 return JSON.load(file)
@@ -595,9 +562,7 @@ class Captcha:
         if (ip_request_count >= rate_limit and not rate_limit == 0) or \
             (request_count >= max_rate_limit and not max_rate_limit == 0):
             emoji = random.choice(TEA_EMOJIS)
-            theme, is_default_theme = self._client_theme
-            return self._correct_template('rate_limited', emoji = emoji,
-                                          theme = theme, is_default_theme = is_default_theme), 418
+            return self._correct_template('rate_limited', emoji = emoji), 418
 
 
     def _change_language(self) -> Optional[str]:
@@ -605,26 +570,21 @@ class Captcha:
         Change the language of the web application based on the provided query parameters.
         """
 
-        if request.args.get('captchaify_changelanguage') == '1':
+        if request.args.get('ccl') == '1':
             languages = LANGUAGES
 
             search = None
-            if request.args.get('captchaify_search') is not None:
-                search = request.args.get('captchaify_search')
-                languages = search_languages(request.args.get('captchaify_search'), LANGUAGES)
+            if request.args.get('cs') is not None:
+                search = request.args.get('cs')
+                if search.strip() != '':
+                    languages = search_languages(search, LANGUAGES)
 
             template_dir = self._preferences['template_dir']
 
-            for file in os.listdir(template_dir):
-                if file.startswith('change_language'):
-                    theme, is_default_theme = self._client_theme
-                    client_language, _ = self._client_language
-
-                    return WebPage.render_template(
-                        os.path.join(template_dir, file), client_language = client_language,
-                        search = search, languages = languages, theme = theme,
-                        is_default_theme = is_default_theme, current_url = self._client_url
-                    )
+            for file_name in os.listdir(template_dir):
+                if file_name.startswith('change_language'):
+                    return render_template(template_dir, file_name, request,
+                                           search = search, languages = languages)
 
 
     def _fight_bots(self):
@@ -680,7 +640,7 @@ class Captcha:
                 JSON.dump(failed_captchas, FAILED_CAPTCHAS_PATH)
 
 
-        def display_captcha_default(error: bool = False) -> str:
+        def display_captcha_text(error: bool = False) -> str:
             """
             This function generates and displays text captchas of varying hardness levels.
             It includes text captchas and, optionally, audio captchas.
@@ -733,11 +693,9 @@ class Captcha:
 
             error = 'That was not right, try again!' if error else None
 
-            theme, is_default_theme = self._client_theme
             return self._correct_template(
-                'captcha', error = error, text_captcha = captcha_image_data, 
-                audio_captcha = captcha_audio_data, captcha_token = captcha_token,
-                theme = theme, is_default_theme = is_default_theme, current_url = self._client_url
+                'captcha_text', error = error, text_captcha = captcha_image_data, 
+                audio_captcha = captcha_audio_data, captcha_token = captcha_token
             )
 
 
@@ -785,26 +743,25 @@ class Captcha:
 
             original_image = convert_image_to_base64(manipulate_image_bytes(original_image))
 
-            captcha_images = [convert_image_to_base64(manipulate_image_bytes(image)) for image in captcha_images]
+            captcha_images = [convert_image_to_base64(manipulate_image_bytes(image, is_small = True)) for image in captcha_images]
             captcha_images = [{'id': str(i), 'src': image_data} for i, image_data in enumerate(captcha_images)]
 
             captcha_token = self.sses.encrypt(captcha_token_data)
 
-            error = 'That was not right, try again!' if error else None
+            error = 'That was not the right one, try again!' if error else None
 
-            theme, is_default_theme = self._client_theme
             return self._correct_template(
-                'oneclick', error = error, original_image = original_image, 
-                captcha_images = captcha_images, captcha_token = captcha_token,
-                theme = theme, is_default_theme = is_default_theme,
-                current_url = self._client_url
+                'captcha_oneclick', error = error, original_image = original_image, 
+                captcha_images = captcha_images, captcha_token = captcha_token
             )
 
+
         captcha_display_functions = {
-            'default': display_captcha_default,
+            'text': display_captcha_text,
             'oneclick_keys': display_captcha_oneclick
         }
-        captcha_display_function = captcha_display_functions.get(captcha_type, display_captcha_default)
+        captcha_display_function = captcha_display_functions.get(captcha_type, display_captcha_oneclick)
+
 
         def valid_captcha(hardness: str):
             """
@@ -839,20 +796,19 @@ class Captcha:
 
             g.captchaify_captcha = captcha_id + captcha_token
 
-            if self.without_cookies:
-                url = remove_args_from_url(self._client_url)
-                url += '?captcha=' + quote(g.captchaify_captcha)
+            url = remove_args_from_url(self._client_url)
+            url += '?captcha=' + quote(g.captchaify_captcha)
 
-                theme, is_default_theme = self._client_theme
-                if not is_default_theme:
-                    url += '&theme=' + theme
+            theme, is_default_theme = WebPage.client_theme(request)
+            if not is_default_theme:
+                url += '&theme=' + theme
 
-                language, is_default_language = self._client_language
-                if not is_default_language:
-                    url += '&language=' + language
+            language, is_default_language = WebPage.client_language(request)
+            if not is_default_language:
+                url += '&language=' + language
 
-                return redirect(url)
-            return
+            return redirect(url)
+
 
         if action == 'let':
             return
@@ -889,9 +845,7 @@ class Captcha:
 
         if action == 'block':
             emoji = random.choice(EMOJIS)
-            theme, is_default_theme = self._client_theme
-            return self._correct_template('block', emoji = emoji, theme = theme,
-                                          is_default_theme = is_default_theme)
+            return self._correct_template('block', emoji = emoji)
 
         failed_captchas = JSON.load(FAILED_CAPTCHAS_PATH)
 
@@ -907,73 +861,106 @@ class Captcha:
                     and records_length > 2 or records_length > 3:
 
                     emoji = random.choice(EMOJIS)
-                    theme, is_default_theme = self._client_theme
-
-                    return self._correct_template(
-                        'block', emoji = emoji, theme = theme,
-                        is_default_theme = is_default_theme
-                    )
+                    return self._correct_template('block', emoji = emoji)
 
         is_failed_captcha = False
 
-        if request.args.get('captchasolved', '0') == '1':
-            text_captcha = request.args.get('textCaptcha')
-            audio_captcha = request.args.get('audioCaptcha')
-            captcha_token = request.args.get('captchatoken')
+        if request.args.get('ct') is not None:
+            captcha_token = request.args.get('ct')
 
-            if not None in [text_captcha, captcha_token]:
-                decrypted_captcha_token = self.sses.decrypt(captcha_token, CAPTCHA_TOKEN_KEYS)
-                if decrypted_captcha_token is not None:
-                    captcha_token_hardness = decrypted_captcha_token['hardness']
+            if captcha_type == 'oneclick_keys':
+                choosen_image = request.args.get('ci')
+                if not None in [choosen_image, captcha_token]:
+                    decrypted_token_data = self.sses.decrypt(captcha_token, CAPTCHA_TOKEN_KEYS_ONECLICK)
+                    if decrypted_token_data is not None:
+                        captcha_token_hardness = decrypted_token_data['hardness']
 
-                    if captcha_token_hardness.isdigit():
-                        captcha_token_hardness = hardness
-                    else:
-                        captcha_token_hardness = int(captcha_token_hardness)
-
-                    is_failing = False
-
-                    if captcha_token_hardness == 3:
-                        captcha_token_audio = decrypted_captcha_token['audio']
-
-                        if hardness == 3:
-                            if audio_captcha is None:
-                                is_failing = True
-                            else:
-                                if str(audio_captcha) != str(captcha_token_audio):
-                                    is_failing = True
-                        else:
-                            if audio_captcha is not None:
-                                if str(audio_captcha) == str(captcha_token_audio):
-                                    captcha_token_hardness = hardness
-                            else:
+                        captcha_id = decrypted_token_data['id']
+                        if not self._check_used_captcha_id(captcha_id):
+                            if captcha_token_hardness.isdigit():
                                 captcha_token_hardness = hardness
-
-                    if not is_failing:
-                        if not hardness < captcha_token_hardness:
-                            comparison_path = Hashing()\
-                                .compare(url_path, decrypted_captcha_token['path'])
-
-                            comparison_ip = Hashing()\
-                                .compare(client_ip, decrypted_captcha_token['ip'])
-
-                            comparison_user_agent = Hashing()\
-                                .compare(self._client_user_agent,
-                                         decrypted_captcha_token['user_agent'])
-
-                            if not comparison_path or \
-                                int(time()) - int(decrypted_captcha_token['time']) > 180 or \
-                                    (not comparison_ip and not comparison_user_agent) or \
-                                        str(text_captcha.lower()) !=\
-                                            str(decrypted_captcha_token['text'].lower()):
-                                is_failed_captcha = True
-
                             else:
-                                return valid_captcha(captcha_token_hardness)
+                                captcha_token_hardness = int(captcha_token_hardness)
+
+                            original_keyword = decrypted_token_data['keyword']
+                            keywords: list = decrypted_token_data['other_keywords']
+                            correct_index = keywords.index(original_keyword)
+
+                            if not hardness < captcha_token_hardness:
+                                comparison_path = Hashing()\
+                                    .compare(url_path, decrypted_token_data['path'])
+
+                                comparison_ip = Hashing()\
+                                    .compare(client_ip, decrypted_token_data['ip'])
+
+                                comparison_user_agent = Hashing()\
+                                    .compare(self._client_user_agent,
+                                            decrypted_token_data['user_agent'])
+
+                                self._add_used_captcha_id(captcha_id)
+                                if not comparison_path or \
+                                    int(time()) - int(decrypted_token_data['time']) > 120 or \
+                                        (not comparison_ip and not comparison_user_agent) or \
+                                            str(choosen_image) != str(correct_index):
+                                    is_failed_captcha = True
+                                else:
+                                    return valid_captcha(captcha_token_hardness)
+            else:
+                text_captcha = request.args.get('tc')
+                audio_captcha = request.args.get('ac')
+                if not None in [text_captcha, captcha_token]:
+                    decrypted_token_data = self.sses.decrypt(captcha_token, CAPTCHA_TOKEN_KEYS)
+                    if decrypted_token_data is not None:
+                        captcha_token_hardness = decrypted_token_data['hardness']
+
+                        if captcha_token_hardness.isdigit():
+                            captcha_token_hardness = hardness
+                        else:
+                            captcha_token_hardness = int(captcha_token_hardness)
+
+                        is_failing = False
+
+                        if captcha_token_hardness == 3:
+                            captcha_token_audio = decrypted_token_data['audio']
+
+                            if hardness == 3:
+                                if audio_captcha is None:
+                                    is_failing = True
+                                else:
+                                    if str(audio_captcha) != str(captcha_token_audio):
+                                        is_failing = True
+                            else:
+                                if audio_captcha is not None:
+                                    if str(audio_captcha) == str(captcha_token_audio):
+                                        captcha_token_hardness = hardness
+                                else:
+                                    captcha_token_hardness = hardness
+
+                        if not is_failing:
+                            if not hardness < captcha_token_hardness:
+                                comparison_path = Hashing()\
+                                    .compare(url_path, decrypted_token_data['path'])
+
+                                comparison_ip = Hashing()\
+                                    .compare(client_ip, decrypted_token_data['ip'])
+
+                                comparison_user_agent = Hashing()\
+                                    .compare(self._client_user_agent,
+                                            decrypted_token_data['user_agent'])
+
+                                if not comparison_path or \
+                                    int(time()) - int(decrypted_token_data['time']) > 180 or \
+                                        (not comparison_ip and not comparison_user_agent) or \
+                                            str(text_captcha.lower()) !=\
+                                                str(decrypted_token_data['text'].lower()):
+                                    is_failed_captcha = True
+
+                                else:
+                                    return valid_captcha(captcha_token_hardness)
+                            else:
+                                is_failed_captcha = True
                         else:
                             is_failed_captcha = True
-                    else:
-                        is_failed_captcha = True
 
         captcha_string = None
         if request.args.get('captcha') is not None:
@@ -1072,12 +1059,12 @@ class Captcha:
                                     max_age = self.verification_age, httponly = True,
                                     secure = self.app.config.get('HTTPS'))
 
-        theme, is_default_theme = self._client_theme
+        theme, is_default_theme = WebPage.client_theme(request)
         if not is_default_theme:
             response.set_cookie('theme', theme, max_age = 93312000,
                                 httponly = True, secure = self.app.config.get('HTTPS'))
 
-        language, is_default_language = self._client_language
+        language, is_default_language = WebPage.client_language(request)
         if not is_default_language:
             response.set_cookie('language', language,
                                 max_age = 93312000, httponly = True,
@@ -1106,65 +1093,7 @@ class Captcha:
         if request.args.get('captcha') is not None and not is_captcha_set:
             args['captcha'] = request.args.get('captcha')
 
-        theme, is_default_theme = self._client_theme
-        if not is_default_theme:
-            args['theme'] = theme
-
-        language, is_default_language = self._client_language
-        if not is_default_language:
-            args['language'] = language
-
-        html = response.data
-        soup = BeautifulSoup(html, 'html.parser')
-
-        def has_argument(url, arg):
-            parsed_url = urlparse(url)
-            query_params = parse_qs(parsed_url.query)
-            return arg in query_params
-
-        for anchor in soup.find_all('a'):
-            if not 'href' in anchor.attrs:
-                continue
-
-            if '://' in anchor['href']:
-                anchor_host = urlparse(anchor['href']).netloc
-                if not anchor_host == request.host:
-                    continue
-            elif not anchor['href'].startswith('/') and \
-                not anchor['href'].startswith('#') and \
-                    not anchor['href'].startswith('?') and \
-                        not anchor['href'].startswith('&'):
-                continue
-
-            for arg, content in args.items():
-                if not has_argument(anchor['href'], arg):
-                    special_character = '?' if '?' not in anchor['href'] else '&'
-                    anchor['href'] = anchor['href'] + special_character + arg + '=' + quote(content)
-
-        for form in soup.find_all('form'):
-            action = form.get('action')
-            if action:
-                for arg, content in args.items():
-                    if not has_argument(action, arg):
-                        special_character = '?' if '?' not in action else '&'
-                        form['action'] = action + special_character + arg + '=' + quote(content)
-
-            existing_names = set()
-            for input_tag in form.find_all('input'):
-                existing_names.add(input_tag.get('name'))
-
-            added_input = ''
-            for arg, content in args.items():
-                if arg not in existing_names:
-                    added_input += f'<input type="hidden" name="{arg}" value="{content}">'
-
-            form_button = form.find('button')
-            if form_button:
-                form_button.insert_before(BeautifulSoup(added_input, 'html.parser'))
-            else:
-                form.append(BeautifulSoup(added_input, 'html.parser'))
-
-        response.data = soup.prettify()
+        response.data = WebPage.add_args(response.data, request, **args)
 
         return response
 

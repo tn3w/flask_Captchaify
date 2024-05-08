@@ -16,23 +16,22 @@ import re
 import io
 import random
 from base64 import urlsafe_b64encode, urlsafe_b64decode, b64decode, b64encode
-from urllib.parse import urlparse, urlunparse, parse_qs
+from urllib.parse import urlparse, urlunparse, parse_qs, urlencode, quote
 import gzip
 import hashlib
 import os
 import unicodedata
 import threading
 import json
-from typing import Union, Optional, Final
+from typing import Union, Optional, Final, Tuple
 from time import time
 from PIL import Image, ImageFilter
 import numpy as np
 import ipaddress
-import pkg_resources
-from flask import request, g
-from jinja2 import Environment, select_autoescape, Undefined
+from flask import request, g, Request
+from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
 from googletrans import Translator
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from cryptography.hazmat.backends import default_backend
 from cryptography.exceptions import InvalidKey
 from cryptography.hazmat.primitives import hashes, padding
@@ -41,13 +40,30 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 import requests
 
 
-DATA_DIR: Final[str] = pkg_resources.resource_filename('flask_Captchaify', 'data')
-ASSETS_DIR: Final[str] = pkg_resources.resource_filename('flask_Captchaify', 'assets')
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Create the file test.env in the `src/flask_Captchaify` folder if you do
+# not want to install the module with pip but want to import it from this
+# folder, e.g. to display code changes directly.
+if not os.path.exists(os.path.join(CURRENT_DIR, 'test.env')):
+    import pkg_resources
+
+def get_work_dir():
+    if os.path.exists(os.path.join(CURRENT_DIR, 'test.env')):
+        return CURRENT_DIR
+
+    return pkg_resources.resource_filename('flask_Captchaify', '')
+
+
+WORK_DIR: Final[str] = get_work_dir()
+DATA_DIR: Final[str] = os.path.join(WORK_DIR, 'data')
+ASSETS_DIR: Final[str] = os.path.join(WORK_DIR, 'assets')
 
 TOR_EXIT_IPS_LIST_PATH: Final[str] = os.path.join(DATA_DIR, 'tor-exit-ips.json')
 STOPFORUMSPAM_CACHE_PATH: Final[str] = os.path.join(DATA_DIR, 'stopforumspam-cache.json')
 IP_API_CACHE_PATH: Final[str] = os.path.join(DATA_DIR, 'ipapi-cache.json')
 
+ALL_THEMES: Final[list] = ['dark', 'light']
 UNWANTED_IPS: Final[list] = ['127.0.0.1', '192.168.0.1', '10.0.0.1',
                              '192.0.2.1', '198.51.100.1', '203.0.113.1']
 IPV4_PATTERN: Final[str] = r'^(\d{1,3}\.){3}\d{1,3}$'
@@ -90,6 +106,65 @@ IP_INFO_KEYS: Final[list] = ['continent', 'continentCode', 'country', 'countryCo
                 'lon', 'timezone', 'offset', 'currency', 'isp', 'org', 'as',
                 'asname', 'reverse', 'mobile', 'proxy', 'hosting', 'time']
 TOR_EXIT_IPS_URL: Final[str] = 'https://check.torproject.org/torbulkexitlist'
+
+
+def rearrange_url(url: str, args_to_remove: list) -> str:
+    """
+    Rearrange the arguments of a URL by removing specified arguments and moving others to the beginning.
+
+    :param url: The URL to rearrange.
+    :param args_to_remove: A list of arguments to remove from the URL.
+    :return: The rearranged URL.
+    """
+
+    parsed_url = urlparse(url)
+
+    args = parse_qs(parsed_url.query)
+
+    for arg in args_to_remove:
+        args.pop(arg, None)
+
+    new_query_string = urlencode(args, doseq=True)
+
+    rearranged_url = urlunparse(
+        (parsed_url.scheme, parsed_url.netloc, parsed_url.path,
+         parsed_url.params, new_query_string, parsed_url.fragment)
+    )
+
+    return rearranged_url
+
+
+def get_domain_from_url(url: str) -> str:
+    """
+    Extracts the domain from a given URL.
+
+    :param url: The URL from which to extract the domain.
+    :return: The domain extracted from the URL.
+    """
+
+    parsed_url = urlparse(url)
+    domain_parts = parsed_url.netloc.split('.')
+    if len(domain_parts) > 2:
+        domain = '.'.join(domain_parts[-2:])
+    else:
+        domain = parsed_url.netloc
+    return domain
+
+
+def get_path_from_url(url: str) -> Optional[str]:
+    """
+    Extracts the path component from a given URL.
+
+    :param url: The URL from which to extract the path.
+    :return: The path component of the URL, or None if the URL
+             is invalid or does not contain a path.
+    """
+
+    parsed_url = urlparse(url)
+    if isinstance(parsed_url.path, str):
+        return parsed_url.path
+
+    return None
 
 
 def generate_random_string(length: int, with_punctuation: bool = True, with_letters: bool = True):
@@ -190,44 +265,46 @@ def convert_image_to_base64(image_data: bytes) -> str:
     return data_url
 
 
-def manipulate_image_bytes(image_data: bytes) -> bytes:
+def manipulate_image_bytes(image_data: bytes, is_small: bool = False) -> bytes:
     """
     Manipulates an image represented by bytes to create a distorted version.
 
     :param image_data: The bytes representing the original image.
     :return: The bytes of the distorted image.
     """
-
     img = Image.open(io.BytesIO(image_data))
 
-    img_array = np.array(img)
+    width, height = img.size
 
-    distorted_img_array = img_array.copy()
-    height, width, _ = distorted_img_array.shape
+    x_shifts = [[random.randint(-2, 3) for _ in range(width)] for _ in range(height)]
+    y_shifts = [[random.randint(-2, 3) for _ in range(width)] for _ in range(height)]
+
+    shifted_img = Image.new('RGB', (width, height))
     for y in range(height):
         for x in range(width):
-            x_shift = np.random.randint(-2, 3)
-            y_shift = np.random.randint(-2, 3)
-            distorted_img_array[y, x] = img_array[(y + y_shift) % height, (x + x_shift) % width]
+            new_x = (x + x_shifts[y][x]) % width
+            new_y = (y + y_shifts[y][x]) % height
+            shifted_img.putpixel((x, y), img.getpixel((new_x, new_y)))
 
-    distorted_img = Image.fromarray(distorted_img_array)
+    shifted_img = shifted_img.convert('HSV')
 
-    distorted_img = distorted_img.convert('HSV')
-    distorted_img = Image.merge('HSV', [distorted_img.getchannel('H'), 
-                                distorted_img.getchannel('S').point(lambda i: min(255, i * 1.02)), 
-                                distorted_img.getchannel('V').point(lambda i: max(0, i * 0.99))])
+    saturation_factor = 1.02
+    value_factor = 0.99
+    h, s, v = shifted_img.split()
 
-    distorted_img = distorted_img.convert('RGB')
-    distorted_img = distorted_img.filter(ImageFilter.GaussianBlur(radius=0.2))
+    s = s.point(lambda i: min(255, i * saturation_factor))
+    v = v.point(lambda i: max(0, i * value_factor))
 
-    distorted_img = distorted_img.resize(
-        (int(distorted_img.width // 1.5), int(distorted_img.height // 1.5)), Image.LANCZOS
-    ).resize(
-        (int(distorted_img.width * 1.5), int(distorted_img.height * 1.5)), Image.LANCZOS
-    )
+    shifted_img = Image.merge('HSV', (h, s, v))
+
+    shifted_img = shifted_img.convert('RGB')
+    shifted_img = shifted_img.filter(ImageFilter.GaussianBlur(radius=0.2))
+
+    size = 100 if is_small else 200
+    shifted_img = shifted_img.resize((size, size), Image.LANCZOS)
 
     output_bytes = io.BytesIO()
-    distorted_img.save(output_bytes, format='WebP')
+    shifted_img.save(output_bytes, format='WebP')
     output_bytes.seek(0)
     return output_bytes.read()
 
@@ -435,23 +512,145 @@ class JSON:
 
 LANGUAGES = JSON.load(os.path.join(ASSETS_DIR, 'languages.json'), [])
 LANGUAGE_CODES = [language['code'] for language in LANGUAGES]
-TRANSLATIONS_PATH = os.path.join(DATA_DIR, 'translations.json')
+TRANSLATIONS_FILE_PATH = os.path.join(DATA_DIR, 'translations.json')
 translator = Translator()
 
 
-class SilentUndefined(Undefined):
+def render_template(template_dir: str, file_name: str,
+                    request: Request, template_language:\
+                    Optional[str] = None, **args) -> str:
     """
-    Class to not get an error when specifying a non-existent argument
+    Renders a template file into HTML content, optionally translating it to the specified language.
+
+    :param template_dir: The directory path where template files are located.
+    :param file_name: The name of the template file to render.
+    :param request: The request object providing information about the client's language preference.
+    :param template_language: The language code specifying the language of the template content. 
+                              If not provided, defaults to 'en' (English).
+    :param **args: Additional keyword arguments to pass to the template rendering function.
+
+    :return: The rendered HTML content of the template.
     """
 
-    def _fail_with_undefined_error(self, *args, **kwargs):
-        return None
+    if template_language is None:
+        template_language = "en"
+
+    client_theme, is_default_theme = WebPage.client_theme(request)
+    client_language, is_default_language = WebPage.client_language(request)
+
+    args["theme"] = client_theme
+    args["is_default_theme"] = is_default_theme
+    args["language"] = client_language
+    args["is_default_language"] = is_default_language
+    args["alternate_languages"] = LANGUAGE_CODES
+
+    args["current_url"] = rearrange_url(WebPage.client_url(request), ['ct', 'ci', 'captcha'])
+    args["current_url_without_ccl"] = rearrange_url(args["current_url"], ['ccl'])
+    args["current_url_without_theme"] = rearrange_url(args["current_url"], ['theme'])
+    args["current_url_without_language"] = rearrange_url(args["current_url"], ['language'])
+
+    html = WebPage.render_template(template_dir, file_name, html = None, **args)
+    html = WebPage.translate(html, template_language, client_language)
+    html = WebPage.minimize(html)
+
+    return html
 
 
 class WebPage:
     """
     Class with useful tools for WebPages
     """
+
+
+    @staticmethod
+    def client_theme(request: Request, default: Optional[str] = None) -> Tuple[str, bool]:
+        """
+        Which color theme the user prefers
+        
+        :return theme: The client theme
+        :return is_default: Is default Value
+        """
+
+        theme_from_args = request.args.get('theme')
+        theme_from_cookies = request.cookies.get('theme')
+        theme_from_form = request.form.get('theme')
+
+        theme = (
+            theme_from_args
+            if theme_from_args in ALL_THEMES
+            else (
+                theme_from_cookies
+                if theme_from_cookies in ALL_THEMES
+                else (
+                    theme_from_form
+                    if theme_from_form in ALL_THEMES
+                    else None
+                )
+            )
+        )
+
+        if theme is None:
+            if default is None:
+                default = "dark"
+
+            return default, True
+
+        return theme, False
+
+
+    @staticmethod
+    def client_language(request: Request) -> Tuple[str, bool]:
+        """
+        Which language the client prefers
+
+        :return language: The client languge
+        :return is_default: Is Default Value
+        """
+
+        language_from_args = request.args.get('language')
+        language_from_cookies = request.cookies.get('language')
+        language_from_form = request.form.get('language')
+
+        chosen_language = (
+            language_from_args
+            if language_from_args in LANGUAGE_CODES
+            else (
+                language_from_cookies
+                if language_from_cookies in LANGUAGE_CODES
+                else (
+                    language_from_form
+                    if language_from_form in LANGUAGE_CODES
+                    else None
+                )
+            )
+        )
+
+        if chosen_language is None:
+            preferred_language = request.accept_languages.best_match(LANGUAGE_CODES)
+
+            if preferred_language is not None:
+                return preferred_language, True
+        else:
+            return chosen_language, False
+
+        return 'en', True
+
+
+    @staticmethod
+    def client_url(request: Request) -> str:
+        """
+        Gets the correct client URL
+        """
+
+        scheme = request.headers.get('X-Forwarded-Proto', '')
+        if scheme not in ['https', 'http']:
+            if request.is_secure:
+                scheme = 'https'
+            else:
+                scheme = 'http'
+
+        return request.url.replace('http', scheme)
+
 
     @staticmethod
     def _minimize_tag_content(html: str, tag: str) -> str:
@@ -489,22 +688,6 @@ class WebPage:
 
 
     @staticmethod
-    def get_client_language(default: str = 'en') -> str:
-        """
-        Function to get the language code of the client
-
-        :param default: The value that is returned if no language can be found
-        """
-
-        preferred_language = request.accept_languages.best_match(LANGUAGE_CODES)
-
-        if preferred_language is not None:
-            return preferred_language
-
-        return default
-
-
-    @staticmethod
     def _translate_text(text_to_translate: str, from_lang: str, to_lang: str) -> str:
         """
         Function to translate a text based on a translation file
@@ -514,36 +697,41 @@ class WebPage:
         :param to_lang: Into which language the text should be translated
         """
 
-        if from_lang == to_lang:
+        text_to_translate = text_to_translate.strip('\n ')
+
+        if from_lang == to_lang or not text_to_translate:
             return text_to_translate
 
-        translations = JSON.load(TRANSLATIONS_PATH, list())
+        translations = JSON.load(TRANSLATIONS_FILE_PATH, [])
 
         for translation in translations:
-            if translation['text_to_translate'] == text_to_translate and\
-                translation['from_lang'] == from_lang and translation['to_lang'] == to_lang:
-                return translation['translated_output']
+            if translation["text_to_translate"] == text_to_translate\
+                and translation["from_lang"] == from_lang\
+                    and translation["to_lang"] == to_lang:
+                return translation["translated_output"]
 
-        translated_output = translator.translate(text_to_translate,
-                                                 src=from_lang, dest=to_lang).text
+        translator = Translator()
 
         try:
-            translated_output = translated_output.encode('latin-1').decode('unicode_escape')
-        except (UnicodeEncodeError, UnicodeDecodeError, AttributeError):
-            pass
+            translated_output = translator.translate(
+                text_to_translate, src=from_lang, dest=to_lang
+                ).text
+
+            if translated_output is None:
+                return text_to_translate
+        except (UnicodeEncodeError, UnicodeDecodeError,
+                ValueError, AttributeError, TypeError):
+            return text_to_translate
 
         translation = {
-            'text_to_translate': text_to_translate, 
-            'from_lang': from_lang,
-            'to_lang': to_lang, 
-            'translated_output': translated_output
+            "text_to_translate": text_to_translate, 
+            "from_lang": from_lang,
+            "to_lang": to_lang, 
+            "translated_output": translated_output
         }
         translations.append(translation)
 
-        JSON.dump(translations, TRANSLATIONS_PATH)
-
-        if to_lang in ['de', 'en', 'es', 'fr', 'pt', 'it']:
-            translated_output = translated_output[0].upper() + translated_output[1:]
+        JSON.dump(translations, TRANSLATIONS_FILE_PATH)
 
         return translated_output
 
@@ -558,92 +746,184 @@ class WebPage:
         :param to_lang: Into which language the text should be translated
         """
 
+        def translate_tag(html_tag: Tag, from_lang: str, to_lang: str):
+            for tag in html_tag.find_all(text=True):
+                if hasattr(tag, 'attrs'):
+                    if 'ntr' in tag.attrs:
+                        continue
+
+                if tag.parent.name not in ['script', 'style']:
+                    translated_text = WebPage._translate_text(tag, from_lang, to_lang)
+                    tag.replace_with(translated_text)
+
+            translated_html = str(html_tag)
+            return translated_html
+
         soup = BeautifulSoup(html, 'html.parser')
 
-        def translate_htmlified_text(html_tag):
-            try:
-                new_soup = BeautifulSoup(str(html_tag), 'html.parser')
-                outer_tag = new_soup.find(lambda tag: tag.find_all(recursive=False))
-
-                text = ''.join(str(tag) for tag in outer_tag.contents)
-            except (AttributeError, ValueError, TypeError):
-                text = html_tag.text
-
-            if '<' in text:
-                pattern = r'(<.*?>)(.*?)(<\/.*?>)'
-
-                def replace(match):
-                    tag_open, content, tag_close = match.groups()
-                    processed_content = WebPage._translate_text(content, from_lang, to_lang)
-                    return f'{tag_open}{processed_content}{tag_close}'
-
-                modified_text = re.sub(pattern, replace, text)
-            else:
-                modified_text = WebPage._translate_text(text, from_lang, to_lang)
-            return modified_text
-
-        tags = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'p', 'button'])
+        tags = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5',
+                              'h6', 'a', 'p', 'button'])
         for tag in tags:
-            if 'ntr' not in tag.attrs:
-                translated_html = translate_htmlified_text(tag)
-                tag.clear()
-                tag.append(BeautifulSoup(translated_html, 'html.parser'))
+            if str(tag) and 'ntr' not in tag.attrs:
+                translate_tag(tag, from_lang, to_lang)
 
         inputs = soup.find_all('input')
         for input_tag in inputs:
             if input_tag.has_attr('placeholder') and 'ntr' not in input_tag.attrs:
                 input_tag['placeholder'] = WebPage._translate_text(
-                    input_tag['placeholder'], from_lang, to_lang)
+                    input_tag['placeholder'].strip(), from_lang, to_lang
+                    )
 
         head_tag = soup.find('head')
         if head_tag:
             title_element = head_tag.find('title')
             if title_element:
                 title_element.string = WebPage._translate_text(
-                    title_element.text, from_lang, to_lang)
+                    title_element.text.strip(), from_lang, to_lang
+                    )
+
+            meta_title = head_tag.find('meta', attrs={'name': 'title'})
+            if meta_title and 'content' in meta_title.attrs:
+                meta_title['content'] = WebPage._translate_text(
+                    meta_title['content'].strip(), from_lang, to_lang
+                )
+
+            meta_description = head_tag.find('meta', attrs={'name': 'description'})
+            if meta_description and 'content' in meta_description.attrs:
+                meta_description['content'] = WebPage._translate_text(
+                    meta_description['content'].strip(), from_lang, to_lang
+                )
+
+            meta_keywords = head_tag.find('meta', attrs={'name': 'keywords'})
+            if meta_keywords and 'content' in meta_keywords.attrs:
+                meta_keywords['content'] = WebPage._translate_text(
+                    meta_keywords['content'].strip(), from_lang, to_lang
+                )
 
         translated_html = soup.prettify()
         return translated_html
 
 
     @staticmethod
-    def render_template(file_path: Optional[str] = None,
-                        html: Optional[str] = None,
-                        client_language: str = 'en', **args) -> str:
+    def add_args(html: str, request: Request, **args) -> str:
+        """
+        Adds arguments to links and forms in HTML based on the request.
+
+        :param html: The HTML content to which arguments need to be added.
+        :param request: The Flask Request object containing information about the current request.
+        :return: The HTML content with arguments added to links and forms.
+        """
+
+        theme, is_default_theme = WebPage.client_theme(request)
+        if not is_default_theme:
+            args['theme'] = theme
+
+        language, is_default_language = WebPage.client_language(request)
+        if not is_default_language:
+            args['language'] = language
+
+        soup = BeautifulSoup(html, 'html.parser')
+
+        def has_argument(url, arg):
+            parsed_url = urlparse(url)
+            query_params = parse_qs(parsed_url.query)
+            return arg in query_params
+
+        for anchor in soup.find_all('a'):
+            if not 'href' in anchor.attrs:
+                continue
+
+            if '://' in anchor['href']:
+                anchor_host = get_domain_from_url(anchor['href'])
+                if anchor_host != get_domain_from_url(request.url):
+                    continue
+            elif not anchor['href'].startswith('/') and \
+                not anchor['href'].startswith('#') and \
+                    not anchor['href'].startswith('?') and \
+                        not anchor['href'].startswith('&'):
+                continue
+
+            for arg, content in args.items():
+                if arg == 'template':
+                    anchor_path = get_path_from_url(anchor['href'])
+                    if isinstance(anchor_path, str):
+                        if not '/signature' in anchor_path:
+                            continue
+
+                if not has_argument(anchor['href'], arg):
+                    special_character = '?' if '?' not in anchor['href'] else '&'
+                    anchor['href'] = anchor['href'] + special_character + arg + '=' + quote(content)
+
+        for form in soup.find_all('form'):
+            action = form.get('action')
+            if action:
+                for arg, content in args.items():
+                    if not has_argument(action, arg):
+                        special_character = '?' if '?' not in action else '&'
+                        form['action'] = action + special_character + arg + '=' + quote(content)
+
+            existing_names = set()
+            for input_tag in form.find_all('input'):
+                existing_names.add(input_tag.get('name'))
+
+            added_input = ''
+            for arg, content in args.items():
+                if arg not in existing_names:
+                    added_input += f'<input type="hidden" name="{arg}" value="{content}">'
+
+            form_button = form.find('button')
+            if form_button:
+                form_button.insert_before(BeautifulSoup(added_input, 'html.parser'))
+            else:
+                form.append(BeautifulSoup(added_input, 'html.parser'))
+
+        html_with_args = soup.prettify()
+        return html_with_args
+
+
+    @staticmethod
+    def render_template(template_dir: str, file_name: Optional[str] = None,
+                        html: Optional[str] = None, **args) -> str:
         """
         Function to render a HTML template (= insert arguments / translation / minimization)
 
-        :param file_path: From which file HTML code should be loaded (Optional)
-        :param html: The content of the page as html (Optional)
-        :param client_language: The client's language (Default `en`)
-        :param args: Arguments to be inserted into the WebPage with Jinja2
+        :param template_dir: The directory path where template files are located.
+        :param file_name: The name of the template file to render. (Optional)
+        :param html: The content of the page as html. (Optional)
+        :param args: Arguments to be inserted into the WebPage with Jinja2.
         """
 
+        file_path = os.path.join(template_dir, file_name)
+
         if file_path is None and html is None:
-            return ''
+            raise ValueError("Arguments 'file_path' and 'html' are None")
 
         if not file_path is None:
-            if not os.path.isfile(file_path) and html is None:
-                return ''
+            if not os.path.isfile(file_path):
+                raise FileNotFoundError(f"File `{file_path}` does not exist")
 
+        class SilentUndefined(Undefined):
+            """
+            Class to not get an error when specifying a non-existent argument
+            """
+
+            def _fail_with_undefined_error(self, *args, **kwargs):
+                return None
+
+        loader = FileSystemLoader(template_dir)
         env = Environment(
+            loader = loader,
             autoescape=select_autoescape(['html', 'xml']),
             undefined=SilentUndefined
         )
 
         if html is None:
-            with open(file_path, 'r', encoding = 'utf-8') as file:
+            with open(file_path, "r", encoding = "utf-8") as file:
                 html = file.read()
 
         template = env.from_string(html)
 
-        args['language'] = client_language
-
         html = template.render(**args)
-        html = WebPage.translate(html, 'en', client_language)
-        html = WebPage.minimize(html)
-
-        g.ddosify_page = True
 
         return html
 
@@ -813,7 +1093,7 @@ class SSES:
         new_values = []
         for value in values:
             if isinstance(value, list) or isinstance(value, dict):
-                value = '--json--' + json.dumps(value)
+                value = '==json==' + json.dumps(value)
             new_values.append(value)
 
         text_data = self.separator.join(new_values)
@@ -846,8 +1126,8 @@ class SSES:
                 break
 
             value = values[i]
-            if value.startswith('--json--'):
-                value = json.loads(value[9:])
+            if value.startswith('==json=='):
+                value = json.loads(value[8:])
 
             data_dict[dict_key] = value
 

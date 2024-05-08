@@ -6,10 +6,10 @@ Made with 💩 in Germany by TN3W
 """
 
 from flask import Flask
-from flask_Captchaify import Captcha
+from flask_Captchaify import Captchaify
 
 app = Flask(__name__)
-captcha = Captcha(app)
+captchaify = Captchaify(app, default_action = 'fight')
 
 @app.route('/')
 def index():

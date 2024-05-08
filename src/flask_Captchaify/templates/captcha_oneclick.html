@@ -10,6 +10,7 @@
                 --background: #f2f2f2;
                 --text: #181818;
                 --border: rgba(0, 0, 0, 0.1);
+                --ancher-color: #222;
             }
 
             #choose-light {
@@ -20,6 +21,7 @@
                 --background: #121212;
                 --text: #f2f2f2;
                 --border: rgba(255, 255, 255, 0.1);
+                --ancher-color: #999;
             }
 
             #choose-dark {
@@ -30,6 +32,7 @@
                 --background: #f2f2f2;
                 --text: #181818;
                 --border: rgba(0, 0, 0, 0.1);
+                --ancher-color: #222;
             }
 
             #choose-light {
@@ -41,6 +44,7 @@
                     --background: #121212;
                     --text: #f2f2f2;
                     --border: rgba(255, 255, 255, 0.1);
+                    --ancher-color: #999;
                 }
 
                 #choose-dark {
@@ -55,13 +59,16 @@
 
             body {
                 margin: 0;
-                font-family: Arial, sans-serif;
+                font-family: Consolas, Arial, sans-serif;
                 background-color: var(--background);
                 color: var(--text);
+            }
+
+            main {
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                height: 100vh;
+                height: 90vh;
                 text-align: center;
             }
 
@@ -93,6 +100,33 @@
                 box-shadow: 0 0 5px var(--border);
             }
 
+            footer {
+                text-align: center;
+            }
+
+            footer nav ul {
+                list-style-type: none;
+                padding: 0;
+            }
+
+            footer nav ul li {
+                color: var(--ancher-color);
+                display: inline;
+                margin-right: 20px;
+                font-size: 15px;
+                text-align: center;
+                font-weight: lighter;
+            }
+
+            footer nav ul li a {
+                color: var(--ancher-color);
+                text-decoration: none;
+            }
+
+            footer nav ul li a:hover {
+                text-decoration: underline;
+            }
+
             @media only screen and (max-width: 670px) {
                 .image-grid {
                     grid-template-columns: repeat(3, 1fr);
@@ -108,13 +142,30 @@
     </head>
     <body>
         <main>
-            <img src="{{ original_image }}" alt="Original Image" class="square-image">
-            <p class="description">Select the picture that contains the same motif</p>
-            <div class="image-grid">
-                {% for image in captcha_images %}
-                <a href="{{ current_url }}{% if '?' in current_url %}?{% else %}&{% endif %}captchasolved=1&captchatoken={{ captcha_token }}&choosen_image={{ image.id }}"><img src="{{ image.src }}" alt="Image {{ image.id }}" class="grid-image"></a>
-                {% endfor %}
+            <div>
+                <img src="{{ original_image }}" alt="Original Image" class="square-image">
+                <p class="description">Select the picture that contains the same motif:</p>
+                {% if error|default %}
+                <p style="color: #ff0000;margin:10px;">
+                    {{ error }}
+                </p>
+                {% endif %}
+                <div class="image-grid">
+                    {% for image in captcha_images %}
+                    <a href="{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}ct={{ captcha_token }}&ci={{ image.id }}"><img src="{{ image.src }}" alt="Image {{ image.id }}" class="grid-image"></a>
+                    {% endfor %}
+                </div>
             </div>
         </main>
+        <footer>
+            <nav>
+                <ul>
+                    <li><a href="{{ current_url_without_language }}{% if '?' in current_url_without_language %}&{% else %}?{% endif %}ccl=1">🌐Change Language</a></li>
+                    <li id="choose-light"><a href="{{ current_url_without_theme }}{% if '?' in current_url_without_theme %}&{% else %}?{% endif %}theme=light">Light Mode</a></li>
+                    <li id="choose-dark"><a href="{{ current_url_without_theme }}{% if '?' in current_url_without_theme %}&{% else %}?{% endif %}theme=dark">Dark Mode</a></li>
+                    <li>DDoS protection from <a href="https://github.com/tn3w/flask_Captchaify" target="_blank">Captchaify</a></li>
+                </ul>
+            </nav>
+        </footer>
     </body>
 </html>

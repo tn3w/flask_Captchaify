@@ -4,7 +4,7 @@
         <meta charset="UTF-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Enjoy a cup of tea</title>
+        <title>Access blocked</title>
         <style>{% if theme == "light" and not is_default_theme %}
             :root {
                 --background: #f2f2f2;
@@ -34,7 +34,7 @@
                 --main-ancher-color: #0000ad;
                 --ancher-color: #222;
             }
-
+            
             #choose-light {
                 display: none;
             }
@@ -58,9 +58,14 @@
             {% endif %}
 
             body {
-                font-family: Arial, sans-serif;
+                font-family: Consolas, Arial, sans-serif;
                 background-color: var(--background);
                 color: var(--text);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 98vh;
             }
 
             a {
@@ -71,16 +76,10 @@
                 text-decoration: underline;
             }
     
-            .container {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                height: 100vh;
-            }
-    
             .emoji {
                 height: 100px;
+                display: flex;
+                margin: auto;
             }
     
             .error-text {
@@ -103,27 +102,54 @@
                 text-align: center;
                 max-width: 800px;
             }
-    
-            .captchaify-text, .captchaify-link {
-                font-size: 12px;
-                margin-top: 10px;
+
+            footer {
+                text-align: center;
+                margin-top: 20px;
+            }
+
+            footer nav ul {
+                list-style-type: none;
+                padding: 0;
+            }
+
+            footer nav ul li {
+                color: var(--ancher-color);
+                display: inline;
+                margin-right: 20px;
+                font-size: 15px;
                 text-align: center;
                 font-weight: lighter;
+            }
+
+            footer nav ul li a {
                 color: var(--ancher-color);
+                text-decoration: none;
+            }
+
+            footer nav ul li a:hover {
+                text-decoration: underline;
             }
         </style>
     </head>
     <body>
-        <div class="container">
+        <main>
             <img class="emoji" src="{{ emoji }}">
-            <h1 class="error-text">Have some Tea</h1>
+            <h1 class="error-text">Drink a cup of tea</h1>
             <p>It appears that you are sending an excessive number of requests per minute to this website. Please reduce the frequency of your requests.</p>
             <div class="main-link">
                 <a href="">Refresh webpage</a>
             </div>
-            <span class="captchaify-text">
-                <a class="captchaify-link" href="?captchaify_changelanguage=1&language={{ language }}">🌐Change Language</a> - <span id="choose-dark"><a class="captchaify-link" href="?theme=dark">Dark Mode</a> - </span><span id="choose-light"><a class="captchaify-link" href="?theme=light">Light Mode</a> - </span>DDoS protection from <a class="captchaify-link" href="https://github.com/tn3w/flask_Captchaify" target="_blank">Captchaify</a>
-            </span>
-        </div>
+        </main>
+        <footer>
+            <nav>
+                <ul>
+                    <li><a href="{{ current_url_without_language }}{% if '?' in current_url_without_language %}&{% else %}?{% endif %}ccl=1">🌐Change Language</a></li>
+                    <li id="choose-light"><a href="{{ current_url_without_theme }}{% if '?' in current_url_without_theme %}&{% else %}?{% endif %}theme=light">Light Mode</a></li>
+                    <li id="choose-dark"><a href="{{ current_url_without_theme }}{% if '?' in current_url_without_theme %}&{% else %}?{% endif %}theme=dark">Dark Mode</a></li>
+                    <li>DDoS protection from <a href="https://github.com/tn3w/flask_Captchaify" target="_blank">Captchaify</a></li>
+                </ul>
+            </nav>
+        </footer>
     </body>
 </html>

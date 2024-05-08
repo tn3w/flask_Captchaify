@@ -72,7 +72,7 @@
             body {
                 background-color: var(--background);
                 color: var(--text);
-                font-family: Arial, sans-serif;
+                font-family: Consolas, Arial, sans-serif;
             }
 
             .back-button {
@@ -192,6 +192,33 @@
                 text-decoration: underline;
             }
 
+            footer {
+                text-align: center;
+            }
+
+            footer nav ul {
+                list-style-type: none;
+                padding: 0;
+            }
+
+            footer nav ul li {
+                color: var(--ancher-color);
+                display: inline;
+                margin-right: 20px;
+                font-size: 15px;
+                text-align: center;
+                font-weight: lighter;
+            }
+
+            footer nav ul li a {
+                color: var(--ancher-color);
+                text-decoration: none;
+            }
+
+            footer nav ul li a:hover {
+                text-decoration: underline;
+            }
+
             @media screen and (min-width: 1200px) {
                 h1 {
                     font-size: 32px;
@@ -273,45 +300,44 @@
         </style>
     </head>
     <body>
-        <a class="back-button" href="?language={{ language }}" ntr="1">
-            <img class="icon" src="" alt="Back">
-        </a>
-        <h1>Change Language</h1>
-        <div class="search-form">
-            <form class="search-form" action="{{ current_url }}" method="GET">
-                <input type="text" class="search-input" name="captchaify_search" placeholder="Search Language" value="{{ search if search|default else '' }}">
-                <input type="hidden" name="captchaify_changelanguage" value="1">
-                <input type="hidden" name="language" value="{{ language }}">
-                <button type="submit" class="search-button" ntr="1">
-                    <img src="" alt="Search">
-                </button>
-            </form>
-        </div>
-        {% if languages is none or languages|length == 0 %}
-        <p>No language found that matches your search.</p>
-        {% endif %}
-        {% if languages|default %}
-        <div class="container">
-            {% for language in languages %}
-            <div class="item">
-                <a href="?language={{ language['code'] }}" ntr="1">
-                    <img src="{{ language['flag'] }}" alt="{{ language['name'] }} Flag">
-                    <div class="language">{{ language['name'] }}</div>
-                </a>
+        <main>
+            <a class="back-button" href="{{ current_url_without_ccl }}" ntr="1">
+                <img class="icon" src="" alt="Back">
+            </a>
+            <h1>Change Language</h1>
+            <div class="search-form">
+                <form class="search-form" action="{{ current_url }}" method="GET">
+                    <input type="text" class="search-input" name="cs" placeholder="Search Language" value="{{ search if search|default else '' }}">
+                    <input type="hidden" name="ccl" value="1">
+                    <button type="submit" class="search-button" ntr="1">
+                        <img src="" alt="Search">
+                    </button>
+                </form>
             </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-        <div class="captchaify-text">
-            <p>
-                <span id="choose-dark">
-                    <a href="?theme=dark&captchaify_changelanguage=1&language={{ language }}">Dark Mode</a><span>&nbsp;-&nbsp;</span>
-                </span>
-                <span id="choose-light">
-                    <a href="?theme=light&captchaify_changelanguage=1&language={{ language }}">Light Mode</a><span>&nbsp;-&nbsp;</span>
-                </span>
-                DDoS protection from&nbsp;<a href="https://github.com/tn3w/flask_Captchaify" target="_blank">Captchaify</a>
-            </p>
-        </div>
+            {% if languages is none or languages|length == 0 %}
+            <p>No language found that matches your search.</p>
+            {% endif %}
+            {% if languages|default %}
+            <div class="container">
+                {% for language in languages %}
+                <div class="item">
+                    <a href="?language={{ language['code'] }}" ntr="1">
+                        <img src="{{ language['flag'] }}" alt="{{ language['name'] }} Flag">
+                        <div class="language">{{ language['name'] }}</div>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </main>
+        <footer>
+            <nav>
+                <ul>
+                    <li id="choose-light"><a href="{{ current_url_without_theme }}{% if '?' in current_url_without_theme %}&{% else %}?{% endif %}theme=light">Light Mode</a></li>
+                    <li id="choose-dark"><a href="{{ current_url_without_theme }}{% if '?' in current_url_without_theme %}&{% else %}?{% endif %}theme=dark">Dark Mode</a></li>
+                    <li>DDoS protection from <a href="https://github.com/tn3w/flask_Captchaify" target="_blank">Captchaify</a></li>
+                </ul>
+            </nav>
+        </footer>
     </body>
 </html>

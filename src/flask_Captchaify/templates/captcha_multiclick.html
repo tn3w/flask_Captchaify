@@ -67,7 +67,7 @@
             }
 
             body {
-                font-family: Arial, sans-serif;
+                font-family: Consolas, Arial, sans-serif;
                 background-color: var(--background);
                 color: var(--text);
                 display: flex;
@@ -97,32 +97,27 @@
                 align-items: center;
             }
 
-            .captcha-image,
-            .captcha-audio {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                margin-bottom: 20px;
+            .grid-container {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                grid-gap: 10px;
             }
 
-            img {
-                max-width: 100%;
-                margin-bottom: 10px;
+            .grid-item {
+                position: relative;
             }
 
-            audio {
+            .grid-item img {
                 width: 100%;
-                margin-bottom: 10px;
+                height: auto;
             }
 
-            input {
-                padding: 8px 12px;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                margin-bottom: 10px;
-                width: 300px;
-                background-color: var(--background);
-                color: var(--text);
+            .grid-item input[type="checkbox"] {
+                position: absolute;
+                transform: scale(1.5);
+                margin: 5px;
+                bottom: 5px;
+                right: 5px;
             }
 
             button {
@@ -145,7 +140,7 @@
                 color: var(--ancher-color);
                 text-decoration: none;
             }
-            
+
             a:hover {
                 text-decoration: underline;
             }
@@ -155,37 +150,43 @@
                     max-width: 80%;
                 }
             }
+
+            @media (max-width: 450px) {
+                .grid-item img {
+                    width: 50px;
+                }
+                .grid-item input[type="checkbox"] {
+                    transform: scale(1.2);
+                    margin-right: 10px;
+                    margin-bottom: 5px;
+                }
+            }
         </style>
     </head>
     <body>
         <div class="captcha-container">
             <h2 ntr="1">Beep beop Boop?</h2>
             <p>Before you can see the page you have to prove that you are not a robot!</p>
+            <p>Select all images that contain <strong>{{ captcha_text }}</strong>:</p>
             {% if error|default %}
             <p style="color: #ff0000;margin:10px;">
                 {{ error }}
             </p>
             {% endif %}
             <form action="{{ current_url }}" method="GET">
-                <div class="captcha-image">
-                    <img src="{{ text_captcha }}" alt="Captcha Image">
-                    <input type="text" name="textCaptcha" placeholder="Enter what you see in the picture." required>
+                <div class="grid-container">
+                    {% for image in captcha_images %}
+                    <div class="grid-item">
+                        <img src="{{ image }}">
+                        <input type="checkbox" name="{{ loop.index }}" value="true">
+                    </div>
+                    {% endfor %}
                 </div>
-                {% if audio_captcha|default %}
-                <div class="captcha-audio">
-                    <audio controls>
-                        <source src="{{ audio_captcha }}" type="audio/wav">
-                        Your browser does not support the audio element.
-                    </audio>
-                    <input type="text" name="audioCaptcha" placeholder="Enter what you hear." required>
-                </div>
-                {% endif %}
-                <input type="hidden" name="captchatoken" value="{{ captcha_token }}">
-                <input type="hidden" name="captchasolved" value="1">
+                <input type="hidden" name="ct" value="{{ captchatoken }}">
                 <button type="submit">Check</button>
             </form>
             <div class="captchaify-text">
-                <a href="?captchaify_changelanguage=1&language={{ language }}">🌐Change Language</a> - 
+                <a href="?ccl=1&language={{ language }}">🌐Change Language</a> - 
                 <span id="choose-dark"><a class="captchaify-link" href="?theme=dark">Dark Mode</a> - </span><span id="choose-light"><a class="captchaify-link" href="?theme=light">Light Mode</a> - </span>
                 <a href="https://github.com/tn3w/flask_Captchaify" target="_blank">About Captchaify</a>
             </div>
