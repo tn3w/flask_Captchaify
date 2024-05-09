@@ -874,11 +874,11 @@ class Captchaify:
 
             theme, is_default_theme = WebPage.client_theme(request)
             if not is_default_theme:
-                url += '&theme=' + theme
+                url += '&theme=' + quote(theme)
 
             language, is_default_language = WebPage.client_language(request)
             if not is_default_language:
-                url += '&language=' + language
+                url += '&language=' + quote(language)
 
             return redirect(url)
 
