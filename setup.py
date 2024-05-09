@@ -24,13 +24,11 @@ long_description = '<p align="center"><a rel="noreferrer noopener" href="https:/
                     'ttps://libraries.io/pypi/flask-Captchaify"><img alt="Libraries.io" src="http'+\
                     's://img.shields.io/badge/Libraries.io-141e24.svg?&style=for-the-badge&logo=n'+\
                     'pm&logoColor=white"></a>\n' + long_description
-long_description = long_description.split("[^1]: Text and,")[0]
-long_description = long_description.replace("[^1]", "").replace("[^2]", "")\
-    .replace("[^3]", "").replace("[^4]", "").replace("> [!NOTE]", "")
+long_description.replace('[!TIP]', 'Tip:', '[!CAUTION]', 'Caution:')
 
 setup(
     name='flask_Captchaify',
-    version='1.6.8.1',
+    version='1.6.8.2',
     description='Protect against bots and DDoS attacks',
     long_description=long_description,
     long_description_content_type='text/markdown',

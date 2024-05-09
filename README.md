@@ -16,13 +16,16 @@ A DDoS defense system for flask applications, first sends users to a captcha pag
 > use the `default_captcha_type` argument to set the captcha with `text` back to text
 
 Todos:
-- [ ] Captcha type with animals or emojis
+- [ ] Captcha data set with emojis
 - [ ] Captcha type with multiclick
 - [ ] Add used captcha id to text captcha
 - [ ] Captcha or blocking rules based on client_ip and client_ip_info (e.g. blocking of certain IP countries)
 
 ## How does flask_Captchaify work?
-If needed, a captcha is displayed to the user (or the robot) based on the strength set.[^1] Javascript is not needed for this, as the content is rendered on the server.[^2]
+If needed, a captcha is displayed to the user (or the robot) based on the strength set. Javascript is not needed for this, as the content is rendered on the server. If the captcha is fulfilled correctly, a token is created that stores the client's data in encrypted form and is used to confirm fulfillment with each request. It is stored as a cookie and as the url Arg `captcha`.
+
+> [!TIP]
+> The `captcha`, `language` and `theme` Arg is automatically inserted in all anchors on your HTML page
 
 An example script could look like this:
 ```python
@@ -42,13 +45,13 @@ if __name__ == "__main__":
 
 ## Application purposes
 A few application purposes:
-  - Protect against DDoS attacks [^3]
+  - Protect against DDoS attacks
   - Your website contains content that should not be read by a robot
   - A login website
   - A dark web page
 
 ### Why should you use Captchaify if you host a Flask server?
-A quick and easy implementation allows even small websites or a small team of developers to quickly get bot protection. It also doesn't use third-party providers, which limits data collection from Google, Facebook and the creepy data brokers.[^4] Everything is open source, meaning you can rewrite the code yourself and perhaps make it more private.
+A quick and easy implementation allows even small websites or a small team of developers to quickly get bot protection. It also doesn't use third-party providers, which limits data collection from Google, Facebook and the creepy data brokers. Everything is open source, meaning you can rewrite the code yourself and perhaps make it more private.
 
 # Instructions
 
@@ -94,24 +97,33 @@ For more information, see the sample code above.
    captchaify = Captchaify(app, captcha_types={"/": "oneclick", "/login": "text"})
    ```
 
-   When using "*" before or after the urlpath / endpoint you can address multiple urls.
+   When using "\*" before or after the urlpath / endpoint you can address multiple urls. "\*" means every possible letter / number or special character.
 
-   Example of a website where all urls with /dev/ are using oneclick captchas, all urls starting with "/login/" displays an text based captcha and all urls ending with "/register/" have oneclick captchas:
+   Example of a website where all urls with "/dev/" e.g. `/account/dev/settings` or `/dev/portal` are using oneclick captchas, all urls starting with "/login" e.g. `/login` or `/login/2fa` displays an text based captcha and all urls ending with "/register/" e.g. `/register` or `/game/register` have oneclick captchas:
    ```python
-   captchaify = Captchaify(app, captcha_types={"*/dev/*": "oneclick", "/login/*": "text", "*/register/": "oneclick"})
+   captchaify = Captchaify(app, captcha_types={"*/dev/*": "oneclick", "/login*": "text", "*/register": "oneclick"})
    ```
    
    All captcha types:
-   | Name of captcha type | Displayed Captchas                                                       |
-   | --------------       | ------------------------------------------------------------------------ |
-   | oneclick (Default)   | The user only needs one click to confirm that he is not a bot            |
-   | text                 | The user enters a text combination from an image into an input (obsolete)|
+   | Name of captcha type | Displayed Captchas                                                        |
+   | --------------       | ------------------------------------------------------------------------- |
+   | oneclick (Default)   | The user only needs one click to confirm that he is not a bot             |
+   | multiclick           | The user must select several images that match a motif (harder)           |
+   | text                 | The user enters a text combination from an image into an input (obsolete) |
+
+   To specify the exact data set, you have to add it after the captcha_type with a `_` as separator, e.g. `oneclick_animals` or if you use a custom data set: `oneclick_custom`. If you use a text captcha, you do not need a data set.
+
+   Here are all the ready-made data sets:
+   | Name of dataset | Displayed Captchas                                                                                 |
+   | --------------- | -------------------------------------------------------------------------------------------------- |
+   | keys            | Displays images based on specific keywords of landscapes, objects, and more (default for oneclick) |
+   | animals         | Displays 50 different animal species (default for multiclick)                                      |
 
 
 3. `dataset_size` Arg
 
-   The size of the data set with e.g. images and keywords that determine how much of a data set is used, if a lot is used this can reduce RAM capacity but also increase security
-   Either a tuple of 2 numbers where the first indicates how many images per keyword (always the first ones) can be used (recommended around 20, maximum 200 or more depending on the data set) and the second number how many keywords are e.g. (images_per_keyword, number_of_keywords), default setting: (20, 100)
+   The size of the data set with e.g. images and keywords that determine how much of a data set is used, if a lot is used this can reduce RAM capacity but also increase security.
+   Either a tuple of 2 numbers where the first indicates how many images per keyword (always the first ones) can be used (recommended around 20, maximum 200 or more depending on the data set) and the second number how many keywords are e.g. (images_per_keyword, number_of_keywords), default setting: (20, 100).
 
    But can also be a string for prefabricated dimensions:
    | value             | corresponding tuple |
@@ -124,8 +136,8 @@ For more information, see the sample code above.
    | smaller           | (20, 8)             |
    | little            | (6, 8)              |
 
-   The more images per keyword, the more inaccurate the user rate becomes, as images further behind in the image search and in the data set could no longer show the keyword
-   It is recommended that you generate your own dataset as the default data could be trained, use the script written in src/flask_Captchaify/datasets and put the file in a folder and use the `dataset_dir` arg to use it
+   The more images per keyword, the more inaccurate the user rate becomes, as images further behind in the image search and in the data set could no longer show the keyword.
+   It is recommended that you generate your own dataset as the default data could be trained, use the script written in `src/flask_Captchaify/datasets` and put the file in a folder and use the `dataset_dir` Arg to use it.
 
    Example of a website that uses 100 images per keyword and 140 keywords:
    ```python
@@ -145,7 +157,7 @@ For more information, see the sample code above.
    A data set should be a json file and have the following names in the folder:
    ```
    dataset_dir\
-          \oneclick_keys.json
+          \keys.json
    ```
 
 
@@ -158,7 +170,7 @@ For more information, see the sample code above.
    captchaify = Captchaify(app, actions={"/": "let", "/login": "fight", "/register": "block"})
    ```
 
-   When using "*" before or after the urlpath / endpoint you can address multiple urls.
+   When using "\*" before or after the urlpath / endpoint you can address multiple urls. "\*" means every possible letter / number or special character.
 
    Example of a website where all urls with /api/ are allowed through, all urls starting with "/dogs/" show everyone a captcha and all urls ending with "/cats/" block bots:
    ```python
@@ -196,6 +208,9 @@ For more information, see the sample code above.
 7. `rate_limits` Arg
 
    To change the rate_limit and max_rate_limit for a specific route or endpoint use the rate_limits arg.
+
+   When using "*" before or after the urlpath / endpoint you can address multiple urls, like actions.
+
    The syntax is a bit different from the others, because two values are specified `{"route": (rate_limit, max_rate_limit), "endpoint": (rate_limit, max_rate_limit)}`. The variable rate_limit must be a number indicating how many requests per minute can come from a given ip. max_rate_limit indicates how many requests can come from all ips per minute, also a number.
 
    Example of a website that has a specific rate_limit on /api/:
@@ -212,6 +227,8 @@ For more information, see the sample code above.
    ```python
    captchaify = Captchaify(app, template_dirs={"/api/*": "/path/to/special/template/directory"})
    ```
+
+   When using "*" before or after the urlpath / endpoint you can address multiple urls, like actions.
 
    A template directory can look like this:
    ```
@@ -302,8 +319,7 @@ For more information, see the sample code above.
    captchaify = Captchaify(app, without_cookies=True)
    ```
 
-
-9. `block_crawler` Arg
+17. `block_crawler` Arg
 
    If True, crawlers like Googlebot, further are estimated via their user agent as suspicious and not the website, good for websites that should not be crawled (Default: True)
 
@@ -338,10 +354,3 @@ For more information, see the sample code above.
    | tor                  | [SecOps-Institute/Tor-IP-Addresses](https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst) on GitHub is asked for Tor Ipv4 and Ipv6 addresses and the Ip address is compared with this list |
    | ipapi                | [Ipapi](https://ipapi.com) is requested with the Ip and the result of the fields "proxy" and "hosting" is used                                              |
    | stopforumspam        | [StopForumSpam](https://stopforumspam.com) is requested and the result is used                                                         |
-
-
-
-[^1]: Text and, if the set strength is above 2, audio captchas can already be partially solved by robots, this is a solution for small websites or, e.g. dark web sites that cannot use third party solutions. However, it should still provide sufficient protection.
-[^2]: For a captcha to work, however, the user's IP and user agent must normally be stored. The website may also collect data such as language to translate the website. Cookies can also be used, this is decided by the server administrator.
-[^3]: Only if you have a large server that is supposed to protect a small server from DDoS attacks.
-[^4]: Only if you do not use other services such as Google Analytics/Meta Pixel on your website.

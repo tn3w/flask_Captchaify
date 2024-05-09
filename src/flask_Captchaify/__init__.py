@@ -34,8 +34,11 @@ TEMPLATE_DIR: Final[str] = os.path.join(WORK_DIR, 'templates')
 DATASETS_DIR: Final[str] = os.path.join(WORK_DIR, 'datasets')
 
 DATASET_PATHS: Final[dict] = {
-    'default': os.path.join(DATASETS_DIR, 'oneclick_keys.json'),
-    'oneclick_keys': os.path.join(DATASETS_DIR, 'oneclick_keys.json')
+    'default': os.path.join(DATASETS_DIR, 'keys.json'),
+    'oneclick_keys': os.path.join(DATASETS_DIR, 'keys.json'),
+    'multiclick_keys': os.path.join(DATASETS_DIR, 'keys.json'),
+    'oneclick_animals': os.path.join(DATASETS_DIR, 'animals.json'),
+    'multiclick_animals': os.path.join(DATASETS_DIR, 'animals.json'),
 }
 
 RATE_LIMIT_PATH: Final[str] = os.path.join(DATA_DIR, 'rate-limits.json')
@@ -68,7 +71,10 @@ CRAWLER_USER_AGENTS: Final[list] = [
     'sentibot', 'AI Crawler', 'Xenu Link Sleuth', 'Barkrowler', 'proximic',
     'Yahoo Link Preview', 'Cliqzbot', 'woobot', 'Barkrowler'
 ]
-ALL_CAPTCHA_TYPES: Final[list] = ['text', 'oneclick_keys'] # + emojis, animals
+ALL_CAPTCHA_TYPES: Final[list] = [
+    'text', 'oneclick_keys', 'multiclick_keys', 'oneclick_animals',
+    'multiclick_animals'
+] # + emojis, animals
 DATASET_SIZES: Final[dict] = {
     'largest': (200, 140),
     'large': (20, 140),
@@ -174,8 +180,12 @@ class Captchaify:
         self.rate_limits = rate_limits if isinstance(rate_limits, dict) else {}
         self.template_dirs = template_dirs if isinstance(template_dirs, dict) else {}
 
-        if default_captcha_type == 'oneclick':
+        if default_captcha_type.startswith('text'):
+            default_captcha_type = 'text'
+        elif default_captcha_type == 'oneclick':
             default_captcha_type = 'oneclick_keys'
+        elif default_captcha_type == 'multiclick':
+            default_captcha_type = 'multiclick_animals'
 
         self.default_captcha_type = default_captcha_type if default_captcha_type\
                                     in ALL_CAPTCHA_TYPES else 'default'
@@ -290,18 +300,26 @@ class Captchaify:
             for path, path_preference in preference.items():
                 if is_correct_route(path):
                     if preference_name != 'rate_limit':
-                        if path_preference == 'oneclick':
-                            path_preference = 'oneclick_keys'
+
+                        if preference_name == 'captcha_type':
+                            if path_preference.startswith('text'):
+                                path_preference = 'text'
+                            elif path_preference == 'oneclick':
+                                path_preference = 'oneclick_keys'
+                            elif path_preference == 'multiclick':
+                                path_preference = 'multiclick_animals'
+
                         current_url[preference_name] = path_preference
                     else:
                         current_url['rate_limit'], current_url['max_rate_limit'] = path_preference
 
         if self.dataset_dir is not None:
-            current_url['dataset_file'] = os.path.join(self.dataset_dir, current_url['captcha_type'] + '.json')
+            current_captcha_motif = current_url['captcha_type'].split('_')[1]
+            current_url['dataset_file'] = os.path.join(self.dataset_dir, current_captcha_motif + '.json')
 
         if self.dataset_dir is None or self.default_captcha_type != current_url['captcha_type']:
             current_url['dataset_file'] = DATASET_PATHS.get(
-                current_url['captcha_type'], os.path.join(DATASETS_DIR, 'oneclick_keys.json')
+                current_url['captcha_type'], os.path.join(DATASETS_DIR, 'keys.json')
             )
 
         return current_url
@@ -727,7 +745,7 @@ class Captchaify:
 
                 other_keywords.append(random_keyword)
 
-            random_index = secrets.choice([0, 1, 2, 3, 4])
+            random_index = secrets.choice(range(0, len(other_keywords) + 1))
             other_keywords.insert(random_index, keyword)
 
             captcha_token_data['other_keywords'] = other_keywords
@@ -755,12 +773,68 @@ class Captchaify:
                 captcha_images = captcha_images, captcha_token = captcha_token
             )
 
+        def display_captcha_multiclick(error: bool = False) -> str:
+            captcha_id = generate_random_string(30)
+
+            captcha_token_data = {
+                'id': captcha_id,
+                'hardness': str(hardness), 'ip': Hashing().hash(client_ip),
+                'user_agent': Hashing().hash(self._client_user_agent),
+                'path': Hashing().hash(url_path), 'time': str(int(time()))
+            }
+
+            dataset = self._load_dataset(dataset_file)
+
+            keywords = list(dataset.keys())
+
+            keyword = secrets.choice(keywords)
+            captcha_token_data['keyword'] = keyword
+
+            images = dataset[keyword]
+            original_image = get_random_image(images)
+
+            other_keywords = []
+            for _ in range(9):
+                is_original_keyword = secrets.choice(range(0, 17)) < 5
+                if is_original_keyword:
+                    other_keywords.append(keyword)
+                else:
+                    random_keyword = secrets.choice(keywords)
+                    while random_keyword == keyword or random_keyword in other_keywords:
+                        random_keyword = secrets.choice(keywords)
+                    other_keywords.append(random_keyword)
+
+            captcha_token_data['other_keywords'] = other_keywords
+
+            captcha_images = []
+            for keyword in other_keywords:
+                images = dataset[keyword]
+
+                random_image = get_random_image(images)
+                while random_image in captcha_images or random_image == original_image:
+                    random_image = get_random_image(images)
+                captcha_images.append(random_image)
+
+            original_image = convert_image_to_base64(manipulate_image_bytes(original_image))
+
+            captcha_images = [convert_image_to_base64(manipulate_image_bytes(image, is_small = True)) for image in captcha_images]
+            captcha_images = [{'id': str(i), 'src': image_data} for i, image_data in enumerate(captcha_images)]
+
+            captcha_token = self.sses.encrypt(captcha_token_data)
+
+            error = 'That was not the right one, try again!' if error else None
+
+            return self._correct_template(
+                'captcha_multiclick', error = error, original_image = original_image, 
+                captcha_images = captcha_images, captcha_token = captcha_token
+            )
 
         captcha_display_functions = {
             'text': display_captcha_text,
-            'oneclick_keys': display_captcha_oneclick
+            'oneclick': display_captcha_oneclick,
+            'multiclick': display_captcha_multiclick,
         }
-        captcha_display_function = captcha_display_functions.get(captcha_type, display_captcha_oneclick)
+        captcha_display_function = captcha_display_functions.get(captcha_type.split('_')[0], display_captcha_oneclick)
 
 
         def valid_captcha(hardness: str):
@@ -868,7 +942,7 @@ class Captchaify:
         if request.args.get('ct') is not None:
             captcha_token = request.args.get('ct')
 
-            if captcha_type == 'oneclick_keys':
+            if captcha_type.split('_')[0] == 'oneclick':
                 choosen_image = request.args.get('ci')
                 if not None in [choosen_image, captcha_token]:
                     decrypted_token_data = self.sses.decrypt(captcha_token, CAPTCHA_TOKEN_KEYS_ONECLICK)
