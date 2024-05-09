@@ -16,9 +16,10 @@ A DDoS defense system for flask applications, first sends users to a captcha pag
 > use the `default_captcha_type` argument to set the captcha with `text` back to text
 
 Todos:
+- [x] Captcha type with multiclick
+- [x] Captcha data set with animals
+- [x] Add used captcha id to text captcha
 - [ ] Captcha data set with emojis
-- [ ] Captcha type with multiclick
-- [ ] Add used captcha id to text captcha
 - [ ] Captcha or blocking rules based on client_ip and client_ip_info (e.g. blocking of certain IP countries)
 
 ## How does flask_Captchaify work?

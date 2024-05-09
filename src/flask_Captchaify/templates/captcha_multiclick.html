@@ -191,15 +191,15 @@
                 </p>
                 {% endif %}
                 <form action="{{ current_url }}" method="GET">
+                    <input type="hidden" name="ct" value="{{ captcha_token }}">
                     <div class="grid-container">
                         {% for image in captcha_images %}
                         <div class="grid-item">
                             <img src="{{ image.src }}">
-                            <input type="checkbox" name="ci{{ image.id }}" value="true">
+                            <input type="checkbox" name="ci{{ image.id }}" value="1">
                         </div>
                         {% endfor %}
                     </div>
-                    <input type="hidden" name="ct" value="{{ captcha_token }}">
                     <button type="submit">Check</button>
                 </form>
             </div>

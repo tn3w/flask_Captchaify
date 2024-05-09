@@ -16,15 +16,16 @@ import random
 import secrets
 from typing import Optional, Final, Union
 from time import time
-from urllib.parse import urlparse, parse_qs, quote
+from urllib.parse import urlparse, quote
 from base64 import b64encode
 from bs4 import BeautifulSoup
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
 from flask import Flask, Response, request, g, abort, send_file, make_response, redirect
-from .utils import JSON, Hashing, SymmetricCrypto, SSES, WebPage, get_work_dir, generate_random_string,\
-    get_client_ip, get_ip_info, remove_args_from_url, request_tor_ips, is_stopforumspam_spammer,\
-    search_languages, get_random_image, manipulate_image_bytes, convert_image_to_base64, render_template
+from .utils import JSON, Hashing, SymmetricCrypto, SSES, WebPage, get_work_dir, get_client_ip,\
+    generate_random_string, get_ip_info, remove_args_from_url, request_tor_ips, render_template,\
+    is_stopforumspam_spammer, search_languages, get_random_image, manipulate_image_bytes,\
+    convert_image_to_base64
 
 
 WORK_DIR: Final[str] = get_work_dir()
@@ -91,9 +92,11 @@ ALL_TEMPLATE_TYPES: Final[list] = [
     'block', 'rate_limited', 'change_language'
 ]
 ALL_THEMES: Final[list] = ['dark', 'light']
-CAPTCHA_TOKEN_KEYS: Final[list] = ['hardness', 'ip', 'user_agent',
-                                   'path', 'time', 'text', 'audio']
-CAPTCHA_TOKEN_KEYS_ONECLICK: Final[list] = [
+CAPTCHA_TOKEN_TEXT: Final[list] = [
+    'id', 'hardness', 'ip', 'user_agent',
+    'path', 'time', 'text', 'audio'
+]
+CAPTCHA_TOKEN_CLICK: Final[list] = [
     'id', 'hardness', 'ip', 'user_agent',
     'path', 'time', 'keyword', 'other_keywords'
 ]
@@ -164,7 +167,8 @@ class Captchaify:
             app = Flask(__name__)
 
         if isinstance(dataset_size, str):
-            self.max_dataset_images, self.max_dataset_keys = DATASET_SIZES.get(dataset_size, (20, 100))
+            self.max_dataset_images, self.max_dataset_keys =\
+                DATASET_SIZES.get(dataset_size, (20, 100))
         elif isinstance(dataset_size, tuple):
             self.max_dataset_images, self.max_dataset_keys = dataset_size
         else:
@@ -314,7 +318,9 @@ class Captchaify:
 
         if self.dataset_dir is not None:
             current_captcha_motif = current_url['captcha_type'].split('_')[1]
-            current_url['dataset_file'] = os.path.join(self.dataset_dir, current_captcha_motif + '.json')
+            current_url['dataset_file'] = os.path.join(
+                self.dataset_dir, current_captcha_motif + '.json'
+            )
 
         if self.dataset_dir is None or self.default_captcha_type != current_url['captcha_type']:
             current_url['dataset_file'] = DATASET_PATHS.get(
@@ -334,7 +340,7 @@ class Captchaify:
             if isinstance(g.client_ip, str):
                 return g.client_ip
 
-        client_ip, is_invalid_ip = get_client_ip()
+        client_ip, is_invalid_ip = get_client_ip(request)
 
         g.client_ip = client_ip
         g.is_invalid_ip = is_invalid_ip
@@ -351,7 +357,7 @@ class Captchaify:
             if isinstance(g.is_invalid_ip, bool):
                 return g.is_invalid_ip
 
-        client_ip, is_invalid_ip = get_client_ip()
+        client_ip, is_invalid_ip = get_client_ip(request)
 
         g.client_ip = client_ip
         g.is_invalid_ip = is_invalid_ip
@@ -440,11 +446,12 @@ class Captchaify:
             max_dataset_keys = min(len(dataset.keys()), self.max_dataset_keys)
             for _ in range(max_dataset_keys):
                 random_keyword = secrets.choice(list(dataset.keys()))
-                while random_keyword in list(new_dataset.keys()):
+                while random_keyword in new_dataset:
                     random_keyword = secrets.choice(list(dataset.keys()))
                 new_dataset[random_keyword] = dataset[random_keyword]
 
-        dataset = {keyword: images[:self.max_dataset_images] for keyword, images in new_dataset.items()}
+        dataset = {keyword: images[:self.max_dataset_images]
+                   for keyword, images in new_dataset.items()}
 
         self.loaded_datasets[dataset_path] = dataset
         return dataset
@@ -498,7 +505,7 @@ class Captchaify:
         g.captchaify_captcha = None
         g.is_crawler = False
 
-        client_ip, is_invalid_ip = get_client_ip()
+        client_ip, is_invalid_ip = get_client_ip(request)
         client_user_agent = request.user_agent.string
 
         if client_ip is None or client_user_agent is None:
@@ -530,6 +537,7 @@ class Captchaify:
         template_dir = self._preferences['template_dir']
 
         page_path = None
+        file_name = None
 
         for file_name in os.listdir(template_dir):
             if file_name.startswith(template_type):
@@ -666,8 +674,10 @@ class Captchaify:
 
             :param error: Indicates whether there was an error in the previous captcha attempt.
             """
+            captcha_id = generate_random_string(30)
 
             captcha_token_data = {
+                'id': captcha_id,
                 'hardness': str(hardness), 'ip': Hashing().hash(client_ip),
                 'user_agent': Hashing().hash(self._client_user_agent),
                 'path': Hashing().hash(url_path), 'time': str(int(time()))
@@ -760,8 +770,13 @@ class Captchaify:
 
             original_image = convert_image_to_base64(manipulate_image_bytes(original_image))
 
-            captcha_images = [convert_image_to_base64(manipulate_image_bytes(image, is_small = True)) for image in captcha_images]
-            captcha_images = [{'id': str(i), 'src': image_data} for i, image_data in enumerate(captcha_images)]
+            captcha_images = [
+                convert_image_to_base64(
+                    manipulate_image_bytes(image, is_small = True)
+                    ) for image in captcha_images
+            ]
+            captcha_images = [{'id': str(i), 'src': image_data}
+                              for i, image_data in enumerate(captcha_images)]
 
             captcha_token = self.sses.encrypt(captcha_token_data)
 
@@ -794,7 +809,7 @@ class Captchaify:
 
             other_keywords = []
             for _ in range(9):
-                is_original_keyword = secrets.choice(range(0, 17)) < 5
+                is_original_keyword = secrets.choice(range(0, 17)) < 7
                 if is_original_keyword:
                     other_keywords.append(keyword)
                 else:
@@ -802,6 +817,10 @@ class Captchaify:
                     while random_keyword == keyword or random_keyword in other_keywords:
                         random_keyword = secrets.choice(keywords)
                     other_keywords.append(random_keyword)
+
+            if not any(keyword == keyw for keyw in other_keywords):
+                random_index = secrets.choice(range(0, len(other_keywords) + 1))
+                other_keywords[random_index] = keyword
 
             captcha_token_data['other_keywords'] = other_keywords
 
@@ -816,8 +835,13 @@ class Captchaify:
 
             original_image = convert_image_to_base64(manipulate_image_bytes(original_image))
 
-            captcha_images = [convert_image_to_base64(manipulate_image_bytes(image, is_small = True)) for image in captcha_images]
-            captcha_images = [{'id': str(i), 'src': image_data} for i, image_data in enumerate(captcha_images)]
+            captcha_images = [
+                convert_image_to_base64(
+                    manipulate_image_bytes(image, is_small = True)
+                    ) for image in captcha_images
+            ]
+            captcha_images = [{'id': str(i), 'src': image_data}
+                              for i, image_data in enumerate(captcha_images)]
 
             captcha_token = self.sses.encrypt(captcha_token_data)
 
@@ -828,12 +852,15 @@ class Captchaify:
                 captcha_images = captcha_images, captcha_token = captcha_token
             )
 
+
         captcha_display_functions = {
             'text': display_captcha_text,
             'oneclick': display_captcha_oneclick,
             'multiclick': display_captcha_multiclick,
         }
-        captcha_display_function = captcha_display_functions.get(captcha_type.split('_')[0], display_captcha_oneclick)
+        captcha_display_function = captcha_display_functions.get(
+            captcha_type.split('_')[0], display_captcha_oneclick
+        )
 
 
         def valid_captcha(hardness: str):
@@ -941,67 +968,52 @@ class Captchaify:
         if request.args.get('ct') is not None:
             captcha_token = request.args.get('ct')
 
-            if captcha_type.split('_')[0] == 'oneclick':
-                choosen_image = request.args.get('ci')
-                if not None in [choosen_image, captcha_token]:
-                    decrypted_token_data = self.sses.decrypt(captcha_token, CAPTCHA_TOKEN_KEYS_ONECLICK)
-                    if decrypted_token_data is not None:
-                        captcha_token_hardness = decrypted_token_data['hardness']
+            required_field = {
+                'oneclick': request.args.get('ci'),
+                'multiclick': 1, 'text': request.args.get('tc')
+            }
+            encryption_keys = {'text': CAPTCHA_TOKEN_TEXT}.get(captcha_type, CAPTCHA_TOKEN_CLICK)
 
-                        captcha_id = decrypted_token_data['id']
-                        if not self._check_used_captcha_id(captcha_id):
-                            if captcha_token_hardness.isdigit():
-                                captcha_token_hardness = hardness
-                            else:
-                                captcha_token_hardness = int(captcha_token_hardness)
+            captcha_type = captcha_type.split('_')[0]
 
-                            original_keyword = decrypted_token_data['keyword']
-                            keywords: list = decrypted_token_data['other_keywords']
-                            correct_index = keywords.index(original_keyword)
+            if required_field.get(captcha_type, 1) is not None:
+                decrypted_token_data = self.sses.decrypt(captcha_token, encryption_keys)
+                if decrypted_token_data is not None:
+                    captcha_token_hardness = decrypted_token_data['hardness']
 
-                            if not hardness < captcha_token_hardness:
-                                comparison_path = Hashing()\
-                                    .compare(url_path, decrypted_token_data['path'])
-
-                                comparison_ip = Hashing()\
-                                    .compare(client_ip, decrypted_token_data['ip'])
-
-                                comparison_user_agent = Hashing()\
-                                    .compare(self._client_user_agent,
-                                            decrypted_token_data['user_agent'])
-
-                                self._add_used_captcha_id(captcha_id)
-                                if not comparison_path or \
-                                    int(time()) - int(decrypted_token_data['time']) > 120 or \
-                                        (not comparison_ip and not comparison_user_agent) or \
-                                            str(choosen_image) != str(correct_index):
-                                    is_failed_captcha = True
-                                else:
-                                    return valid_captcha(captcha_token_hardness)
-            else:
-                text_captcha = request.args.get('tc')
-                audio_captcha = request.args.get('ac')
-                if not None in [text_captcha, captcha_token]:
-                    decrypted_token_data = self.sses.decrypt(captcha_token, CAPTCHA_TOKEN_KEYS)
-                    if decrypted_token_data is not None:
-                        captcha_token_hardness = decrypted_token_data['hardness']
-
+                    captcha_id = decrypted_token_data['id']
+                    if not self._check_used_captcha_id(captcha_id):
                         if captcha_token_hardness.isdigit():
                             captcha_token_hardness = hardness
                         else:
                             captcha_token_hardness = int(captcha_token_hardness)
 
-                        is_failing = False
+                    if captcha_type in ['oneclick', 'multiclick']:
+                        original_keyword = decrypted_token_data['keyword']
+                        keywords: list = decrypted_token_data['other_keywords']
+
+                        checks = {
+                            'oneclick': str(keywords.index(original_keyword)) !=\
+                                str(request.args.get('ci')),
+                            'multiclick':
+                            [i for i, x in enumerate(keywords) if x == original_keyword] !=\
+                            [int(key[-1]) for key, value in request.args.items()
+                             if value.lower() == '1' and key.startswith('ci')]
+                        }
+                        check = checks.get(captcha_type, False)
+                    else:
+                        text_captcha = request.args.get('tc')
+                        audio_captcha = request.args.get('ac')
 
                         if captcha_token_hardness == 3:
                             captcha_token_audio = decrypted_token_data['audio']
 
                             if hardness == 3:
                                 if audio_captcha is None:
-                                    is_failing = True
+                                    is_failed_captcha = True
                                 else:
                                     if str(audio_captcha) != str(captcha_token_audio):
-                                        is_failing = True
+                                        is_failed_captcha = True
                             else:
                                 if audio_captcha is not None:
                                     if str(audio_captcha) == str(captcha_token_audio):
@@ -1009,31 +1021,29 @@ class Captchaify:
                                 else:
                                     captcha_token_hardness = hardness
 
-                        if not is_failing:
-                            if not hardness < captcha_token_hardness:
-                                comparison_path = Hashing()\
-                                    .compare(url_path, decrypted_token_data['path'])
+                        if not is_failed_captcha:
+                            check = str(text_captcha.lower()) !=\
+                                str(decrypted_token_data['text'].lower())
 
-                                comparison_ip = Hashing()\
-                                    .compare(client_ip, decrypted_token_data['ip'])
+                    if not is_failed_captcha:
+                        if not hardness < captcha_token_hardness:
+                            comparison_path = Hashing()\
+                                .compare(url_path, decrypted_token_data['path'])
 
-                                comparison_user_agent = Hashing()\
-                                    .compare(self._client_user_agent,
-                                            decrypted_token_data['user_agent'])
+                            comparison_ip = Hashing()\
+                                .compare(client_ip, decrypted_token_data['ip'])
 
-                                if not comparison_path or \
-                                    int(time()) - int(decrypted_token_data['time']) > 180 or \
-                                        (not comparison_ip and not comparison_user_agent) or \
-                                            str(text_captcha.lower()) !=\
-                                                str(decrypted_token_data['text'].lower()):
-                                    is_failed_captcha = True
+                            comparison_user_agent = Hashing()\
+                                .compare(self._client_user_agent,
+                                        decrypted_token_data['user_agent'])
 
-                                else:
-                                    return valid_captcha(captcha_token_hardness)
-                            else:
+                            self._add_used_captcha_id(captcha_id)
+                            if not comparison_path or \
+                                int(time()) - int(decrypted_token_data['time']) > 120 or \
+                                    (not comparison_ip and not comparison_user_agent) or check:
                                 is_failed_captcha = True
-                        else:
-                            is_failed_captcha = True
+                            else:
+                                return valid_captcha(captcha_token_hardness)
 
         captcha_string = None
         if request.args.get('captcha') is not None:

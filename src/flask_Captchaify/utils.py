@@ -25,9 +25,9 @@ import threading
 import json
 from typing import Union, Optional, Final, Tuple
 from time import time
-from PIL import Image, ImageFilter
 import ipaddress
-from flask import request, Request
+from PIL import Image, ImageFilter
+from werkzeug import Request
 from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
 from googletrans import Translator
 from bs4 import BeautifulSoup, Tag
@@ -48,6 +48,12 @@ if not os.path.exists(os.path.join(CURRENT_DIR, 'test.env')):
     import pkg_resources
 
 def get_work_dir():
+    """
+    Determine the working directory for the application.
+
+    :return: The working directory path.
+    """
+
     if os.path.exists(os.path.join(CURRENT_DIR, 'test.env')):
         return CURRENT_DIR
 
@@ -109,7 +115,8 @@ TOR_EXIT_IPS_URL: Final[str] = 'https://check.torproject.org/torbulkexitlist'
 
 def rearrange_url(url: str, args_to_remove: list) -> str:
     """
-    Rearrange the arguments of a URL by removing specified arguments and moving others to the beginning.
+    Rearrange the arguments of a URL by removing specified
+    arguments and moving others to the beginning.
 
     :param url: The URL to rearrange.
     :param args_to_remove: A list of arguments to remove from the URL.
@@ -308,7 +315,7 @@ def manipulate_image_bytes(image_data: bytes, is_small: bool = False) -> bytes:
     return output_bytes.read()
 
 
-def get_client_ip() -> Union[Optional[str], bool]:
+def get_client_ip(request: Request) -> Union[Optional[str], bool]:
     """
     Get the client IP in v4 or v6
     """
@@ -708,8 +715,6 @@ class WebPage:
                 and translation["from_lang"] == from_lang\
                     and translation["to_lang"] == to_lang:
                 return translation["translated_output"]
-
-        translator = Translator()
 
         try:
             translated_output = translator.translate(
