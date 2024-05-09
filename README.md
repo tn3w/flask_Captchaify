@@ -319,7 +319,7 @@ For more information, see the sample code above.
    captchaify = Captchaify(app, without_cookies=True)
    ```
 
-17. `block_crawler` Arg
+9. `block_crawler` Arg
 
    If True, crawlers like Googlebot, further are estimated via their user agent as suspicious and not the website, good for websites that should not be crawled (Default: True)
 

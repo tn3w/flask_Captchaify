@@ -24,7 +24,7 @@ long_description = '<p align="center"><a rel="noreferrer noopener" href="https:/
                     'ttps://libraries.io/pypi/flask-Captchaify"><img alt="Libraries.io" src="http'+\
                     's://img.shields.io/badge/Libraries.io-141e24.svg?&style=for-the-badge&logo=n'+\
                     'pm&logoColor=white"></a>\n' + long_description
-long_description.replace('[!TIP]', 'Tip:', '[!CAUTION]', 'Caution:')
+long_description = long_description.replace('[!TIP]', 'Tip:').replace('[!CAUTION]', 'Caution:')
 
 setup(
     name='flask_Captchaify',
