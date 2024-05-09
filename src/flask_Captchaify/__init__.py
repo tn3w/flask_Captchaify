@@ -270,9 +270,8 @@ class Captchaify:
 
                 if url.startswith(first_part) and url.endswith(second_part):
                     return True
-
             else:
-                if path == url_endpoint:
+                if path == url:
                     return True
 
             return False
