@@ -4,9 +4,8 @@ googletrans==3.1.0a0
 beautifulsoup4
 ipaddress
 Jinja2
-Pillow
+Pillow>=10.3.0 # not directly required, pinned by Snyk to avoid a vulnerability
 requests
-numpy
 bs4
 captcha
 bcrypt

@@ -26,9 +26,8 @@ import json
 from typing import Union, Optional, Final, Tuple
 from time import time
 from PIL import Image, ImageFilter
-import numpy as np
 import ipaddress
-from flask import request, g, Request
+from flask import request, Request
 from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
 from googletrans import Translator
 from bs4 import BeautifulSoup, Tag
