@@ -62,6 +62,10 @@ def get_work_dir():
 
 WORK_DIR: Final[str] = get_work_dir()
 DATA_DIR: Final[str] = os.path.join(WORK_DIR, 'data')
+
+if not os.path.isdir(DATA_DIR):
+    os.makedirs(DATA_DIR, exist_ok = True)
+
 ASSETS_DIR: Final[str] = os.path.join(WORK_DIR, 'assets')
 
 TOR_EXIT_IPS_LIST_PATH: Final[str] = os.path.join(DATA_DIR, 'tor-exit-ips.json')

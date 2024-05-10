@@ -30,6 +30,10 @@ from .utils import JSON, Hashing, SymmetricCrypto, SSES, WebPage, get_work_dir, 
 
 WORK_DIR: Final[str] = get_work_dir()
 DATA_DIR: Final[str] = os.path.join(WORK_DIR, 'data')
+
+if not os.path.isdir(DATA_DIR):
+    os.makedirs(DATA_DIR, exist_ok = True)
+
 ASSETS_DIR: Final[str] = os.path.join(WORK_DIR, 'assets')
 TEMPLATE_DIR: Final[str] = os.path.join(WORK_DIR, 'templates')
 DATASETS_DIR: Final[str] = os.path.join(WORK_DIR, 'datasets')
@@ -75,7 +79,7 @@ CRAWLER_USER_AGENTS: Final[list] = [
 ALL_CAPTCHA_TYPES: Final[list] = [
     'text', 'oneclick_keys', 'multiclick_keys', 'oneclick_animals',
     'multiclick_animals'
-] # + emojis, animals
+] # + emojis
 DATASET_SIZES: Final[dict] = {
     'largest': (200, 140),
     'large': (20, 140),
@@ -100,9 +104,6 @@ CAPTCHA_TOKEN_CLICK: Final[list] = [
     'id', 'hardness', 'ip', 'user_agent',
     'path', 'time', 'keyword', 'other_keywords'
 ]
-
-if not os.path.isdir(DATA_DIR):
-    os.mkdir(DATA_DIR)
 
 
 class Captchaify:
