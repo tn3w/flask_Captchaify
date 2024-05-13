@@ -249,7 +249,7 @@ class Captchaify:
             self.route_id = route_id
 
             @app.route('/blocked-' + route_id)
-            def blocked():
+            def blocked_captchaify():
                 return_path = get_return_path(request)
                 if return_path is None:
                     return_path = '/'
@@ -263,7 +263,7 @@ class Captchaify:
                 )
 
             @app.route('/rate_limited-' + route_id)
-            def rate_limited():
+            def rate_limited_captchaify():
                 return_path = get_return_path(request)
                 if return_path is None:
                     return_path = '/'
@@ -277,7 +277,7 @@ class Captchaify:
                 ), 418
 
             @app.route('/change_language-' + route_id)
-            def change_language():
+            def change_language_captchaify():
                 return_path = get_return_path(request)
                 if return_path is None:
                     return_path = '/'
@@ -288,7 +288,7 @@ class Captchaify:
                 return abort(404)
 
             @app.route('/captcha-' + route_id)
-            def captcha():
+            def captcha_captchaify():
                 return_path = get_return_path(request)
                 if return_path is None:
                     return_path = '/'
