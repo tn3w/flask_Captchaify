@@ -63,6 +63,14 @@ def get_work_dir():
 
 WORK_DIR: Final[str] = get_work_dir()
 DATA_DIR: Final[str] = os.path.join(WORK_DIR, 'data')
+<<<<<<< HEAD
+=======
+
+if not os.path.isdir(DATA_DIR):
+    os.makedirs(DATA_DIR, exist_ok = True)
+
+ASSETS_DIR: Final[str] = os.path.join(WORK_DIR, 'assets')
+>>>>>>> 635896af0219344fd32a8d2656c337aba5481071
 
 if not os.path.isdir(DATA_DIR):
     os.makedirs(DATA_DIR, exist_ok = True)
