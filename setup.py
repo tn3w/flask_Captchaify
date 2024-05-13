@@ -36,7 +36,7 @@ long_description = long_description.replace('[!TIP]', 'Tip:').replace('[!CAUTION
 
 setup(
     name='flask_Captchaify',
-    version='1.6.9.1',
+    version='1.6.9.2',
     description='Protect against bots and DDoS attacks',
     long_description=long_description,
     long_description_content_type='text/markdown',
