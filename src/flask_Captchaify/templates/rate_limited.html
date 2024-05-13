@@ -138,13 +138,13 @@
             <h1 class="error-text">Drink a cup of tea</h1>
             <p>It appears that you are sending an excessive number of requests per minute to this website. Please reduce the frequency of your requests.</p>
             <div class="main-link">
-                <a href="">Refresh webpage</a>
+                <a href="{% if return_url|default %}{{ return_url }}{% else %} {% endif %}">Refresh webpage</a>
             </div>
         </main>
         <footer>
             <nav>
                 <ul>
-                    <li><a href="{{ current_url_without_language }}{% if '?' in current_url_without_language %}&{% else %}?{% endif %}ccl=1">🌐Change Language</a></li>
+                    <li><a href="{% if route_id|default %}/change_language-{{ route_id }}?return_path={{ return_path }}{% else %}{{ current_url_without_language }}{% if '?' in current_url_without_language %}&{% else %}?{% endif %}ccl=1{% endif %}">🌐Change Language</a></li>
                     <li id="choose-light"><a href="{{ current_url_without_theme }}{% if '?' in current_url_without_theme %}&{% else %}?{% endif %}theme=light">Light Mode</a></li>
                     <li id="choose-dark"><a href="{{ current_url_without_theme }}{% if '?' in current_url_without_theme %}&{% else %}?{% endif %}theme=dark">Dark Mode</a></li>
                     <li>DDoS protection from <a href="https://github.com/tn3w/flask_Captchaify" target="_blank">Captchaify</a></li>

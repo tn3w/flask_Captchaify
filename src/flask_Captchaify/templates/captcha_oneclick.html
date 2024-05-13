@@ -145,14 +145,14 @@
             <div>
                 <img src="{{ original_image }}" alt="Original Image" class="square-image">
                 <p class="description">Select the picture that contains the same motif:</p>
-                {% if error|default %}
+                {% if error_message|default %}
                 <p style="color: #ff0000;margin:10px;">
-                    {{ error }}
+                    {{ error_message }}
                 </p>
                 {% endif %}
                 <div class="image-grid">
                     {% for image in captcha_images %}
-                    <a href="{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}ct={{ captcha_token }}&ci={{ image.id }}"><img src="{{ image.src }}" alt="Image {{ image.id }}" class="grid-image"></a>
+                    <a href="{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}ct={{ captcha_token }}&ci={{ image.id }}{% if return_path|default %}&return_path={{ return_path }}{% endif %}"><img src="{{ image.src }}" alt="Image {{ image.id }}" class="grid-image"></a>
                     {% endfor %}
                 </div>
             </div>
@@ -160,7 +160,7 @@
         <footer>
             <nav>
                 <ul>
-                    <li><a href="{{ current_url_without_language }}{% if '?' in current_url_without_language %}&{% else %}?{% endif %}ccl=1">🌐Change Language</a></li>
+                    <li><a href="{% if route_id|default %}/change_language-{{ route_id }}?return_path={{ return_path }}{% else %}{{ current_url_without_language }}{% if '?' in current_url_without_language %}&{% else %}?{% endif %}ccl=1{% endif %}">🌐Change Language</a></li>
                     <li id="choose-light"><a href="{{ current_url_without_theme }}{% if '?' in current_url_without_theme %}&{% else %}?{% endif %}theme=light">Light Mode</a></li>
                     <li id="choose-dark"><a href="{{ current_url_without_theme }}{% if '?' in current_url_without_theme %}&{% else %}?{% endif %}theme=dark">Dark Mode</a></li>
                     <li>DDoS protection from <a href="https://github.com/tn3w/flask_Captchaify" target="_blank">Captchaify</a></li>

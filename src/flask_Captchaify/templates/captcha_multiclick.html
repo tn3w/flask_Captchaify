@@ -185,9 +185,9 @@
             <div>
                 <img class="square-image" src="{{ original_image }}">
                 <p>Select all images that contain the same motif:</p>
-                {% if error|default %}
+                {% if error_message|default %}
                 <p style="color: #ff0000;margin:10px;">
-                    {{ error }}
+                    {{ error_message }}
                 </p>
                 {% endif %}
                 <form action="{{ current_url }}" method="GET">
@@ -200,6 +200,9 @@
                         </div>
                         {% endfor %}
                     </div>
+                    {% if return_path|default %}
+                    <input type="hidden" name="return_path" value="{{ return_path }}"
+                    {% endif %}
                     <button type="submit">Check</button>
                 </form>
             </div>
@@ -207,7 +210,7 @@
         <footer>
             <nav>
                 <ul>
-                    <li><a href="{{ current_url_without_language }}{% if '?' in current_url_without_language %}&{% else %}?{% endif %}ccl=1">🌐Change Language</a></li>
+                    <li><a href="{% if route_id|default %}/change_language-{{ route_id }}?return_path={{ return_path }}{% else %}{{ current_url_without_language }}{% if '?' in current_url_without_language %}&{% else %}?{% endif %}ccl=1{% endif %}">🌐Change Language</a></li>
                     <li id="choose-light"><a href="{{ current_url_without_theme }}{% if '?' in current_url_without_theme %}&{% else %}?{% endif %}theme=light">Light Mode</a></li>
                     <li id="choose-dark"><a href="{{ current_url_without_theme }}{% if '?' in current_url_without_theme %}&{% else %}?{% endif %}theme=dark">Dark Mode</a></li>
                     <li>DDoS protection from <a href="https://github.com/tn3w/flask_Captchaify" target="_blank">Captchaify</a></li>

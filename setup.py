@@ -5,8 +5,16 @@ https://github.com/tn3w/flask_Captchaify
 Made with 💩 in Germany by TN3W
 """
 
+import os
+import shutil
 from setuptools import setup, find_packages
+import pkg_resources
 from pip._internal.req import parse_requirements
+
+if pkg_resources.get_distribution('flask_Captchaify'):
+    data_dir = pkg_resources.resource_filename('flask_Captchaify', 'data')
+    if os.path.exists(data_dir):
+        shutil.rmtree(data_dir)
 
 requirements = [str(requirement.requirement)\
                 for requirement in list(parse_requirements("requirements.txt", session=False))]
@@ -28,7 +36,7 @@ long_description = long_description.replace('[!TIP]', 'Tip:').replace('[!CAUTION
 
 setup(
     name='flask_Captchaify',
-    version='1.6.9',
+    version='1.6.9.1',
     description='Protect against bots and DDoS attacks',
     long_description=long_description,
     long_description_content_type='text/markdown',

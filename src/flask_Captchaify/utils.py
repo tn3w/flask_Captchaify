@@ -16,13 +16,14 @@ import re
 import io
 import random
 from base64 import urlsafe_b64encode, urlsafe_b64decode, b64decode, b64encode
-from urllib.parse import urlparse, urlunparse, parse_qs, urlencode, quote
+from urllib.parse import urlparse, urlunparse, parse_qs, urlencode, quote, urljoin
 import gzip
 import hashlib
 import os
 import unicodedata
 import threading
 import json
+import pickle
 from typing import Union, Optional, Final, Tuple
 from time import time
 import ipaddress
@@ -62,11 +63,12 @@ def get_work_dir():
 
 WORK_DIR: Final[str] = get_work_dir()
 DATA_DIR: Final[str] = os.path.join(WORK_DIR, 'data')
-ASSETS_DIR: Final[str] = os.path.join(WORK_DIR, 'assets')
 
-TOR_EXIT_IPS_LIST_PATH: Final[str] = os.path.join(DATA_DIR, 'tor-exit-ips.json')
-STOPFORUMSPAM_CACHE_PATH: Final[str] = os.path.join(DATA_DIR, 'stopforumspam-cache.json')
-IP_API_CACHE_PATH: Final[str] = os.path.join(DATA_DIR, 'ipapi-cache.json')
+if not os.path.isdir(DATA_DIR):
+    os.makedirs(DATA_DIR, exist_ok = True)
+
+ASSETS_DIR: Final[str] = os.path.join(WORK_DIR, 'assets')
+CACHE_FILE_PATH: Final[str] = os.path.join(DATA_DIR, 'cache.pkl')
 
 ALL_THEMES: Final[list] = ['dark', 'light']
 UNWANTED_IPS: Final[list] = ['127.0.0.1', '192.168.0.1', '10.0.0.1',
@@ -140,6 +142,28 @@ def rearrange_url(url: str, args_to_remove: list) -> str:
     return rearranged_url
 
 
+def extract_path_and_args(url: str) -> str:
+    """
+    Extracts the path and arguments from the given URL.
+
+    :param url: The URL from which to extract the path and arguments.
+    :return: The path and arguments extracted from the URL
+    """
+
+    parsed_url = urlparse(url)
+
+    path = parsed_url.path
+
+    args_dict = parse_qs(parsed_url.query)
+    args_str = urlencode(args_dict, doseq=True)
+
+    path_and_args = path
+    if args_str:
+        path_and_args += '?' + args_str
+
+    return path_and_args
+
+
 def get_domain_from_url(url: str) -> str:
     """
     Extracts the domain from a given URL.
@@ -155,6 +179,39 @@ def get_domain_from_url(url: str) -> str:
     else:
         domain = parsed_url.netloc
     return domain
+
+
+def get_return_path(request: Request) -> Optional[str]:
+    """
+    Retrieves the return path from the request's arguments, if available.
+
+    :param request: The HTTP request object.
+    :return: The return path extracted from the request's arguments.
+    """
+
+    return_path = request.args.get('return_path')
+    if return_path is None:
+        return None
+    return extract_path_and_args(return_path)
+
+
+def get_return_url(return_path: str, request: Request) -> Optional[str]:
+    """
+    Constructs the return URL based on the return path extracted from the request.
+
+    :param request: The HTTP request object.
+    :return: The constructed return URL, or None if the return path is not available.
+    """
+
+    scheme = request.headers.get('X-Forwarded-Proto', '')
+    if scheme not in ['https', 'http']:
+        if request.is_secure:
+            scheme = 'https'
+        else:
+            scheme = 'http'
+
+    domain = urlparse(request.url).netloc
+    return urljoin(scheme + '://' + domain, return_path)
 
 
 def get_path_from_url(url: str) -> Optional[str]:
@@ -515,10 +572,90 @@ class JSON:
                 json.dump(data, file)
         return True
 
+class Pickle:
+    """
+    Class for loading / saving Pickle
+    """
+
+    @staticmethod
+    def load(file_name: str, default: Union[dict, list] = None) -> Union[dict, list]:
+        """
+        Function to load a JSON file securely.
+
+        :param file_name: The JSON file you want to load
+        :param default: Returned if no data was found
+        """
+
+        if not os.path.isfile(file_name):
+            if not default is None:
+                return default
+            return {}
+
+        if file_name not in file_locks:
+            file_locks[file_name] = threading.Lock()
+
+        with file_locks[file_name]:
+            with open(file_name, 'rb') as file:
+                data = pickle.load(file)
+            return data
+
+
+    @staticmethod
+    def dump(data: Union[dict, list], file_name: str) -> bool:
+        """
+        Function to save a JSON file securely.
+        
+        :param data: The data to be stored should be either dict or list
+        :param file_name: The file to save to
+        """
+
+        file_directory = os.path.dirname(file_name)
+        if not os.path.isdir(file_directory):
+            return False
+
+        if file_name not in file_locks:
+            file_locks[file_name] = threading.Lock()
+
+        with file_locks[file_name]:
+            with open(file_name, 'wb') as file:
+                pickle.dump(data, file)
+        return True
+
+
+class Cache(dict):
+    def __init__(self, file_name: str) -> None:
+        self.file_name = file_name
+        super().__init__()
+
+    def load(self) -> dict:
+        data = Pickle.load(CACHE_FILE_PATH)
+        if not self.file_name in data:
+            return {}
+        return data[self.file_name]
+
+    def __getitem__(self, key: any) -> any:
+        data = self.load()
+        return data.get(key, {})
+
+    def __setitem__(self, key: any, value: any) -> None:
+        data = Pickle.load(CACHE_FILE_PATH)
+        if not self.file_name in data:
+            data[self.file_name] = {}
+        data[self.file_name][key] = value
+        Pickle.dump(data, CACHE_FILE_PATH)
+        return
+
+    def __delitem__(self, key: any) -> None:
+        data = Pickle.load(CACHE_FILE_PATH)
+        if not self.file_name in data:
+            data[self.file_name] = {}
+        del data[self.file_name][key]
+        Pickle.dump(data, CACHE_FILE_PATH)
+        return
 
 LANGUAGES = JSON.load(os.path.join(ASSETS_DIR, 'languages.json'), [])
 LANGUAGE_CODES = [language['code'] for language in LANGUAGES]
-TRANSLATIONS_FILE_PATH = os.path.join(DATA_DIR, 'translations.json')
+TRANSLATIONS_FILE_PATH = os.path.join(DATA_DIR, 'translations.pkl')
 translator = Translator()
 
 
@@ -550,10 +687,17 @@ def render_template(template_dir: str, file_name: str,
     args["is_default_language"] = is_default_language
     args["alternate_languages"] = LANGUAGE_CODES
 
-    args["current_url"] = rearrange_url(WebPage.client_url(request), ['ct', 'ci', 'captcha'])
-    args["current_url_without_ccl"] = rearrange_url(args["current_url"], ['ccl'])
-    args["current_url_without_theme"] = rearrange_url(args["current_url"], ['theme'])
-    args["current_url_without_language"] = rearrange_url(args["current_url"], ['language'])
+    current_url = WebPage.client_url(request)
+    args["current_url"] = rearrange_url(current_url, ['ct', 'ci', 'captcha', 'return_path'])
+    args["current_url_without_ccl_and_lang"] = rearrange_url(current_url, ['ccl', 'language'])
+    args["current_url_without_ccl"] = rearrange_url(current_url, ['ccl'])
+    args["current_url_without_theme"] = rearrange_url(current_url, ['theme'])
+    args["current_url_without_language"] = rearrange_url(current_url, ['language'])
+    args["current_path"] = quote(
+        extract_path_and_args(
+            rearrange_url(request.url, ['theme', 'language'])
+        )
+    )
 
     html = WebPage.render_template(template_dir, file_name, html = None, **args)
     html = WebPage.translate(html, template_language, client_language)
@@ -655,7 +799,7 @@ class WebPage:
             else:
                 scheme = 'http'
 
-        return request.url.replace('http', scheme)
+        return scheme + '://' + request.url.split('://')[1]
 
 
     @staticmethod
@@ -708,7 +852,7 @@ class WebPage:
         if from_lang == to_lang or not text_to_translate:
             return text_to_translate
 
-        translations = JSON.load(TRANSLATIONS_FILE_PATH, [])
+        translations = Pickle.load(TRANSLATIONS_FILE_PATH, [])
 
         for translation in translations:
             if translation["text_to_translate"] == text_to_translate\
@@ -735,7 +879,7 @@ class WebPage:
         }
         translations.append(translation)
 
-        JSON.dump(translations, TRANSLATIONS_FILE_PATH)
+        Pickle.dump(translations, TRANSLATIONS_FILE_PATH)
 
         return translated_output
 
@@ -1097,7 +1241,7 @@ class SSES:
         new_values = []
         for value in values:
             if isinstance(value, list) or isinstance(value, dict):
-                value = '==json==' + json.dumps(value)
+                value = '§§' + b64encode(pickle.dumps(value)).decode('utf-8')
             new_values.append(value)
 
         text_data = self.separator.join(new_values)
@@ -1130,8 +1274,8 @@ class SSES:
                 break
 
             value = values[i]
-            if value.startswith('==json=='):
-                value = json.loads(value[8:])
+            if value.startswith('§§'):
+                value = pickle.loads(b64decode(value[1:].encode('utf-8')))
 
             data_dict[dict_key] = value
 
@@ -1146,14 +1290,14 @@ def request_tor_ips() -> list | None:
     :return: A list of Tor exit IPs.
     """
 
+    cache = Cache('tor_ips')
+
     tor_exit_ips = None
-    if os.path.isfile(TOR_EXIT_IPS_LIST_PATH):
-        ip_data = JSON.load(TOR_EXIT_IPS_LIST_PATH, None)
-        if ip_data is not None:
-            if isinstance(ip_data.get('time'), int):
-                if int(time()) - int(ip_data.get('time', time())) <= 604800:
-                    if isinstance(ip_data.get('ips'), list):
-                        tor_exit_ips = ip_data.get('ips')
+    ip_data = cache.load()
+    if isinstance(ip_data.get('time'), int):
+        if int(time()) - int(ip_data.get('time', time())) <= 604800:
+            if isinstance(ip_data.get('ips'), list):
+                tor_exit_ips = ip_data.get('ips')
 
     if tor_exit_ips is None:
         tor_exit_ips = []
@@ -1169,11 +1313,8 @@ def request_tor_ips() -> list | None:
             for line in response.text.split('\n'):
                 tor_exit_ips.append(line.strip())
 
-            JSON.dump(
-                {'time': int(time()), 'ips': tor_exit_ips}
-                , TOR_EXIT_IPS_LIST_PATH
-            )
-
+            cache['time'] = time()
+            cache['ips'] = tor_exit_ips
     return tor_exit_ips
 
 
@@ -1185,9 +1326,9 @@ def is_stopforumspam_spammer(ip_address: str) -> bool:
     :return: True if the IP address is listed as a spammer, False otherwise.
     """
 
-    stopforumspam_cache = JSON.load(STOPFORUMSPAM_CACHE_PATH)
+    cache = Cache('sfs')
 
-    for hashed_ip, ip_content in stopforumspam_cache.items():
+    for hashed_ip, ip_content in cache.load().items():
         comparison = Hashing().compare(ip_address, hashed_ip)
         if comparison:
 
@@ -1215,16 +1356,14 @@ def is_stopforumspam_spammer(ip_address: str) -> bool:
 
             hashed_ip_address = Hashing().hash(ip_address)
 
-            stopforumspam_cache[hashed_ip_address] = {
+            cache[hashed_ip_address] = {
                 'spammer': is_spammer,
                 'time': int(time())
             }
 
-            JSON.dump(stopforumspam_cache, STOPFORUMSPAM_CACHE_PATH)
             return is_spammer
-
     except (requests.exceptions.Timeout, requests.exceptions.RequestException,
-            json.JSONDecodeError):
+            pickle.UnpicklingError):
         pass
 
     return False
@@ -1237,9 +1376,9 @@ def get_ip_info(ip_address: str) -> dict:
     :param ip_address: The client IP
     """
 
-    ip_api_cache = JSON.load(IP_API_CACHE_PATH)
+    cache = Cache('ipapi')
 
-    for hashed_ip, crypted_data in ip_api_cache.items():
+    for hashed_ip, crypted_data in cache.load().items():
         comparison = Hashing().compare(ip_address, hashed_ip)
         if comparison:
             data = SymmetricCrypto(ip_address).decrypt(crypted_data)
@@ -1250,7 +1389,7 @@ def get_ip_info(ip_address: str) -> dict:
                     .get(data.split('-&%-')[i], data.split('-&%-')[i])
 
             if int(time()) - int(data_json['time']) > 518400:
-                del ip_api_cache[hashed_ip]
+                del cache[hashed_ip]
                 break
 
             return data_json
@@ -1274,8 +1413,7 @@ def get_ip_info(ip_address: str) -> dict:
             crypted_response = SymmetricCrypto(ip_address).encrypt(response_string)
             hashed_ip = Hashing().hash(ip_address)
 
-            ip_api_cache[hashed_ip] = crypted_response
-            JSON.dump(ip_api_cache, IP_API_CACHE_PATH)
+            cache[hashed_ip] = crypted_response
 
             return response_json
 

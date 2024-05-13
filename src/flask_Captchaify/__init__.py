@@ -22,14 +22,19 @@ from bs4 import BeautifulSoup
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
 from flask import Flask, Response, request, g, abort, send_file, make_response, redirect
-from .utils import JSON, Hashing, SymmetricCrypto, SSES, WebPage, get_work_dir, get_client_ip,\
-    generate_random_string, get_ip_info, remove_args_from_url, request_tor_ips, render_template,\
-    is_stopforumspam_spammer, search_languages, get_random_image, manipulate_image_bytes,\
-    convert_image_to_base64
+from .utils import JSON, Pickle, Hashing, SymmetricCrypto, SSES, WebPage, get_work_dir,\
+    get_client_ip, generate_random_string, get_ip_info, remove_args_from_url, request_tor_ips,\
+    render_template, is_stopforumspam_spammer, search_languages, get_random_image,\
+    manipulate_image_bytes, convert_image_to_base64, get_return_path, get_return_url,\
+    extract_path_and_args, rearrange_url
 
 
 WORK_DIR: Final[str] = get_work_dir()
 DATA_DIR: Final[str] = os.path.join(WORK_DIR, 'data')
+
+if not os.path.isdir(DATA_DIR):
+    os.makedirs(DATA_DIR, exist_ok = True)
+
 ASSETS_DIR: Final[str] = os.path.join(WORK_DIR, 'assets')
 TEMPLATE_DIR: Final[str] = os.path.join(WORK_DIR, 'templates')
 DATASETS_DIR: Final[str] = os.path.join(WORK_DIR, 'datasets')
@@ -42,9 +47,9 @@ DATASET_PATHS: Final[dict] = {
     'multiclick_animals': os.path.join(DATASETS_DIR, 'animals.json'),
 }
 
-RATE_LIMIT_PATH: Final[str] = os.path.join(DATA_DIR, 'rate-limits.json')
-FAILED_CAPTCHAS_PATH: Final[str] = os.path.join(DATA_DIR, 'failed-captchas.json')
-SOLVED_CAPTCHAS_PATH: Final[str] = os.path.join(DATA_DIR, 'solved-captchas.json')
+RATE_LIMIT_PATH: Final[str] = os.path.join(DATA_DIR, 'rate-limits.pkl')
+FAILED_CAPTCHAS_PATH: Final[str] = os.path.join(DATA_DIR, 'failed-captchas.pkl')
+SOLVED_CAPTCHAS_PATH: Final[str] = os.path.join(DATA_DIR, 'solved-captchas.pkl')
 
 EMOJIS: Final[list] = JSON.load(os.path.join(ASSETS_DIR, 'emojis.json'), [])
 TEA_EMOJIS: Final[list] = JSON.load(os.path.join(ASSETS_DIR, 'tea_emojis.json'), [])
@@ -75,7 +80,7 @@ CRAWLER_USER_AGENTS: Final[list] = [
 ALL_CAPTCHA_TYPES: Final[list] = [
     'text', 'oneclick_keys', 'multiclick_keys', 'oneclick_animals',
     'multiclick_animals'
-] # + emojis, animals
+] # + emojis
 DATASET_SIZES: Final[dict] = {
     'largest': (200, 140),
     'large': (20, 140),
@@ -101,9 +106,6 @@ CAPTCHA_TOKEN_CLICK: Final[list] = [
     'path', 'time', 'keyword', 'other_keywords'
 ]
 
-if not os.path.isdir(DATA_DIR):
-    os.mkdir(DATA_DIR)
-
 
 class Captchaify:
     """
@@ -121,7 +123,8 @@ class Captchaify:
         default_max_rate_limit = 1200, default_template_dir: Optional[str] = None,
         verification_age: int = 3600, without_cookies: bool = False,
         block_crawler: bool = True, crawler_hints: bool = True,
-        third_parties: Optional[list] = None) -> None:
+        third_parties: Optional[list] = None, as_route: bool = False,
+        without_other_args: Optional[bool] = False) -> None:
         """
         Configures security settings for a Flask app.
 
@@ -161,6 +164,11 @@ class Captchaify:
                               meta content of the real web page that is already in the cache. 
                               Default is False.
         :param third_parties: List of third parties that are also used. All are used by default.
+        :param as_route: Whether the captcha page has its own route and users who need a captcha
+                         are redirected, especially for pages whose cache stores all pages
+                         (e.g. Cloudflare).
+        :param without_other_args: After solving the captcha, delete args like language or theme
+                                   from the URL
         """
 
         if app is None:
@@ -208,6 +216,9 @@ class Captchaify:
         self.block_crawler = block_crawler if isinstance(block_crawler, bool) else True
         self.crawler_hints = crawler_hints if isinstance(crawler_hints, bool) else True
         self.third_parties = third_parties if isinstance(third_parties, list) else ALL_THIRD_PARTIES
+        self.as_route = as_route if isinstance(as_route, bool) else False
+        self.without_other_args = without_other_args if isinstance(without_other_args, bool)\
+                                  else False
 
         captcha_secret = generate_random_string(32)
         self.captcha_secret = captcha_secret
@@ -231,7 +242,110 @@ class Captchaify:
         self.loaded_datasets = {}
 
         app.before_request(self._set_client_information)
-        app.before_request(self._change_language)
+
+        self.route_id = None
+        if as_route:
+            route_id = generate_random_string(6, False)
+            self.route_id = route_id
+
+            @app.route('/blocked-' + route_id)
+            def blocked():
+                return_path = get_return_path(request)
+                if return_path is None:
+                    return_path = '/'
+
+                return_url = get_return_url(return_path, request)
+
+                emoji = random.choice(EMOJIS)
+                return self._correct_template(
+                    'block', emoji = emoji, return_path = return_path,
+                    return_url = return_url, route_id = self.route_id
+                )
+
+            @app.route('/rate_limited-' + route_id)
+            def rate_limited():
+                return_path = get_return_path(request)
+                if return_path is None:
+                    return_path = '/'
+
+                return_url = get_return_url(return_path, request)
+
+                emoji = random.choice(TEA_EMOJIS)
+                return self._correct_template(
+                    'rate_limited', emoji = emoji, return_path = return_path,
+                    return_url = return_url, route_id = self.route_id
+                ), 418
+
+            @app.route('/change_language-' + route_id)
+            def change_language():
+                return_path = get_return_path(request)
+                if return_path is None:
+                    return_path = '/'
+
+                change_language_template = self._display_change_language(return_path)
+                if change_language_template:
+                    return change_language_template
+                return abort(404)
+
+            @app.route('/captcha-' + route_id)
+            def captcha():
+                return_path = get_return_path(request)
+                if return_path is None:
+                    return_path = '/'
+
+                client_ip = self._client_ip
+
+                preferences = self._preferences
+                action = preferences['action']
+                hardness = preferences['hardness']
+
+                if self._is_to_many_attempts(action, hardness):
+                    return redirect(self._create_route_url('block'))
+
+                is_valid_ct, is_failed_captcha = self._is_ct_valid()
+                if is_valid_ct:
+                    return self._valid_captcha(hardness, return_path)
+
+                if self._is_captcha_token_valid(hardness):
+                    return_url = get_return_url(return_path, request)
+                    if '?' not in return_url:
+                        char = '?'
+                    else:
+                        char += '&'
+
+                    captcha_string = None
+                    if request.args.get('captcha') is not None:
+                        captcha_string = request.args.get('captcha')
+                    elif request.cookies.get('captcha') is not None:
+                        captcha_string = request.cookies.get('captcha')
+
+                    return_url += char + 'captcha=' + str(captcha_string)
+
+                    if not self.without_other_args:
+                        theme, is_default_theme = WebPage.client_theme(request)
+                        language, is_default_language = WebPage.client_language(request)
+                        if not is_default_theme:
+                            return_url += '&theme=' + theme
+                        if not is_default_language:
+                            return_url += '&language=' + language
+
+                    return redirect(return_url)
+
+                if is_failed_captcha:
+                    self._add_failed_captcha(client_ip)
+
+                return self._display_captcha(
+                    is_error = is_failed_captcha, return_path = quote(return_path)
+                )
+
+            self.actions.update(
+                {'/blocked-' + route_id: 'let', '/rate_limited-' +\
+                 route_id: 'let', '/change_language-' + route_id: 'let',
+                 '/captcha-' + route_id: 'let'}
+            )
+        else:
+            app.before_request(self._change_language)
+
         app.before_request(self._rate_limit)
         app.before_request(self._fight_bots)
 
@@ -425,7 +539,7 @@ class Captchaify:
             else:
                 scheme = 'http'
 
-        return request.url.replace('http', scheme)
+        return scheme + '://' + request.url.split('://')[1]
 
 
     def _load_dataset(self, dataset_path: str) -> dict:
@@ -552,8 +666,9 @@ class Captchaify:
         if page_ext == 'html':
             return render_template(template_dir, file_name, request, **args)
         if page_ext == 'json':
-            with open(page_path, 'r', encoding = 'utf-8') as file:
-                return JSON.load(file)
+            return JSON.load(page_path)
+        if page_ext == 'pkl':
+            return Pickle.load(page_path)
         if page_ext in ['txt', 'xml']:
             with open(page_path, 'r', encoding = 'utf-8') as file:
                 return file.read()
@@ -565,7 +680,7 @@ class Captchaify:
         Checks for rate limits based on IP addresses and overall request counts.
         """
 
-        rate_limited_ips = JSON.load(RATE_LIMIT_PATH)
+        rate_limited_ips = Pickle.load(RATE_LIMIT_PATH)
 
         preferences = self._preferences
 
@@ -586,8 +701,41 @@ class Captchaify:
 
         if (ip_request_count >= rate_limit and not rate_limit == 0) or \
             (request_count >= max_rate_limit and not max_rate_limit == 0):
+            if self.as_route:
+                if request.path.startswith('/rate_limited-' + self.route_id):
+                    return
+                return redirect(self._create_route_url('rate_limited'))
+
             emoji = random.choice(TEA_EMOJIS)
             return self._correct_template('rate_limited', emoji = emoji), 418
+
+
+    def _display_change_language(self, return_path: Optional[str] = None) -> str:
+        """
+        Displays an change language Template with languages to choose from.
+        """
+
+        languages = LANGUAGES
+
+        search = None
+        if request.args.get('cs') is not None:
+            search = request.args.get('cs')
+            if search.strip() != '':
+                languages = search_languages(search, LANGUAGES)
+
+        template_dir = self._preferences['template_dir']
+
+        for file_name in os.listdir(template_dir):
+            if file_name.startswith('change_language'):
+                return_url = None
+                if return_path is not None:
+                    return_url = get_return_url(return_path, request)
+
+                return render_template(
+                    template_dir, file_name, request, search = search,
+                    languages = languages, return_path = return_path,
+                    return_url = return_url
+                )
 
 
     def _change_language(self) -> Optional[str]:
@@ -596,76 +744,19 @@ class Captchaify:
         """
 
         if request.args.get('ccl') == '1':
-            languages = LANGUAGES
-
-            search = None
-            if request.args.get('cs') is not None:
-                search = request.args.get('cs')
-                if search.strip() != '':
-                    languages = search_languages(search, LANGUAGES)
-
-            template_dir = self._preferences['template_dir']
-
-            for file_name in os.listdir(template_dir):
-                if file_name.startswith('change_language'):
-                    return render_template(template_dir, file_name, request,
-                                           search = search, languages = languages)
+            return self._display_change_language()
 
 
-    def _fight_bots(self):
-        """
-        This method checks whether the client is a bot and combats it.
-        
-        It checks various criteria, including client information, 
-            IP reputation, and captcha verification, to determine whether to block,
-            show a captcha, or take other actions.
-        """
-
+    def _display_captcha(self, is_error: bool = False, return_path: Optional[str] = None):
         url_path = urlparse(request.url).path
         client_ip = self._client_ip
 
         preferences = self._preferences
         captcha_type = preferences['captcha_type']
         dataset_file = preferences['dataset_file']
-        action = preferences['action']
         hardness = preferences['hardness']
 
-
-        def add_failed_captcha() -> None:
-            """
-            This function manages the records of failed captcha attempts,
-            updating the records based on the client's IP. It checks
-            existing records and adds new ones as necessary.
-            """
-
-            failed_captchas = JSON.load(FAILED_CAPTCHAS_PATH)
-
-            is_found = False
-
-            for hashed_ip, ip_records in failed_captchas.items():
-                comparison = Hashing().compare(client_ip, hashed_ip)
-                if comparison:
-                    is_found = True
-
-                    records_length = 0
-                    for record in ip_records:
-                        if not int(time()) - int(record) > 7200:
-                            records_length += 1
-                    records_length += 1
-
-                    ip_records.append(int(time()))
-                    failed_captchas[hashed_ip] = ip_records
-
-                    JSON.dump(failed_captchas, FAILED_CAPTCHAS_PATH)
-
-            if not is_found:
-                hashed_client_ip = Hashing().hash(client_ip)
-                failed_captchas[hashed_client_ip] = [int(time())]
-
-                JSON.dump(failed_captchas, FAILED_CAPTCHAS_PATH)
-
-
-        def display_captcha_text(error: bool = False) -> str:
+        def display_captcha_text() -> str:
             """
             This function generates and displays text captchas of varying hardness levels.
             It includes text captchas and, optionally, audio captchas.
@@ -718,15 +809,16 @@ class Captchaify:
 
             captcha_token = self.sses.encrypt(captcha_token_data)
 
-            error = 'That was not right, try again!' if error else None
+            error_message = 'That was not right, try again!' if is_error else None
 
             return self._correct_template(
-                'captcha_text', error = error, text_captcha = captcha_image_data, 
-                audio_captcha = captcha_audio_data, captcha_token = captcha_token
+                'captcha_text', error_message = error_message, text_captcha = captcha_image_data, 
+                audio_captcha = captcha_audio_data, captcha_token = captcha_token,
+                route_id = self.route_id, return_path = return_path
             )
 
 
-        def display_captcha_oneclick(error: bool = False) -> str:
+        def display_captcha_oneclick() -> str:
             captcha_id = generate_random_string(30)
 
             captcha_token_data = {
@@ -780,14 +872,15 @@ class Captchaify:
 
             captcha_token = self.sses.encrypt(captcha_token_data)
 
-            error = 'That was not the right one, try again!' if error else None
+            error_message = 'That was not the right one, try again!' if is_error else None
 
             return self._correct_template(
-                'captcha_oneclick', error = error, original_image = original_image, 
-                captcha_images = captcha_images, captcha_token = captcha_token
+                'captcha_oneclick', error_message = error_message, route_id = self.route_id,
+                original_image = original_image, captcha_images = captcha_images,
+                captcha_token = captcha_token, return_path = return_path
             )
 
-        def display_captcha_multiclick(error: bool = False) -> str:
+        def display_captcha_multiclick() -> str:
             captcha_id = generate_random_string(30)
 
             captcha_token_data = {
@@ -845,11 +938,12 @@ class Captchaify:
 
             captcha_token = self.sses.encrypt(captcha_token_data)
 
-            error = 'That was not the right one, try again!' if error else None
+            error_message = 'That was not the right one, try again!' if is_error else None
 
             return self._correct_template(
-                'captcha_multiclick', error = error, original_image = original_image, 
-                captcha_images = captcha_images, captcha_token = captcha_token
+                'captcha_multiclick', error_message = error_message, route_id = self.route_id,
+                original_image = original_image, captcha_images = captcha_images,
+                captcha_token = captcha_token, return_path = return_path
             )
 
 
@@ -862,106 +956,16 @@ class Captchaify:
             captcha_type.split('_')[0], display_captcha_oneclick
         )
 
-
-        def valid_captcha(hardness: str):
-            """
-            Generates a token to verify that the captcha has been completed.
-
-            :return: None or redirect to a url + args
-            """
-
-            captcha_id = generate_random_string(6, with_punctuation=False)
-            captcha_token = generate_random_string(16)
-
-            solved_captchas = JSON.load(SOLVED_CAPTCHAS_PATH)
-
-            while any(Hashing().compare(captcha_id, hashed_id)\
-                      for hashed_id, _ in solved_captchas.items()):
-                captcha_id = generate_random_string(6, with_punctuation=False)
-
-            symcrypto = SymmetricCrypto(self.captcha_secret)
-
-            data = {
-                'time': int(time()),
-                'ip': symcrypto.encrypt(client_ip),
-                'user_agent': symcrypto.encrypt(self._client_user_agent),
-                'hardness': symcrypto.encrypt(str(hardness))
-            }
-
-            solved_captchas = JSON.load(SOLVED_CAPTCHAS_PATH)
-
-            solved_captchas[Hashing().hash(captcha_id)] = data
-
-            JSON.dump(solved_captchas, SOLVED_CAPTCHAS_PATH)
-
-            g.captchaify_captcha = captcha_id + captcha_token
-
-            url = remove_args_from_url(self._client_url)
-            url += '?captcha=' + quote(g.captchaify_captcha)
-
-            theme, is_default_theme = WebPage.client_theme(request)
-            if not is_default_theme:
-                url += '&theme=' + quote(theme)
-
-            language, is_default_language = WebPage.client_language(request)
-            if not is_default_language:
-                url += '&language=' + quote(language)
-
-            return redirect(url)
+        return captcha_display_function()
 
 
-        if action == 'let':
-            return
+    def _is_ct_valid(self):
+        url_path = urlparse(request.url).path
+        client_ip = self._client_ip
 
-        is_crawler = False
-        for crawlername in CRAWLER_USER_AGENTS:
-            if crawlername.lower() in self._client_user_agent.lower():
-                is_crawler = True
-
-        g.is_crawler = is_crawler
-
-        criteria = [
-            self._client_use_tor,
-            self._client_invalid_ip,
-            is_crawler and self.block_crawler,
-            action == 'fight'
-        ]
-
-        if not any(criteria) and 'ipapi' in self.third_parties:
-            ip_info = self._client_ip_info
-
-            if not isinstance(ip_info, dict):
-                criteria.append(True)
-            else:
-                if ip_info.get('proxy', False) or ip_info.get('hosting', False):
-                    criteria.append(True)
-
-        if not any(criteria) and 'stopforumspam' in self.third_parties:
-            if is_stopforumspam_spammer(client_ip):
-                criteria.append(True)
-
-        if not any(criteria):
-            return
-
-        if action == 'block':
-            emoji = random.choice(EMOJIS)
-            return self._correct_template('block', emoji = emoji)
-
-        failed_captchas = JSON.load(FAILED_CAPTCHAS_PATH)
-
-        for hashed_ip, ip_records in failed_captchas.items():
-            comparison = Hashing().compare(client_ip, hashed_ip)
-            if comparison:
-                records_length = 0
-                for record in ip_records:
-                    if not int(time()) - int(record) > 14400:
-                        records_length += 1
-
-                if (action == 'fight' or hardness == 3)\
-                    and records_length > 2 or records_length > 3:
-
-                    emoji = random.choice(EMOJIS)
-                    return self._correct_template('block', emoji = emoji)
+        preferences = self._preferences
+        captcha_type = preferences['captcha_type']
+        hardness = preferences['hardness']
 
         is_failed_captcha = False
 
@@ -998,7 +1002,7 @@ class Captchaify:
                             'multiclick':
                             [i for i, x in enumerate(keywords) if x == original_keyword] !=\
                             [int(key[-1]) for key, value in request.args.items()
-                             if value.lower() == '1' and key.startswith('ci')]
+                             if value.lower() == '1' and key.startswith('ci') and len(key) == 3]
                         }
                         check = checks.get(captcha_type, False)
                     else:
@@ -1026,6 +1030,8 @@ class Captchaify:
                                 str(decrypted_token_data['text'].lower())
 
                     if not is_failed_captcha:
+                        if isinstance(captcha_token_hardness, str):
+                            captcha_token_hardness = int(captcha_token_hardness)
                         if not hardness < captcha_token_hardness:
                             comparison_path = Hashing()\
                                 .compare(url_path, decrypted_token_data['path'])
@@ -1043,7 +1049,12 @@ class Captchaify:
                                     (not comparison_ip and not comparison_user_agent) or check:
                                 is_failed_captcha = True
                             else:
-                                return valid_captcha(captcha_token_hardness)
+                                return True, False
+        return False, is_failed_captcha
+
+
+    def _is_captcha_token_valid(self, hardness: int):
+        client_ip = self._client_ip
 
         captcha_string = None
         if request.args.get('captcha') is not None:
@@ -1052,18 +1063,14 @@ class Captchaify:
             captcha_string = request.cookies.get('captcha')
 
         if captcha_string is None:
-            if is_failed_captcha:
-                add_failed_captcha()
-            return captcha_display_function(error=is_failed_captcha)
+            return False
 
         if len(captcha_string) != 22:
-            if is_failed_captcha:
-                add_failed_captcha()
-            return captcha_display_function(error=is_failed_captcha)
+            return False
 
         captcha_id = captcha_string[:6]
 
-        solved_captchas = JSON.load(SOLVED_CAPTCHAS_PATH)
+        solved_captchas = Pickle.load(SOLVED_CAPTCHAS_PATH)
 
         for hashed_id, ip_data in solved_captchas.items():
             comparison = Hashing().compare(captcha_id, hashed_id)
@@ -1079,13 +1086,213 @@ class Captchaify:
                         and hardness >= captcha_hardness:
 
                         if ip == client_ip and user_agent == self._client_user_agent:
-                            return
+                            return True
                 break
+        return False
+
+
+    def _is_to_many_attempts(self, action: str, hardness: int):
+        client_ip = self._client_ip
+        failed_captchas = Pickle.load(FAILED_CAPTCHAS_PATH)
+
+        for hashed_ip, ip_records in failed_captchas.items():
+            comparison = Hashing().compare(client_ip, hashed_ip)
+            if comparison:
+                records_length = 0
+                for record in ip_records:
+                    if not int(time()) - int(record) > 14400:
+                        records_length += 1
+
+                if (action == 'fight' or hardness == 3)\
+                    and records_length > 2 or records_length > 3:
+
+                    return True
+
+        return False
+
+
+    def _add_failed_captcha(self, client_ip: str) -> None:
+        """
+        This function manages the records of failed captcha attempts,
+        updating the records based on the client's IP. It checks
+        existing records and adds new ones as necessary.
+        """
+
+        failed_captchas = Pickle.load(FAILED_CAPTCHAS_PATH)
+
+        is_found = False
+
+        for hashed_ip, ip_records in failed_captchas.items():
+            comparison = Hashing().compare(client_ip, hashed_ip)
+            if comparison:
+                is_found = True
+
+                records_length = 0
+                for record in ip_records:
+                    if not int(time()) - int(record) > 7200:
+                        records_length += 1
+                records_length += 1
+
+                ip_records.append(int(time()))
+                failed_captchas[hashed_ip] = ip_records
+
+                Pickle.dump(failed_captchas, FAILED_CAPTCHAS_PATH)
+
+        if not is_found:
+            hashed_client_ip = Hashing().hash(client_ip)
+            failed_captchas[hashed_client_ip] = [int(time())]
+
+            Pickle.dump(failed_captchas, FAILED_CAPTCHAS_PATH)
+
+
+    def _valid_captcha(self, hardness: str, return_path: Optional[str] = None):
+        """
+        Generates a token to verify that the captcha has been completed.
+
+        :return: None or redirect to a url + args
+        """
+
+        client_ip = self._client_ip
+
+        captcha_id = generate_random_string(6, with_punctuation=False)
+        captcha_token = generate_random_string(16)
+
+        solved_captchas = Pickle.load(SOLVED_CAPTCHAS_PATH)
+
+        while any(Hashing().compare(captcha_id, hashed_id)\
+                    for hashed_id, _ in solved_captchas.items()):
+            captcha_id = generate_random_string(6, with_punctuation=False)
+
+        symcrypto = SymmetricCrypto(self.captcha_secret)
+
+        data = {
+            'time': int(time()),
+            'ip': symcrypto.encrypt(client_ip),
+            'user_agent': symcrypto.encrypt(self._client_user_agent),
+            'hardness': symcrypto.encrypt(str(hardness))
+        }
+
+        solved_captchas = Pickle.load(SOLVED_CAPTCHAS_PATH)
+
+        solved_captchas[Hashing().hash(captcha_id)] = data
+
+        Pickle.dump(solved_captchas, SOLVED_CAPTCHAS_PATH)
+
+        g.captchaify_captcha = captcha_id + captcha_token
+
+        if self.as_route:
+            url = get_return_url(return_path, request)
+        else:
+            url = self._client_url
+            url = remove_args_from_url(url)
+
+        char = '&'
+        if '?' not in url:
+            char = '?'
+
+        url += char + 'captcha=' + quote(str(captcha_id + captcha_token))
+
+        if not self.without_other_args:
+            theme, is_default_theme = WebPage.client_theme(request)
+            language, is_default_language = WebPage.client_language(request)
+            if not is_default_theme:
+                url += '&theme=' + theme
+            if not is_default_language:
+                url += '&language=' + language
+
+        return redirect(url)
+
+
+    def _create_route_url(self, template: str) -> str:
+        return_path = get_return_path(request)
+        if return_path is None:
+            return_path = quote(
+                extract_path_and_args(
+                    rearrange_url(request.url, ['theme', 'language', 'captcha', 'return_path'])
+                )
+            )
+
+        redirect_url = f'/{template}-' + self.route_id + '?return_path=' + return_path
+
+        theme, is_default_theme = WebPage.client_theme(request)
+        language, is_default_language = WebPage.client_language(request)
+        if not is_default_theme:
+            redirect_url += '&theme=' + theme
+        if not is_default_language:
+            redirect_url += '&language=' + language
+
+        return redirect_url
+
+
+    def _fight_bots(self):
+        """
+        This method checks whether the client is a bot and combats it.
+        
+        It checks various criteria, including client information, 
+            IP reputation, and captcha verification, to determine whether to block,
+            show a captcha, or take other actions.
+        """
+
+        client_ip = self._client_ip
+
+        preferences = self._preferences
+        action = preferences['action']
+        hardness = preferences['hardness']
+
+        if action == 'let':
+            return
+
+        is_crawler = False
+        for crawlername in CRAWLER_USER_AGENTS:
+            if crawlername.lower() in self._client_user_agent.lower():
+                is_crawler = True
+
+        g.is_crawler = is_crawler
+
+        criteria = [
+            self._client_use_tor,
+            self._client_invalid_ip,
+            is_crawler and self.block_crawler,
+            action == 'fight'
+        ]
+
+        if not any(criteria) and 'ipapi' in self.third_parties:
+            ip_info = self._client_ip_info
+
+            if not isinstance(ip_info, dict):
+                criteria.append(True)
+            else:
+                if ip_info.get('proxy', False) or ip_info.get('hosting', False):
+                    criteria.append(True)
+
+        if not any(criteria) and 'stopforumspam' in self.third_parties:
+            if is_stopforumspam_spammer(client_ip):
+                criteria.append(True)
+
+        if not any(criteria):
+            return
+
+        if action == 'block' or self._is_to_many_attempts(action, hardness):
+            if self.as_route:
+                return redirect(self._create_route_url('blocked'))
+
+            emoji = random.choice(EMOJIS)
+            return self._correct_template('block', emoji = emoji)
+
+        is_valid_ct, is_failed_captcha = self._is_ct_valid()
+        if is_valid_ct:
+            return self._valid_captcha(hardness)
+
+        if self._is_captcha_token_valid(hardness):
+            return
 
         if is_failed_captcha:
-            add_failed_captcha()
+            self._add_failed_captcha(client_ip)
 
-        return captcha_display_function(error = is_failed_captcha)
+        if self.as_route:
+            return redirect(self._create_route_url('captcha'))
+
+        return self._display_captcha(is_error = is_failed_captcha)
 
 
     def _add_rate_limit(self, response: Response) -> Response:
@@ -1098,7 +1305,7 @@ class Captchaify:
         rate_limit = self._preferences['rate_limit']
 
         if not rate_limit == 0:
-            rate_limited_ips = JSON.load(RATE_LIMIT_PATH)
+            rate_limited_ips = Pickle.load(RATE_LIMIT_PATH)
 
             found = False
             for hashed_ip, ip_timestamps in rate_limited_ips.items():
@@ -1119,7 +1326,7 @@ class Captchaify:
                 hashed_client_ip = Hashing().hash(self._client_ip, 16)
                 rate_limited_ips[hashed_client_ip] = [str(int(time()))]
 
-            JSON.dump(rate_limited_ips, RATE_LIMIT_PATH)
+            Pickle.dump(rate_limited_ips, RATE_LIMIT_PATH)
 
         return response
 

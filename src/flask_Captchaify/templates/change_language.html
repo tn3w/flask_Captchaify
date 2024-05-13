@@ -301,14 +301,19 @@
     </head>
     <body>
         <main>
-            <a class="back-button" href="{{ current_url_without_ccl }}" ntr="1">
+            <a class="back-button" href="{% if return_url|default %}{{ return_url }}{% else %}{{ current_url_without_ccl }}{% endif %}" ntr="1">
                 <img class="icon" src="" alt="Back">
             </a>
             <h1>Change Language</h1>
             <div class="search-form">
                 <form class="search-form" action="{{ current_url }}" method="GET">
                     <input type="text" class="search-input" name="cs" placeholder="Search Language" value="{{ search if search|default else '' }}">
+                    {% if return_path|default %}
+                    <input type="hidden" name="return_path" value="{{ return_path }}">
+                    {% endif %}
+                    {% if not return_url|default %}
                     <input type="hidden" name="ccl" value="1">
+                    {% endif %}
                     <button type="submit" class="search-button" ntr="1">
                         <img src="" alt="Search">
                     </button>
@@ -321,7 +326,7 @@
             <div class="container">
                 {% for language in languages %}
                 <div class="item">
-                    <a href="?language={{ language['code'] }}" ntr="1">
+                    <a href="{% if return_url|default %}{{ return_url }}{% if '?' not in return_url %}?{% else %}&{% endif %}{% else %}{{ current_url_without_ccl_and_lang }}{% if '?' not in current_url_without_ccl_and_lang %}?{% else %}&{% endif %}{% endif %}language={{ language['code'] }}" ntr="1">
                         <img src="{{ language['flag'] }}" alt="{{ language['name'] }} Flag">
                         <div class="language">{{ language['name'] }}</div>
                     </a>

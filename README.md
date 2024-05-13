@@ -355,3 +355,23 @@ For more information, see the sample code above.
    | tor                  | [SecOps-Institute/Tor-IP-Addresses](https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst) on GitHub is asked for Tor Ipv4 and Ipv6 addresses and the Ip address is compared with this list |
    | ipapi                | [Ipapi](https://ipapi.com) is requested with the Ip and the result of the fields "proxy" and "hosting" is used                                              |
    | stopforumspam        | [StopForumSpam](https://stopforumspam.com) is requested and the result is used                                                         |
+
+
+9. `as_route` Arg:
+
+   Specifies whether Captchaify pages are displayed as separate routes in order not to confuse the cache between normal pages and Captchaify pages (e.g. for Cloudflare)
+
+   Web page where this is activated:
+   ```python
+   captchaify = Captchaify(app, as_route = True)
+   ```
+
+
+9. `without_other_args` Arg:
+
+   After solving the captcha, arguments such as language and theme are deleted from the url bar
+
+   Web page where this is activated:
+   ```python
+   captchaify = Captchaify(app, without_other_args = True)
+   ```
