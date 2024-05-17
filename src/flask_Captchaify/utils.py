@@ -28,7 +28,6 @@ import pickle
 from typing import Union, Optional, Final, Tuple
 import time
 from concurrent.futures import ThreadPoolExecutor
-import ipaddress
 from PIL import Image, ImageFilter
 from werkzeug import Request
 from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
@@ -305,20 +304,6 @@ def random_user_agent() -> str:
     return secrets.choice(USER_AGENTS)
 
 
-def shorten_ipv6(ip_address: str) -> str:
-    """
-    Minimizes each ipv6 Ip address to be able to compare it with others
-    
-    :param ip_address: An ipv4 or ipv6 Ip address
-    """
-
-    try:
-        return str(ipaddress.IPv6Address(ip_address).compressed)
-    except Exception as exc:
-        handle_exception(exc)
-    return ip_address
-
-
 def is_valid_ip(ip_address: Optional[str] = None,
                 without_filter: bool = False) -> bool:
     """
@@ -429,7 +414,6 @@ def get_client_ip(request: Request) -> Union[Optional[str], bool]:
     client_ip = request.remote_addr
     invalid_ips.append(client_ip)
     if is_valid_ip(client_ip):
-        client_ip = shorten_ipv6(client_ip)
         return client_ip, False
 
     other_client_ips = [
@@ -441,7 +425,6 @@ def get_client_ip(request: Request) -> Union[Optional[str], bool]:
     for client_ip in other_client_ips:
         invalid_ips.append(client_ip)
         if is_valid_ip(client_ip):
-            client_ip = shorten_ipv6(client_ip)
             return client_ip, False
 
     try:
@@ -451,7 +434,6 @@ def get_client_ip(request: Request) -> Union[Optional[str], bool]:
     else:
         invalid_ips.append(client_ip)
         if is_valid_ip(client_ip):
-            client_ip = shorten_ipv6(client_ip)
             return client_ip, False
 
     headers_to_check = [
@@ -467,7 +449,6 @@ def get_client_ip(request: Request) -> Union[Optional[str], bool]:
             client_ip = client_ip.split(',')[0].strip()
             invalid_ips.append(client_ip)
             if is_valid_ip(client_ip):
-                client_ip = shorten_ipv6(client_ip)
                 return client_ip, False
 
     for invalid_ip in invalid_ips:

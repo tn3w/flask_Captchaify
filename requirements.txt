@@ -2,7 +2,6 @@ cryptography
 Flask
 googletrans==3.1.0a0
 beautifulsoup4
-ipaddress
 Jinja2
 Pillow>=10.3.0 # not directly required, pinned by Snyk to avoid a vulnerability
 requests
