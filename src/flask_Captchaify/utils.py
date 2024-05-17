@@ -20,12 +20,14 @@ from urllib.parse import urlparse, urlunparse, parse_qs, urlencode, quote, urljo
 import gzip
 import hashlib
 import os
+import traceback
 import unicodedata
 import threading
 import json
 import pickle
 from typing import Union, Optional, Final, Tuple
-from time import time
+import time
+from concurrent.futures import ThreadPoolExecutor
 import ipaddress
 from PIL import Image, ImageFilter
 from werkzeug import Request
@@ -33,7 +35,6 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
 from googletrans import Translator
 from bs4 import BeautifulSoup, Tag
 from cryptography.hazmat.backends import default_backend
-from cryptography.exceptions import InvalidKey
 from cryptography.hazmat.primitives import hashes, padding
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -68,6 +69,7 @@ if not os.path.isdir(DATA_DIR):
     os.makedirs(DATA_DIR, exist_ok = True)
 
 ASSETS_DIR: Final[str] = os.path.join(WORK_DIR, 'assets')
+LOG_FILE: Final[str] = os.path.join(CURRENT_DIR, 'log.txt')
 CACHE_FILE_PATH: Final[str] = os.path.join(DATA_DIR, 'cache.pkl')
 
 ALL_THEMES: Final[list] = ['dark', 'light']
@@ -113,6 +115,71 @@ IP_INFO_KEYS: Final[list] = ['continent', 'continentCode', 'country', 'countryCo
                 'lon', 'timezone', 'offset', 'currency', 'isp', 'org', 'as',
                 'asname', 'reverse', 'mobile', 'proxy', 'hosting', 'time']
 TOR_EXIT_IPS_URL: Final[str] = 'https://check.torproject.org/torbulkexitlist'
+WRITE_EXECUTOR = ThreadPoolExecutor(max_workers=1)
+
+
+def write_to_file(log_file: str, message: str) -> None:
+    """
+    Writes the given content to the specified file.
+    """
+
+    with open(log_file, 'a', encoding = 'utf-8') as f:
+        f.write(message + '\n')
+
+
+def generate_random_string(length: int, with_punctuation: bool = True, with_letters: bool = True):
+    """
+    Generates a random string
+
+    :param length: The length of the string
+    :param with_punctuation: Whether to include special characters
+    :param with_letters: Whether letters should be included
+    """
+
+    characters = '0123456789'
+
+    if with_punctuation:
+        characters += r"!\'#$%&'()*+,-./:;<=>?@[\]^_`{|}~"
+
+    if with_letters:
+        characters += 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+    random_string = ''.join(secrets.choice(characters) for _ in range(length))
+    return random_string
+
+
+def handle_exception(error_message: str, print_error: bool = True, is_app_error: bool = True) -> None:
+    """
+    Handles exceptions by logging a warning message and writing
+    detailed traceback information to a file asynchronously.
+
+    :param error_message: A brief description of the error that occurred.
+    :param print_error: Whether the error should be printed in the console.
+    :param is_app_error: Whether the error is in the application or not.
+    """
+
+    long_error_message = traceback.format_exc()
+
+    timestamp = time.strftime(r'%Y-%m-%d %H:%M:%S', time.localtime())
+    error_id = generate_random_string(12, with_punctuation=False)
+
+    if print_error:
+        print(f'[flask_Captchaify Error #{error_id}'+
+              f' at {timestamp}]: {error_message}')
+
+    app_error_message = ''
+    if not is_app_error:
+        app_error_message = '\n(This is not an application error)'
+
+    long_error_message = '----- Error #' + str(error_id) + ' at ' + timestamp\
+                         + f' -----{app_error_message}\n' + long_error_message
+
+    if not os.path.isfile(LOG_FILE):
+        long_error_message = 'If you find a new error, report it here: '+\
+                             'https://github.com/tn3w/flask_Captchaify/issues\n'\
+                              + long_error_message
+
+    WRITE_EXECUTOR.submit(write_to_file, LOG_FILE, long_error_message)
 
 
 def rearrange_url(url: str, args_to_remove: list) -> str:
@@ -230,27 +297,6 @@ def get_path_from_url(url: str) -> Optional[str]:
     return None
 
 
-def generate_random_string(length: int, with_punctuation: bool = True, with_letters: bool = True):
-    """
-    Generates a random string
-
-    :param length: The length of the string
-    :param with_punctuation: Whether to include special characters
-    :param with_letters: Whether letters should be included
-    """
-
-    characters = '0123456789'
-
-    if with_punctuation:
-        characters += r"!\'#$%&'()*+,-./:;<=>?@[\]^_`{|}~"
-
-    if with_letters:
-        characters += 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
-
-    random_string = ''.join(secrets.choice(characters) for _ in range(length))
-    return random_string
-
-
 def random_user_agent() -> str:
     """
     Generates a random user agent to bypass Python blockades
@@ -268,8 +314,9 @@ def shorten_ipv6(ip_address: str) -> str:
 
     try:
         return str(ipaddress.IPv6Address(ip_address).compressed)
-    except ValueError:
-        return ip_address
+    except Exception as exc:
+        handle_exception(exc)
+    return ip_address
 
 
 def is_valid_ip(ip_address: Optional[str] = None,
@@ -399,7 +446,7 @@ def get_client_ip(request: Request) -> Union[Optional[str], bool]:
 
     try:
         client_ip = request.headers.getlist('X-Forwarded-For')[0].rpartition(' ')[-1]
-    except (IndexError, AttributeError, ValueError, TypeError):
+    except Exception:
         pass
     else:
         invalid_ips.append(client_ip)
@@ -523,103 +570,140 @@ def search_languages(query: str, languages: list[dict]) -> list[dict]:
 
 file_locks = {}
 
-class JSON:
+class Json:
     """
     Class for loading / saving JavaScript Object Notation (= JSON)
     """
 
-    @staticmethod
-    def load(file_name: str, default: Union[dict, list] = None) -> Union[dict, list]:
+    def __init__(self) -> None:
+        self.data = None
+
+
+    def load(self, file_path: str, default: Optional[Union[dict, list]] = None) -> Union[dict, list]:
         """
         Function to load a JSON file securely.
 
-        :param file_name: The JSON file you want to load
+        :param file_path: The JSON file you want to load
         :param default: Returned if no data was found
         """
 
-        if not os.path.isfile(file_name):
-            if not default is None:
+        if default is None:
+            default = {}
+
+        if not os.path.isfile(file_path):
+            return default
+
+        if file_path not in file_locks:
+            file_locks[file_path] = threading.Lock()
+
+        with file_locks[file_path]:
+            try:
+                with open(file_path, 'r', encoding = 'utf-8') as file:
+                    data = json.load(file)
+            except Exception as exc:
+                handle_exception(exc, print_error = False, is_app_error = False)
+
+                if self.data.get(file_path) is not None:
+                    self.dump(self.data[file_path], file_path)
+                    return self.data
                 return default
-            return {}
-
-        if file_name not in file_locks:
-            file_locks[file_name] = threading.Lock()
-
-        with file_locks[file_name]:
-            with open(file_name, 'r', encoding = 'utf-8') as file:
-                data = json.load(file)
-            return data
+        return data
 
 
-    @staticmethod
-    def dump(data: Union[dict, list], file_name: str) -> bool:
+    def dump(self, data: Union[dict, list], file_path: str) -> bool:
         """
         Function to save a JSON file securely.
         
         :param data: The data to be stored should be either dict or list
-        :param file_name: The file to save to
+        :param file_path: The file to save to
         """
 
-        file_directory = os.path.dirname(file_name)
+        file_directory = os.path.dirname(file_path)
         if not os.path.isdir(file_directory):
             return False
 
-        if file_name not in file_locks:
-            file_locks[file_name] = threading.Lock()
+        if file_path not in file_locks:
+            file_locks[file_path] = threading.Lock()
 
-        with file_locks[file_name]:
-            with open(file_name, 'w', encoding = 'utf-8') as file:
-                json.dump(data, file)
+        with file_locks[file_path]:
+            self.data = data
+            try:
+                with open(file_path, 'w', encoding = 'utf-8') as file:
+                    json.dump(data, file)
+            except Exception as exc:
+                handle_exception(exc, is_app_error = False)
         return True
+
 
 class Pickle:
     """
     Class for loading / saving Pickle
     """
 
-    @staticmethod
-    def load(file_name: str, default: Union[dict, list] = None) -> Union[dict, list]:
-        """
-        Function to load a JSON file securely.
+    def __init__(self) -> None:
+        self.data = {}
 
-        :param file_name: The JSON file you want to load
+
+    def load(self, file_path: str, default: Optional[Union[dict, list]] = None) -> Union[dict, list]:
+        """
+        Function to load a Pickle file securely.
+
+        :param file_path: The Pickle file you want to load
         :param default: Returned if no data was found
         """
 
-        if not os.path.isfile(file_name):
-            if not default is None:
+        if default is None:
+            default = {}
+
+        if not os.path.isfile(file_path):
+            return default
+
+        if file_path not in file_locks:
+            file_locks[file_path] = threading.Lock()
+
+        with file_locks[file_path]:
+            try:
+                with open(file_path, 'rb') as file:
+                    data = pickle.load(file)
+            except Exception as exc:
+                handle_exception(exc, print_error = False, is_app_error = False)
+
+                if self.data.get(file_path) is not None:
+                    self.dump(self.data[file_path], file_path)
+                    return self.data
                 return default
-            return {}
 
-        if file_name not in file_locks:
-            file_locks[file_name] = threading.Lock()
-
-        with file_locks[file_name]:
-            with open(file_name, 'rb') as file:
-                data = pickle.load(file)
-            return data
+        return data
 
 
-    @staticmethod
-    def dump(data: Union[dict, list], file_name: str) -> bool:
+    def dump(self, data: Union[dict, list], file_path: str) -> bool:
         """
-        Function to save a JSON file securely.
+        Function to save a Pickle file securely.
         
         :param data: The data to be stored should be either dict or list
-        :param file_name: The file to save to
+        :param file_path: The file to save to
         """
 
-        file_directory = os.path.dirname(file_name)
+        file_directory = os.path.dirname(file_path)
         if not os.path.isdir(file_directory):
             return False
 
-        if file_name not in file_locks:
-            file_locks[file_name] = threading.Lock()
+        if file_path not in file_locks:
+            file_locks[file_path] = threading.Lock()
 
-        with file_locks[file_name]:
-            with open(file_name, 'wb') as file:
-                pickle.dump(data, file)
+        with file_locks[file_path]:
+            self.data[file_path] = data
+            try:
+                with open(file_path, 'wb') as file:
+                    pickle.dump(data, file)
+            except Exception as exc:
+                handle_exception(exc, is_app_error = False)
+
         return True
+
+
+JSON = Json()
+PICKLE = Pickle()
 
 
 class Cache(dict):
@@ -628,7 +712,7 @@ class Cache(dict):
         super().__init__()
 
     def load(self) -> dict:
-        data = Pickle.load(CACHE_FILE_PATH)
+        data = PICKLE.load(CACHE_FILE_PATH)
         if not self.file_name in data:
             return {}
         return data[self.file_name]
@@ -638,19 +722,19 @@ class Cache(dict):
         return data.get(key, {})
 
     def __setitem__(self, key: any, value: any) -> None:
-        data = Pickle.load(CACHE_FILE_PATH)
+        data = PICKLE.load(CACHE_FILE_PATH)
         if not self.file_name in data:
             data[self.file_name] = {}
         data[self.file_name][key] = value
-        Pickle.dump(data, CACHE_FILE_PATH)
+        PICKLE.dump(data, CACHE_FILE_PATH)
         return
 
     def __delitem__(self, key: any) -> None:
-        data = Pickle.load(CACHE_FILE_PATH)
+        data = PICKLE.load(CACHE_FILE_PATH)
         if not self.file_name in data:
             data[self.file_name] = {}
         del data[self.file_name][key]
-        Pickle.dump(data, CACHE_FILE_PATH)
+        PICKLE.dump(data, CACHE_FILE_PATH)
         return
 
 LANGUAGES = JSON.load(os.path.join(ASSETS_DIR, 'languages.json'), [])
@@ -852,7 +936,7 @@ class WebPage:
         if from_lang == to_lang or not text_to_translate:
             return text_to_translate
 
-        translations = Pickle.load(TRANSLATIONS_FILE_PATH, [])
+        translations = PICKLE.load(TRANSLATIONS_FILE_PATH, [])
 
         for translation in translations:
             if translation["text_to_translate"] == text_to_translate\
@@ -867,8 +951,8 @@ class WebPage:
 
             if translated_output is None:
                 return text_to_translate
-        except (UnicodeEncodeError, UnicodeDecodeError,
-                ValueError, AttributeError, TypeError):
+        except Exception as exc:
+            handle_exception(exc, is_app_error = False)
             return text_to_translate
 
         translation = {
@@ -879,7 +963,7 @@ class WebPage:
         }
         translations.append(translation)
 
-        Pickle.dump(translations, TRANSLATIONS_FILE_PATH)
+        PICKLE.dump(translations, TRANSLATIONS_FILE_PATH)
 
         return translated_output
 
@@ -1101,26 +1185,30 @@ class SymmetricCrypto:
         :param plaintext: The text to be encrypted
         """
 
-        salt = secrets.token_bytes(self.salt_length)
+        try:
+            salt = secrets.token_bytes(self.salt_length)
 
-        kdf_ = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=salt,
-            iterations=100000,
-            backend=default_backend()
-        )
-        key = kdf_.derive(self.password)
+            kdf_ = PBKDF2HMAC(
+                algorithm=hashes.SHA256(),
+                length=32,
+                salt=salt,
+                iterations=100000,
+                backend=default_backend()
+            )
+            key = kdf_.derive(self.password)
 
-        iv = secrets.token_bytes(16)
+            iv = secrets.token_bytes(16)
 
-        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
-        encryptor = cipher.encryptor()
-        padder = padding.PKCS7(algorithms.AES.block_size).padder()
-        padded_data = padder.update(plain_text.encode()) + padder.finalize()
-        ciphertext = encryptor.update(padded_data) + encryptor.finalize()
+            cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+            encryptor = cipher.encryptor()
+            padder = padding.PKCS7(algorithms.AES.block_size).padder()
+            padded_data = padder.update(plain_text.encode()) + padder.finalize()
+            ciphertext = encryptor.update(padded_data) + encryptor.finalize()
 
-        return urlsafe_b64encode(salt + iv + ciphertext).decode()
+            return urlsafe_b64encode(salt + iv + ciphertext).decode()
+        except Exception as exc:
+            handle_exception(exc, is_app_error=False)
+            return None
 
 
     def decrypt(self, cipher_text: str) -> Optional[str]:
@@ -1153,7 +1241,8 @@ class SymmetricCrypto:
             plaintext = unpadder.update(decrypted_data) + unpadder.finalize()
 
             return plaintext.decode()
-        except (ValueError, TypeError, InvalidKey):
+        except Exception as exc:
+            handle_exception(exc, False, False)
             return None
 
 
@@ -1228,7 +1317,7 @@ class SSES:
         self.separator = separator
 
 
-    def encrypt(self, data_dict: dict) -> str:
+    def encrypt(self, data_dict: dict) -> Optional[str]:
         """
         Encrypts the provided values.
 
@@ -1236,21 +1325,26 @@ class SSES:
         :return: The encrypted data.
         """
 
-        values = list(data_dict.values())
+        try:
+            values = list(data_dict.values())
 
-        new_values = []
-        for value in values:
-            if isinstance(value, list) or isinstance(value, dict):
-                value = '§§' + b64encode(pickle.dumps(value)).decode('utf-8')
-            new_values.append(value)
+            new_values = []
+            for value in values:
+                if isinstance(value, (list, dict)):
+                    value = '§§' + b64encode(pickle.dumps(value)).decode('utf-8')
+                new_values.append(value)
 
-        text_data = self.separator.join(new_values)
-        encrypted_data = self.symmetric_crypto.encrypt(text_data)
+            text_data = self.separator.join(new_values)
+            encrypted_data = self.symmetric_crypto.encrypt(text_data)
 
-        return encrypted_data
+            return encrypted_data
+        except Exception as exc:
+            handle_exception(exc)
+            return None
 
 
-    def decrypt(self, encrypted_data: str, dict_keys: Optional[list] = None) -> Union[dict, list]:
+    def decrypt(self, encrypted_data: str, dict_keys:\
+                Optional[list] = None) -> Optional[Union[dict, list]]:
         """
         Decrypts the provided encrypted data.
 
@@ -1259,27 +1353,31 @@ class SSES:
         :return: Decrypted data as either a dictionary (if dict_keys is provided) or a list.
         """
 
-        decrypted_data = self.symmetric_crypto.decrypt(encrypted_data)
-        if decrypted_data is None:
+        try:
+            decrypted_data = self.symmetric_crypto.decrypt(encrypted_data)
+            if decrypted_data is None:
+                return None
+
+            values = decrypted_data.split(self.separator)
+
+            if not isinstance(dict_keys, list) or len(dict_keys) == 0:
+                return values
+
+            data_dict = {}
+            for i, dict_key in enumerate(dict_keys):
+                if len(values) - 1 < i:
+                    break
+
+                value = values[i]
+                if value.startswith('§§'):
+                    value = pickle.loads(b64decode(value[1:].encode('utf-8')))
+
+                data_dict[dict_key] = value
+
+            return data_dict
+        except Exception as exc:
+            handle_exception(exc)
             return None
-
-        values = decrypted_data.split(self.separator)
-
-        if not isinstance(dict_keys, list) or len(dict_keys) == 0:
-            return values
-
-        data_dict = {}
-        for i, dict_key in enumerate(dict_keys):
-            if len(values) - 1 < i:
-                break
-
-            value = values[i]
-            if value.startswith('§§'):
-                value = pickle.loads(b64decode(value[1:].encode('utf-8')))
-
-            data_dict[dict_key] = value
-
-        return data_dict
 
 
 def request_tor_ips() -> list | None:
@@ -1295,7 +1393,7 @@ def request_tor_ips() -> list | None:
     tor_exit_ips = None
     ip_data = cache.load()
     if isinstance(ip_data.get('time'), int):
-        if int(time()) - int(ip_data.get('time', time())) <= 604800:
+        if int(time.time()) - int(ip_data.get('time', time.time())) <= 604800:
             if isinstance(ip_data.get('ips'), list):
                 tor_exit_ips = ip_data.get('ips')
 
@@ -1307,14 +1405,16 @@ def request_tor_ips() -> list | None:
                 headers = {'User-Agent': random_user_agent()},
                 timeout = 3
             )
-        except (requests.exceptions.Timeout, requests.exceptions.RequestException):
-            pass
-        else:
-            for line in response.text.split('\n'):
-                tor_exit_ips.append(line.strip())
+        except Exception as exc:
+            handle_exception(exc)
+            return []
 
-            cache['time'] = time()
-            cache['ips'] = tor_exit_ips
+        for line in response.text.split('\n'):
+            tor_exit_ips.append(line.strip())
+
+        cache['time'] = time.time()
+        cache['ips'] = tor_exit_ips
+
     return tor_exit_ips
 
 
@@ -1332,7 +1432,7 @@ def is_stopforumspam_spammer(ip_address: str) -> bool:
         comparison = Hashing().compare(ip_address, hashed_ip)
         if comparison:
 
-            if not int(time()) - int(ip_content['time']) > 604800:
+            if not int(time.time()) - int(ip_content['time']) > 604800:
                 return ip_content['spammer']
             break
 
@@ -1358,13 +1458,12 @@ def is_stopforumspam_spammer(ip_address: str) -> bool:
 
             cache[hashed_ip_address] = {
                 'spammer': is_spammer,
-                'time': int(time())
+                'time': int(time.time())
             }
 
             return is_spammer
-    except (requests.exceptions.Timeout, requests.exceptions.RequestException,
-            pickle.UnpicklingError):
-        pass
+    except Exception as exc:
+        handle_exception(exc)
 
     return False
 
@@ -1388,7 +1487,7 @@ def get_ip_info(ip_address: str) -> dict:
                 data_json[IP_INFO_KEYS[i]] = {'True': True, 'False': False}\
                     .get(data.split('-&%-')[i], data.split('-&%-')[i])
 
-            if int(time()) - int(data_json['time']) > 518400:
+            if int(time.time()) - int(data_json['time']) > 518400:
                 del cache[hashed_ip]
                 break
 
@@ -1400,14 +1499,15 @@ def get_ip_info(ip_address: str) -> dict:
             timeout = 3
         )
         response.raise_for_status()
-    except (requests.exceptions.Timeout, requests.exceptions.RequestException):
+    except Exception as exc:
+        handle_exception(exc)
         return None
 
     if response.ok:
         response_json = response.json()
         if response_json['status'] == 'success':
             del response_json['status'], response_json['query']
-            response_json['time'] = int(time())
+            response_json['time'] = int(time.time())
             response_string = '-&%-'.join([str(value) for value in response_json.values()])
 
             crypted_response = SymmetricCrypto(ip_address).encrypt(response_string)
