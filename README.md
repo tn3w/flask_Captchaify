@@ -243,20 +243,20 @@ For more information, see the sample code above.
    
    Example of a website that allows all bots on the main page, enforces captchas on the login page, and blocks all robots on the registration page:
    ```python
-   captchaify = Captchaify(app, actions={"/": "let", "/login": "fight", "/register": "block"})
+   captchaify = Captchaify(app, actions={"/": "allow", "/login": "fight", "/register": "block"})
    ```
 
    When using "\*" before or after the urlpath / endpoint you can address multiple urls. "\*" means every possible letter / number or special character.
 
    Example of a website where all urls with /api/ are allowed through, all urls starting with "/dogs/" show everyone a captcha and all urls ending with "/cats/" block bots:
    ```python
-   captchaify = Captchaify(app, actions={"*/api/*": "let", "/dogs/*": "fight", "*/cats/": "block"})
+   captchaify = Captchaify(app, actions={"*/api/*": "allow", "/dogs/*": "fight", "*/cats/": "block"})
    ```
    
    All actions:
    | Name of action | Executing Action                                                     |
    | -------------- | -------------------------------------------------------------------- |
-   | let            | Allows all traffic through, regardless of whether the IP is blocked. |
+   | allow            | Allows all traffic through, regardless of whether the IP is blocked. |
    | block          | Blocks all traffic if it is blocked, without captcha.                |
    | fight          | Displays a captcha to all traffic, whether suspicious or not.        |
    | captcha        | Default value, shows only suspicious traffic captchas.               |
