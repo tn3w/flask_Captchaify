@@ -109,6 +109,16 @@ USER_AGENTS: Final[list] =\
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/6'+
         '05.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.1'
 ]
+GEOLITE_DATA: Final[dict] = {
+    "city": {
+        "url": "https://git.io/GeoLite2-City.mmdb",
+        "path": os.path.join(DATA_DIR, "GeoLite2-City.mmdb")
+    },
+    "asn": {
+        "url": "https://git.io/GeoLite2-ASN.mmdb",
+        "path": os.path.join(DATA_DIR, "GeoLite2-ASN.mmdb")
+    }
+}
 IP_INFO_KEYS: Final[list] = ['continent', 'continentCode', 'country', 'countryCode',
                 'region', 'regionName', 'city', 'district', 'zip', 'lat',
                 'lon', 'timezone', 'offset', 'currency', 'isp', 'org', 'as',
@@ -147,7 +157,9 @@ def generate_random_string(length: int, with_punctuation: bool = True, with_lett
     return random_string
 
 
-def handle_exception(error_message: str, print_error: bool = True, is_app_error: bool = True) -> None:
+def handle_exception(error_message: str, print_error: bool =\
+                     True, is_app_error: bool = True,
+                     long_error_message: Optional[str] = None) -> None:
     """
     Handles exceptions by logging a warning message and writing
     detailed traceback information to a file asynchronously.
@@ -155,9 +167,12 @@ def handle_exception(error_message: str, print_error: bool = True, is_app_error:
     :param error_message: A brief description of the error that occurred.
     :param print_error: Whether the error should be printed in the console.
     :param is_app_error: Whether the error is in the application or not.
+    :param long_error_message: The long error message, if given, no
+                               traceback is requested by format_exc().
     """
 
-    long_error_message = traceback.format_exc()
+    if long_error_message is None:
+        long_error_message = traceback.format_exc()
 
     timestamp = time.strftime(r'%Y-%m-%d %H:%M:%S', time.localtime())
     error_id = generate_random_string(12, with_punctuation=False)
@@ -179,6 +194,66 @@ def handle_exception(error_message: str, print_error: bool = True, is_app_error:
                               + long_error_message
 
     WRITE_EXECUTOR.submit(write_to_file, LOG_FILE, long_error_message)
+
+
+def does_match_rule(rule: list, client_info: dict) -> bool:
+    """
+    Evaluates whether a given client information matches the specified rule.
+
+    :param rule: The rule to evaluate. It can be a nested list 
+                 with logical operators ('and', 'or') combining 
+                 multiple conditions. Each condition is represented 
+                 by a list containing a field name, an operator, and a value.
+    :param client_info: The client information to evaluate against the rule. 
+                        The dictionary keys represent field names, and the 
+                        values are the corresponding data for those fields.
+    :return: True if the client information matches the rule, otherwise False.
+    """
+
+    i = 0
+    while i < len(rule):
+        if rule[i] == 'and':
+            return does_match_rule(rule[:i], client_info)\
+                and does_match_rule(rule[i+1:], client_info)
+        if rule[i] == 'or':
+            return does_match_rule(rule[:i], client_info)\
+                or does_match_rule(rule[i+1:], client_info)
+        i += 1
+
+    field, operator, value = rule
+
+    if field not in client_info:
+        short_error_message = f'UnknownFieldError: {field} does not exist as client info field'
+        handle_exception(
+            short_error_message + '.', is_app_error = False, long_error_message =\
+            short_error_message + ' this is because you have specified an incorrect user info '+
+            ' field in the rules argument (valid: `ip`, invalid: `ipadd`)'
+        )
+
+    if operator in ('==', 'equals', 'equal', 'is'):
+        return client_info.get(field) == value
+    if operator in ('!=', 'does not equal', 'does not equals', 'not equals', 'not equal', 'not is'):
+        return client_info.get(field) != value
+    if operator in ('contains', 'contain'):
+        return value in client_info.get(field, '')
+    if operator in ('does not contain', 'does not contains', 'not contain', 'not contains'):
+        return value not in client_info.get(field, '')
+    if operator in ('is in', 'in'):
+        return client_info.get(field) in value
+    if operator in ('is not in', 'not is in', 'not in'):
+        return client_info.get(field) not in value
+    if operator in ('greater than', 'larger than'):
+        return client_info(field) > value
+    if operator == 'less than':
+        return client_info(field) < value
+
+    short_error_message = f'UnknownOperatorError: {operator} is not known.'
+    handle_exception(
+        short_error_message + '.', is_app_error = False, long_error_message =\
+        short_error_message + ' this is because you have specified an incorrect operator '+
+        ' field in the rules argument (valid: `==`, invalid: `is the same as`)'
+    )
+    return False
 
 
 def rearrange_url(url: str, args_to_remove: list) -> str:
@@ -560,7 +635,8 @@ class Json:
         self.data = None
 
 
-    def load(self, file_path: str, default: Optional[Union[dict, list]] = None) -> Union[dict, list]:
+    def load(self, file_path: str, default: Optional[
+             Union[dict, list]] = None) -> Union[dict, list]:
         """
         Function to load a JSON file securely.
 
@@ -625,7 +701,8 @@ class Pickle:
         self.data = {}
 
 
-    def load(self, file_path: str, default: Optional[Union[dict, list]] = None) -> Union[dict, list]:
+    def load(self, file_path: str, default: Optional[
+             Union[dict, list]] = None) -> Union[dict, list]:
         """
         Function to load a Pickle file securely.
 
@@ -688,35 +765,77 @@ PICKLE = Pickle()
 
 
 class Cache(dict):
+    """
+    A dictionary-based cache that loads and saves data to a file using pickle.
+    """
+
     def __init__(self, file_name: str) -> None:
+        """
+        Initializes the Cache with the specified file name.
+
+        :param file_name: The name of the file to store cache data.
+        """
+
         self.file_name = file_name
         super().__init__()
 
     def load(self) -> dict:
+        """
+        Loads and returns the cache data from the file.
+
+        :return: The cache data from the file. If the cache file does not contain
+                 data for this file_name, an empty dictionary is returned.
+        """
+
         data = PICKLE.load(CACHE_FILE_PATH)
         if not self.file_name in data:
             return {}
         return data[self.file_name]
 
     def __getitem__(self, key: any) -> any:
+        """
+        Retrieves the value associated with the given key from the cache.
+
+        :param keys: The key for which the value is to be retrieved.
+        :return: The value associated with the key, or an empty dictionary if the key is not found.
+        """
+
         data = self.load()
         return data.get(key, {})
 
     def __setitem__(self, key: any, value: any) -> None:
+        """
+        Sets the value associated with the given key in the cache.
+
+        :param keys: The key for which the value is to be set.
+        :param value: The value to be set for the key.
+        """
+
         data = PICKLE.load(CACHE_FILE_PATH)
+
         if not self.file_name in data:
             data[self.file_name] = {}
+
         data[self.file_name][key] = value
         PICKLE.dump(data, CACHE_FILE_PATH)
         return
 
     def __delitem__(self, key: any) -> None:
+        """
+        Deletes the value associated with the given key from the cache.
+
+        :param key: The key for which the value is to be deleted.
+        """
+
         data = PICKLE.load(CACHE_FILE_PATH)
+
         if not self.file_name in data:
             data[self.file_name] = {}
+
         del data[self.file_name][key]
         PICKLE.dump(data, CACHE_FILE_PATH)
         return
+
 
 LANGUAGES = JSON.load(os.path.join(ASSETS_DIR, 'languages.json'), [])
 LANGUAGE_CODES = [language['code'] for language in LANGUAGES]
@@ -1397,6 +1516,24 @@ def request_tor_ips() -> list | None:
         cache['ips'] = tor_exit_ips
 
     return tor_exit_ips
+
+
+def download_geolite() -> None:
+    """
+    Downloads the GeoLite2 databases files.
+    """
+
+    for _, data in GEOLITE_DATA.items():
+        if os.path.isfile(data['path']):
+            continue
+        try:
+            response = requests.get(data['url'])
+            response.raise_for_status()
+
+            with open(data['path'], 'wb') as file:
+                file.write(response.content)
+        except Exception as exc:
+            handle_exception(exc, is_app_error = False)
 
 
 def is_stopforumspam_spammer(ip_address: str) -> bool:

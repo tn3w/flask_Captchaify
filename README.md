@@ -1,8 +1,10 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/tn3w/flask_Captchaify/releases/download/img_v1.7/oneclick_dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="https://github.com/tn3w/flask_Captchaify/releases/download/img_v1.7/oneclick_light.png">
-  <img alt="Picture from Block Page" src="https://github.com/tn3w/flask_Captchaify/releases/download/img_v1.7/oneclick_dark.png">
-</picture>
+<center>
+   <picture align="center">
+      <source width="800px" media="(prefers-color-scheme: dark)" srcset="https://github.com/tn3w/flask_Captchaify/releases/download/img_v1.7/oneclick_dark.png">
+      <source width="800px" media="(prefers-color-scheme: light)" srcset="https://github.com/tn3w/flask_Captchaify/releases/download/img_v1.7/oneclick_light.png">
+      <img width="800px" alt="Picture from Block Page" src="https://github.com/tn3w/flask_Captchaify/releases/download/img_v1.7/oneclick_dark.png">
+   </picture>
+</center>
 <p align="center"><a rel="noreferrer noopener" href="https://github.com/tn3w/flask_Captchaify"><img alt="Github" src="https://img.shields.io/badge/Github-141e24.svg?&style=for-the-badge&logo=github&logoColor=white"></a>  <a rel="noreferrer noopener" href="https://pypi.org/project/flask-Captchaify/"><img alt="PyPI" src="https://img.shields.io/badge/PyPi-141e24.svg?&style=for-the-badge&logo=python&logoColor=white"></a>  <a rel="noreferrer noopener" href="https://libraries.io/pypi/flask-Captchaify"><img alt="Libraries.io" src="https://img.shields.io/badge/Libraries.io-141e24.svg?&style=for-the-badge&logo=npm&logoColor=white"></a>
 
 # flask_Captchaify
@@ -12,15 +14,16 @@ A DDoS defense system for flask applications, first sends users to a captcha pag
 > [!CAUTION]
 > Captchaify must now no longer be imported as Captcha, i.e. `from flask_Captchaify import Captcha`, but as Captchaify (`from flask_Captchaify import Captchaify`)
 > 
-> The normal captcha page has changed and from version 1.6.8 uses a one-click method instead of text captchas,
-> use the `default_captcha_type` argument to set the captcha with `text` back to text
+> In the latest version, the let action is now set as `allow`.
 
 Todos:
 - [x] Captcha type with multiclick
 - [x] Captcha data set with animals
 - [x] Add used captcha id to text captcha
+- [x] Captcha or blocking rules based on client_ip and client_ip_info (e.g. blocking of certain IP countries)
+- [ ] add `*` to rules Arg
+- [ ] `hardness` Arg also changes hardness of oneclick and multiclick captcha
 - [ ] Captcha data set with emojis
-- [ ] Captcha or blocking rules based on client_ip and client_ip_info (e.g. blocking of certain IP countries)
 
 ## How does flask_Captchaify work?
 If needed, a captcha is displayed to the user (or the robot) based on the strength set. Javascript is not needed for this, as the content is rendered on the server. If the captcha is fulfilled correctly, a token is created that stores the client's data in encrypted form and is used to confirm fulfillment with each request. It is stored as a cookie and as the url Arg `captcha`.
@@ -161,8 +164,80 @@ For more information, see the sample code above.
           \keys.json
    ```
 
+5. `rules` Arg
 
-5. `actions` Arg
+   Certain changes based on specific criteria such as IP, proxy, hosting or geo information
+
+   Web page that blocks the localhost Ip:
+   ```python
+   captchaify = Captchaify(app, rules=[{"rule": ['ip', 'equals', '127.0.0.1'], "change": {"action": "block"}}])
+   ```
+
+   Criteria can also be combined, with 'and' meaning that both criteria must be met and 'or' meaning that one of the two criteria must be met:
+   ```python
+   rules = [{"rule": ['ip', 'is in', ['127.0.0.1', '10.0.0.1'], 'or', 'proxy', 'is', True]}, "change": {"action": "block"}]
+   ```
+
+   The following client info fields can be compared:
+   | Name of field  | Type | Information                                                   | Example                                                                          |
+   | -------------- | ---- | ------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+   | ip             | str  | Client's IP address.                                          | 169.150.196.74                                                                   |
+   | user_agent     | str  | User agent string of the client's browser.                    | Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0 |
+   | invalid_ip     | bool | Boolean indicating if the IP is invalid.                      | False                                                                            |
+   | continent      | str  | Name of the continent.                                        | Europe                                                                           |
+   | continent_code | str  | Continent code. (ISO 3166)                                    | EU                                                                               |
+   | country        | str  | Name of the country.                                          | The Netherlands                                                                  |
+   | country_code   | str  | Country code. (ISO 3166)                                      | NL                                                                               |
+   | region         | str  | Name of the region.                                           | North Holland                                                                    |
+   | region_code    | str  | Region code. (ISO 3166)                                       | NH                                                                               |
+   | city           | str  | Name of the city.                                             | Amsterdam                                                                        |
+   | district       | str  | Name of the district.                                         | None                                                                             |
+   | zip            | int  | Postal code.                                                  | 1012                                                                             |
+   | lat            | int  | Latitude.                                                     | 52.3759                                                                          |
+   | lon            | int  | Longitude.                                                    | 4.8975                                                                           |
+   | timezone       | str  | Timezone.                                                     | Europe/Amsterdam                                                                 |
+   | offset         | int  | Timezone offset.                                              | 7200                                                                             |
+   | currency       | str  | Local currency. (ISO 4217)                                    | EUR                                                                              |
+   | isp            | str  | Internet Service Provider.                                    | Datacamp Limited                                                                 |
+   | org            | str  | Organization name.                                            | CSNext                                                                           |
+   | as             | str  | Autonomous system name.                                       | Datacamp Limited                                                                 |
+   | as_code        | int  | Autonomous system code.                                       | 212238                                                                           |
+   | reverse        | str  | Reverse DNS lookup result.                                    | unn-169-150-196-74.datapacket.com                                                |
+   | mobile         | bool | Boolean indicating if the connection is via a mobile network. | False                                                                            |
+   | proxy          | bool | Boolean indicating if the client is using a proxy.            | True                                                                             |
+   | hosting        | bool | Boolean indicating if the client is using a hosting service.  | True                                                                             |
+   | forum_spammer  | bool | Boolean indicating if the client is a known forum spammer.    | True                                                                             |
+   | netloc         | str  | Network location part of the URL. (includes Port)             | domain.example.com:80                                                            |
+   | hostname       | str  | Fully qualified domain name (FQDN) of the server.             | domain.example.com                                                               |
+   | domain         | str  | Primary domain name, which is a subset of the hostname.       | example.com                                                                      |
+   | path           | str  | Path component of the URL, indicates a specific resource.     | /login                                                                           |
+   | scheme         | str  | Protocol used to access the resource.                         | http                                                                             |
+   | url            | str  | Complete URL that combines all the individual components.     | http://domain.example.com/login                                                  |
+
+   The following operators are available:
+   | Name of Operator                                                   | The same as        |
+   | ------------------------------------------------------------------ | ------------------ |
+   | ==, equals, equal, is                                              | field == value     |
+   | !=, does not equal, does not equals, not equals, not equal, not is | field != value     |
+   | contains, contain                                                  | value in field     |
+   | does not contain, does not contains, not contain, not contains     | value not in field |
+   | is in, in                                                          | field in value     |
+   | is not in, not is in, not in                                       | field not in value |
+   | greater than, larger than                                          | field > value      |
+   | less than                                                          | field < value      |
+   Where field is the type of data e.g. `ip` and value is the value it should have e.g. `169.150.196.74`.
+
+   All changes that can be made by these rules:
+   | Name of the change | Type            | Example                |
+   | ------------------ | --------------- | ---------------------- |
+   | captcha_type       | str             | multiclick             |
+   | action             | str             | allow                  |
+   | hardness           | int             | 1                      |
+   | rate_limit         | Tuple[int, int] | (20, 100)              |
+   | template_dir       | str             | /path/to/template/dir  |
+
+
+6. `actions` Arg
 
    To change the response in the case of certain routes / endpoints, you can use the actions parameter.
    
@@ -187,7 +262,7 @@ For more information, see the sample code above.
    | captcha        | Default value, shows only suspicious traffic captchas.               |
 
 
-6. `hardness` Arg
+7. `hardness` Arg
    
    To change the hardness of a captcha for specific routes or endpoints use hardness.
 
@@ -206,7 +281,7 @@ For more information, see the sample code above.
    | 3              | The hardness of the captcha is hard, a 9 - 14 number audio captcha is displayed in addition to the 10 - 12 character text captcha. |
 
 
-7. `rate_limits` Arg
+8. `rate_limits` Arg
 
    To change the rate_limit and max_rate_limit for a specific route or endpoint use the rate_limits arg.
 
@@ -220,7 +295,7 @@ For more information, see the sample code above.
    ```
 
 
-8. `template_dirs` Arg
+9. `template_dirs` Arg
 
    To change the template directory of a particular route use the template_dirs arg.
 

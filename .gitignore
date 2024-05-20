@@ -161,3 +161,4 @@ cython_debug/
 
 src/flask_Captchaify/data
 test*
+log.txt

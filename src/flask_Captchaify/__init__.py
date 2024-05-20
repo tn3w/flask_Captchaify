@@ -12,12 +12,15 @@ Under the open source license GPL-3.0 license, supported by Open Source Software
 """
 
 import os
+import re
 import random
 import secrets
+import socket
 from typing import Optional, Final, Union
 from time import time
 from urllib.parse import urlparse, quote
 from base64 import b64encode
+import geoip2.database
 from bs4 import BeautifulSoup
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
@@ -26,7 +29,8 @@ from .utils import JSON, PICKLE, Hashing, SymmetricCrypto, SSES, WebPage, get_wo
     get_client_ip, generate_random_string, get_ip_info, remove_args_from_url, request_tor_ips,\
     render_template, is_stopforumspam_spammer, search_languages, get_random_image,\
     manipulate_image_bytes, convert_image_to_base64, get_return_path, get_return_url,\
-    extract_path_and_args, rearrange_url, handle_exception
+    extract_path_and_args, rearrange_url, handle_exception, does_match_rule, download_geolite,\
+    get_domain_from_url
 
 
 WORK_DIR: Final[str] = get_work_dir()
@@ -50,6 +54,16 @@ DATASET_PATHS: Final[dict] = {
 RATE_LIMIT_PATH: Final[str] = os.path.join(DATA_DIR, 'rate-limits.pkl')
 FAILED_CAPTCHAS_PATH: Final[str] = os.path.join(DATA_DIR, 'failed-captchas.pkl')
 SOLVED_CAPTCHAS_PATH: Final[str] = os.path.join(DATA_DIR, 'solved-captchas.pkl')
+GEOLITE_DATA: Final[dict] = {
+    "city": {
+        "url": "https://git.io/GeoLite2-City.mmdb",
+        "path": os.path.join(DATA_DIR, "GeoLite2-City.mmdb")
+    },
+    "asn": {
+        "url": "https://git.io/GeoLite2-ASN.mmdb",
+        "path": os.path.join(DATA_DIR, "GeoLite2-ASN.mmdb")
+    }
+}
 
 EMOJIS: Final[list] = JSON.load(os.path.join(ASSETS_DIR, 'emojis.json'), [])
 TEA_EMOJIS: Final[list] = JSON.load(os.path.join(ASSETS_DIR, 'tea_emojis.json'), [])
@@ -90,8 +104,8 @@ DATASET_SIZES: Final[dict] = {
     'smaller': (20, 8),
     'little': (6, 8)
 }
-ALL_ACTIONS: Final[list] = ['let', 'block', 'fight', 'captcha']
-ALL_THIRD_PARTIES: Final[list] = ['tor', 'ipapi', 'stopforumspam']
+ALL_ACTIONS: Final[list] = ['allow', 'block', 'fight', 'captcha']
+ALL_THIRD_PARTIES: Final[list] = ['geoip', 'tor', 'ipapi', 'stopforumspam']
 ALL_TEMPLATE_TYPES: Final[list] = [
     'captcha_text', 'captcha_multiclick', 'captcha_oneclick',
     'block', 'rate_limited', 'change_language'
@@ -116,15 +130,15 @@ class Captchaify:
     def __init__ (
         self, app: Flask, captcha_types: Optional[dict] = None,
         dataset_size: Union[tuple[int], str] = 'normal', dataset_dir: Optional[str] = None,
-        actions: Optional[dict] = None, hardness: Optional[dict] = None,
-        rate_limits: Optional[dict] = None, template_dirs: Optional[dict] = None,
-        default_captcha_type: str = 'oneclick', default_action: str = 'captcha',
-        default_hardness: int = 2, default_rate_limit: Optional[int] = 120,
-        default_max_rate_limit = 1200, default_template_dir: Optional[str] = None,
-        verification_age: int = 3600, without_cookies: bool = False,
-        block_crawler: bool = True, crawler_hints: bool = True,
-        third_parties: Optional[list] = None, as_route: bool = False,
-        without_other_args: Optional[bool] = False) -> None:
+        actions: Optional[dict] = None, rules: Optional[list[dict]] = None,
+        hardness: Optional[dict] = None, rate_limits: Optional[dict] = None,
+        template_dirs: Optional[dict] = None, default_captcha_type: str = 'oneclick',
+        default_action: str = 'captcha', default_hardness: int = 2,
+        default_rate_limit: Optional[int] = 120, default_max_rate_limit = 1200,
+        default_template_dir: Optional[str] = None, verification_age: int = 3600,
+        without_cookies: bool = False, block_crawler: bool = True,
+        crawler_hints: bool = True, third_parties: Optional[list] = None,
+        as_route: bool = False, without_other_args: Optional[bool] = False) -> None:
         """
         Configures security settings for a Flask app.
 
@@ -135,6 +149,8 @@ class Captchaify:
                              number of keywords or a string with predefined sizes.
         :param actions: Dict with actions for different routes.
                         Example: {"urlpath": "fight", "endpoint": "block"}. Default is None.
+        :param rules: Dict with rules and actions that occur in certain cases.
+                      Example: {["ip", "==", "8.8.8.8"]: {"action": "block"}}
         :param hardness: Dict with hardness for different routes.
                          Example: {"urlpath": 1, "endpoint": 2}. Default is None.
         :param rate_limits: Dict with rate limit and max rate limit for different routes.
@@ -188,6 +204,7 @@ class Captchaify:
         self.captcha_types = captcha_types if isinstance(captcha_types, dict) else {}
         self.dataset_dir = dataset_dir if isinstance(dataset_dir, str) else None
         self.actions = actions if isinstance(actions, dict) else {}
+        self.rules = rules if isinstance(rules, list) else []
         self.hardness = hardness if isinstance(hardness, dict) else {}
         self.rate_limits = rate_limits if isinstance(rate_limits, dict) else {}
         self.template_dirs = template_dirs if isinstance(template_dirs, dict) else {}
@@ -224,6 +241,9 @@ class Captchaify:
         self.captcha_secret = captcha_secret
 
         self.sses = SSES(SymmetricCrypto(captcha_secret))
+
+        if 'geoip' in self.third_parties:
+            download_geolite()
 
         if 'tor' in self.third_parties:
             tor_exit_ips = request_tor_ips()
@@ -342,12 +362,6 @@ class Captchaify:
                 except Exception as exc:
                     handle_exception(exc)
                     return redirect(self._create_route_url('blocked'))
-
-            self.actions.update(
-                {'/blocked-' + route_id: 'let', '/rate_limited-' +\
-                 route_id: 'let', '/change_language-' + route_id: 'let',
-                 '/captcha-' + route_id: 'let'}
-            )
         else:
             app.before_request(self._change_language)
 
@@ -369,6 +383,8 @@ class Captchaify:
         This property returns a dictionary of preferences based on the current route or endpoint.
         """
 
+        url_path = urlparse(self._client_url).path
+
         def is_correct_route(path: str):
             """
             Helper function to determine if the provided path matches the current route or endpoint.
@@ -376,7 +392,6 @@ class Captchaify:
             :param path: The path to check against the current route or endpoint
             """
 
-            url_path = urlparse(request.url).path
             url_endpoint = request.endpoint
 
             url = url_path
@@ -422,7 +437,6 @@ class Captchaify:
             for path, path_preference in preference.items():
                 if is_correct_route(path):
                     if preference_name != 'rate_limit':
-
                         if preference_name == 'captcha_type':
                             if path_preference.startswith('text'):
                                 path_preference = 'text'
@@ -434,6 +448,28 @@ class Captchaify:
                         current_url[preference_name] = path_preference
                     else:
                         current_url['rate_limit'], current_url['max_rate_limit'] = path_preference
+
+        for rule in self.rules:
+            rule, preferences = rule['rule'], rule['change']
+            if does_match_rule(rule, self._client_info):
+                for preference_name, preference in preferences.items():
+                    if preference_name != 'rate_limit':
+                        if preference_name == 'captcha_type':
+                            if preference.startswith('text'):
+                                preference = 'text'
+                            elif preference == 'oneclick':
+                                preference = 'oneclick_keys'
+                            elif preference == 'multiclick':
+                                preference = 'multiclick_animals'
+
+                        current_url[preference_name] = preference
+                    else:
+                        current_url['rate_limit'], current_url['max_rate_limit'] = preference
+
+        if self.as_route:
+            if url_path in ('/blocked-' + self.route_id, '/rate_limited-'\
+                            + self.route_id, '/captcha-' + self.route_id):
+                current_url['action'] = 'allow'
 
         if self.dataset_dir is not None:
             current_captcha_motif = current_url['captcha_type'].split('_')[1]
@@ -493,8 +529,7 @@ class Captchaify:
         if hasattr(g, 'client_ip_info'):
             if isinstance(g.client_ip_info, dict):
                 return g.client_ip_info
-            else:
-                ip_info = g.client_ip_info
+            ip_info = g.client_ip_info
 
         if ip_info is None:
             if self._client_invalid_ip:
@@ -545,6 +580,101 @@ class Captchaify:
                 scheme = 'http'
 
         return scheme + '://' + request.url.split('://')[1]
+
+
+    @property
+    def _client_info(self) -> dict:
+        """
+        Retrieves and caches client information including
+        IP details, geolocation, ISP, and other metadata.
+
+        :return: A dictionary containing client information.
+        """
+
+        if hasattr(g, 'client_info'):
+            return g.client_info
+
+        url = self._client_url
+        url_info = urlparse(url)
+
+        data = {
+            "ip": self._client_ip, "user_agent": self._client_user_agent, "invalid_ip": self._client_invalid_ip,
+            "continent": None, "continent_code": None, "country": None, "country_code": None, "region": None,
+            "region_code": None, "city": None, "district": None, "zip": None, "lat": None, "lon": None,
+            "timezone": None, "offset": None, "currency": None, "isp": None, "org": None, "as": None,
+            "as_code": None, "reverse": None, "mobile": None, "proxy": None, "hosting": None, "forum_spammer": None,
+            "netloc": url_info.netloc, "hostname": url_info.hostname, "domain": get_domain_from_url(url),
+            "path": url_info.path, "scheme": url_info.scheme, "url": url
+        }
+
+        if not self._client_invalid_ip:
+            if 'geoip' in self.third_parties:
+                try:
+                    with geoip2.database.Reader(GEOLITE_DATA['city']['path']) as reader:
+                        city_response = reader.city(self._client_ip)
+
+                        data.update({
+                            "continent": city_response.continent.name,
+                            "continent_code": city_response.continent.code,
+                            "country": city_response.country.name,
+                            "country_code": city_response.country.iso_code,
+                            "region": city_response.subdivisions.most_specific.name,
+                            "region_code": city_response.subdivisions.most_specific.iso_code,
+                            "city": city_response.city.name,
+                            "zip": city_response.postal.code,
+                            "lat": city_response.location.latitude,
+                            "lon": city_response.location.longitude
+                        })
+                except Exception as exc:
+                    handle_exception(exc, is_app_error = False)
+
+                try:
+                    with geoip2.database.Reader(GEOLITE_DATA['asn']['path']) as reader:
+                        isp_response = reader.asn(self._client_ip)
+
+                        data.update({
+                            "as": isp_response.autonomous_system_organization,
+                            "as_code": isp_response.autonomous_system_number,
+                        })
+                except Exception as exc:
+                    handle_exception(exc, is_app_error = False)
+
+            if 'ipapi' in self.third_parties:
+                client_info = self._client_ip_info
+
+                if client_info is not None:
+                    for key, value in client_info.items():
+                        if key in ('status', 'query', 'time'):
+                            continue
+
+                        if key == 'as' and isinstance(value, str):
+                            as_code = value.split(' ')[0].replace('AS', '')
+                            if not as_code.isdigit():
+                                continue
+                            value = int(as_code)
+
+                        new_key = {'region': 'region_code', 'regionname': 'region', 'as': 'as_code', 'asname': 'as'}\
+                            .get(key.lower(), re.sub('([A-Z])', r'_\1', key).lower())
+                        if data.get(new_key) is None:
+                            if isinstance(value, str) and value.strip() == '':
+                                value = None
+
+                            data[new_key] = value
+
+            if 'stopforumspam' in self.third_parties:
+                data["forum_spammer"] = is_stopforumspam_spammer(self._client_ip)
+
+        if data.get('reverse') is None:
+            try:
+                socket.setdefaulttimeout(1)
+                hostname = socket.gethostbyaddr(self._client_ip)[0]
+                data["reverse"] = hostname if hostname != self._client_ip else None
+            except Exception as exc:
+                handle_exception(exc, is_app_error = False)
+
+        g.client_info = data
+
+        return data
 
 
     def _load_dataset(self, dataset_path: str) -> dict:
@@ -639,11 +769,7 @@ class Captchaify:
             g.is_invalid_ip = is_invalid_ip
             g.client_user_agent = client_user_agent
 
-            client_ip_info = None
-            if 'ipapi' in self.third_parties and not g.is_invalid_ip:
-                client_ip_info = get_ip_info(client_ip)
-
-            g.client_ip_info = client_ip_info
+            self._client_info
         except Exception as exc:
             handle_exception(exc)
             if self.as_route:
@@ -775,7 +901,7 @@ class Captchaify:
 
 
     def _display_captcha(self, is_error: bool = False, return_path: Optional[str] = None):
-        url_path = urlparse(request.url).path
+        url_path = urlparse(self._client_url).path
         client_ip = self._client_ip
 
         preferences = self._preferences
@@ -1023,7 +1149,8 @@ class Captchaify:
                     'oneclick': request.args.get('ci'),
                     'multiclick': 1, 'text': request.args.get('tc')
                 }
-                encryption_keys = {'text': CAPTCHA_TOKEN_TEXT}.get(captcha_type, CAPTCHA_TOKEN_CLICK)
+                encryption_keys = {'text': CAPTCHA_TOKEN_TEXT}\
+                    .get(captcha_type, CAPTCHA_TOKEN_CLICK)
 
                 captcha_type = captcha_type.split('_')[0]
 
@@ -1264,11 +1391,19 @@ class Captchaify:
 
 
     def _create_route_url(self, template: str) -> str:
+        """
+        Creates a route URL with the specified template, including return path,
+        theme, and language parameters.
+
+        :param template: The template to be used in constructing the URL.
+        :return: The constructed route URL.
+        """
+
         return_path = get_return_path(request)
         if return_path is None:
             return_path = quote(
                 extract_path_and_args(
-                    rearrange_url(request.url, ['theme', 'language', 'captcha', 'return_path'])
+                    rearrange_url(self._client_url, ['theme', 'language', 'captcha', 'return_path'])
                 )
             )
 
@@ -1300,7 +1435,7 @@ class Captchaify:
             action = preferences['action']
             hardness = preferences['hardness']
 
-            if action == 'let':
+            if action == 'allow':
                 return
 
             is_crawler = False
@@ -1317,18 +1452,10 @@ class Captchaify:
                 action == 'fight'
             ]
 
-            if not any(criteria) and 'ipapi' in self.third_parties:
-                ip_info = self._client_ip_info
-
-                if not isinstance(ip_info, dict):
-                    criteria.append(True)
-                else:
-                    if ip_info.get('proxy', False) or ip_info.get('hosting', False):
-                        criteria.append(True)
-
-            if not any(criteria) and 'stopforumspam' in self.third_parties:
-                if is_stopforumspam_spammer(client_ip):
-                    criteria.append(True)
+            if not any(criteria):
+                criteria.append(self._client_info['proxy'])
+                criteria.append(self._client_info['hosting'])
+                criteria.append(self._client_info['forum_spammer'])
 
             if not any(criteria):
                 return
