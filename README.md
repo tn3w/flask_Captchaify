@@ -30,6 +30,8 @@ If needed, a captcha is displayed to the user (or the robot) based on the streng
 
 > [!TIP]
 > The `captcha`, `language` and `theme` Arg is automatically inserted in all anchors on your HTML page
+>
+> If you use Ip to Domain tools like Cloudflared or Nginx it can happen that no ipv4 IP can be found.
 
 An example script could look like this:
 ```python

@@ -549,6 +549,87 @@ def get_client_ip(request: Request) -> Union[Optional[str], bool]:
     return None, False
 
 
+def get_client_ip(request: Request, return_list: bool = False)\
+        -> Union[Optional[Union[str, list]], bool]:
+    """
+    Get the client IP in v4 or v6
+    """
+
+    valid_ips = []
+    invalid_ips = []
+
+    client_ip = request.remote_addr
+    invalid_ips.append(client_ip)
+    if is_valid_ip(client_ip):
+        valid_ips.append(client_ip)
+        if not return_list:
+            return client_ip, False
+
+    other_client_ips = [
+        request.environ.get('HTTP_X_REAL_IP', None),
+        request.environ.get('REMOTE_ADDR', None),
+        request.environ.get('HTTP_X_FORWARDED_FOR', None),
+    ]
+
+    for client_ip in other_client_ips:
+        invalid_ips.append(client_ip)
+        if is_valid_ip(client_ip):
+            valid_ips.append(client_ip)
+            if not return_list:
+                return client_ip, False
+
+    try:
+        forwarded_ips = request.headers.get('X-Forwarded-For').split(',')
+        for ip in forwarded_ips:
+            ip = ip.strip()
+            invalid_ips.append(ip)
+            if is_valid_ip(ip):
+                valid_ips.append(ip)
+                if not return_list:
+                    return ip, False
+    except Exception:
+        pass
+
+    headers_to_check = [
+        'X-Forwarded-For',
+        'X-Real-Ip',
+        'CF-Connecting-IP',
+        'True-Client-Ip',
+    ]
+
+    for header in headers_to_check:
+        if header in request.headers:
+            client_ip = request.headers[header]
+            client_ip = client_ip.split(',')[0].strip()
+            invalid_ips.append(client_ip)
+            if is_valid_ip(client_ip):
+                valid_ips.append(client_ip)
+                if not return_list:
+                    return client_ip, False
+
+    if return_list:
+        if len(valid_ips) != 0:
+            return valid_ips, False
+
+    for invalid_ip in invalid_ips:
+        if isinstance(invalid_ip, str):
+            valid_ips.append(invalid_ip)
+            if not return_list:
+                return invalid_ip, True
+
+    for invalid_ip in invalid_ips:
+        if isinstance(invalid_ip, str):
+            valid_ips.append(invalid_ip)
+            if not return_list:
+                return invalid_ip, True
+
+    if return_list:
+        if len(valid_ips) != 0:
+            return valid_ips, True
+
+    return [] if return_list else None, False
+
+
 def remove_args_from_url(url: str) -> str:
     """
     Removes query parameters from the given URL and returns the modified URL.
@@ -1491,6 +1572,22 @@ class SSES:
             return None
 
 
+def minimize_ipv6(ipv6_address: str) -> str:
+    """
+    Minimize an IPv6 address by removing leading zeros and using 
+    the "::" notation for the longest consecutive sequence of zeros.
+    
+    :param ipv6_address: The full IPv6 address to be minimized.
+    :return: The minimized IPv6 address.
+    """
+
+    try:
+        ipv6_obj = ipaddress.IPv6Address(ipv6_address)
+        return ipv6_obj.compressed
+    except Exception:
+        return ipv6_address
+
+
 def reverse_ip(ip):
     """
     Reverse the IP address for DNS lookup.
@@ -1512,20 +1609,37 @@ def is_tor_ip(ip):
     :param ip: str - IP address to check (IPv4 or IPv6)
     :return: bool - True if the IP is a Tor exit node, False otherwise
     """
-    query = reverse_ip(ip)
+
+    ip = minimize_ipv6(ip)
+
+    cache = Cache('tor')
+
+    for hashed_ip, ip_content in cache.load().items():
+        comparison = Hashing().compare(ip, hashed_ip)
+        if comparison:
+            if not int(time.time()) - int(ip_content['time']) > 604800:
+                return ip_content['tor']
+            break
+
+    query = reverse_ip(minimize_ipv6(ip))
+
+    is_tor = False
 
     try:
         answers = dns.resolver.resolve(query, 'A')
         for rdata in answers:
             if rdata.to_text() == '127.0.0.2':
-                return True
-    except dns.resolver.NXDOMAIN:
-        return False
-    except dns.resolver.NoAnswer:
-        return False
-    except dns.exception.DNSException as e:
-        print(f"DNS query failed: {e}")
-        return False
+                is_tor = True
+                break
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.exception.DNSException):
+        pass
+
+    hashed_ip_address = Hashing().hash(ip)
+
+    cache[hashed_ip_address] = {
+        'tor': is_tor,
+        'time': int(time.time())
+    }
 
     return False
 
@@ -1539,7 +1653,7 @@ def download_geolite() -> None:
         if os.path.isfile(data['path']):
             continue
         try:
-            response = requests.get(data['url'])
+            response = requests.get(data['url'], timeout = 3)
             response.raise_for_status()
 
             with open(data['path'], 'wb') as file:

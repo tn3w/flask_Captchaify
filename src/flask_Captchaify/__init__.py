@@ -458,7 +458,8 @@ class Captchaify:
 
         if self.as_route:
             if url_path in ('/blocked-' + self.route_id, '/rate_limited-'\
-                            + self.route_id, '/captcha-' + self.route_id):
+                            + self.route_id, '/captcha-' + self.route_id,
+                            '/change_language-' + self.route_id):
                 current_url['action'] = 'allow'
 
         if self.dataset_dir is not None:
@@ -591,12 +592,14 @@ class Captchaify:
         url_info = urlparse(url)
 
         data = {
-            "ip": self._client_ip, "user_agent": self._client_user_agent, "invalid_ip": self._client_invalid_ip,
-            "continent": None, "continent_code": None, "country": None, "country_code": None, "region": None,
-            "region_code": None, "city": None, "district": None, "zip": None, "lat": None, "lon": None,
-            "timezone": None, "offset": None, "currency": None, "isp": None, "org": None, "as": None,
-            "as_code": None, "reverse": None, "mobile": None, "proxy": None, "tor": None, "hosting": None, "forum_spammer": None,
-            "netloc": url_info.netloc, "hostname": url_info.hostname, "domain": get_domain_from_url(url),
+            "ip": self._client_ip, "user_agent": self._client_user_agent,
+            "invalid_ip": self._client_invalid_ip, "continent": None, "continent_code": None,
+            "country": None, "country_code": None, "region": None, "region_code": None,
+            "city": None, "district": None, "zip": None, "lat": None, "lon": None,
+            "timezone": None, "offset": None, "currency": None, "isp": None, "org": None,
+            "as": None, "as_code": None, "reverse": None, "mobile": None, "proxy": None,
+            "tor": None, "hosting": None, "forum_spammer": None, "netloc": url_info.netloc,
+            "hostname": url_info.hostname, "domain": get_domain_from_url(url),
             "path": url_info.path, "scheme": url_info.scheme, "url": url
         }
 
@@ -618,8 +621,8 @@ class Captchaify:
                             "lat": city_response.location.latitude,
                             "lon": city_response.location.longitude
                         })
-                except Exception as exc:
-                    handle_exception(exc, is_app_error = False)
+                except Exception:
+                    pass
 
                 try:
                     with geoip2.database.Reader(GEOLITE_DATA['asn']['path']) as reader:
@@ -629,11 +632,21 @@ class Captchaify:
                             "as": isp_response.autonomous_system_organization,
                             "as_code": isp_response.autonomous_system_number,
                         })
-                except Exception as exc:
-                    handle_exception(exc, is_app_error = False)
+                except Exception:
+                    pass
 
             if 'tor' in self.third_parties and not self._client_invalid_ip:
-                data["tor"] = is_tor_ip(self._client_ip)
+                is_tor = False
+                for client_ip in list(set(get_client_ip(request, True)[0])):
+                    try:
+                        is_tor = is_tor_ip(client_ip)
+                    except Exception as exc:
+                        handle_exception(exc)
+
+                    if is_tor:
+                        break
+
+                data["tor"] = is_tor
 
             if 'ipapi' in self.third_parties:
                 client_info = self._client_ip_info
@@ -649,7 +662,8 @@ class Captchaify:
                                 continue
                             value = int(as_code)
 
-                        new_key = {'region': 'region_code', 'regionname': 'region', 'as': 'as_code', 'asname': 'as'}\
+                        new_key = {'region': 'region_code', 'regionname':\
+                                   'region', 'as': 'as_code', 'asname': 'as'}\
                             .get(key.lower(), re.sub('([A-Z])', r'_\1', key).lower())
                         if data.get(new_key) is None:
                             if isinstance(value, str) and value.strip() == '':
@@ -666,7 +680,7 @@ class Captchaify:
                 hostname = socket.gethostbyaddr(self._client_ip)[0]
                 data["reverse"] = hostname if hostname != self._client_ip else None
             except Exception as exc:
-                handle_exception(exc, is_app_error = False)
+                pass
 
         g.client_info = data
 
