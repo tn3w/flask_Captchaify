@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>I Am Not a Robot</title>
+        <style>
+            body {
+                font-family: 'Consolas', monospace;
+                letter-spacing: -0.05em;
+                background-color: #fff;
+                margin: 0;
+            }
+            #container {
+                border: 1px solid #ddd;
+                padding: 20px;
+                border-radius: 8px;
+                background-color: #fafafa;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                width: 300px;
+                text-align: center;
+            }
+            #content {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+            #checkbox-container {
+                flex: 0 0 20px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            #verify-checkbox {
+                width: 20px;
+                height: 20px;
+            }
+            #text {
+                flex: 1;
+                margin-left: 10px;
+                display: flex;
+                justify-content: flex-start;
+                align-items: center;
+            }
+            #logo-container {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+            }
+            #logo-row {
+                display: flex;
+                align-items: center;
+                justify-content: flex-end;
+                margin-bottom: 4px;
+            }
+            #logo {
+                height: 30px;
+                margin-left: 10px;
+            }
+            #tos {
+                font-size: 8px;
+                color: #888;
+                text-align: center;
+            }
+            #tos a {
+                color: #888;
+                text-decoration: none;
+            }
+            #tos a:hover {
+                text-decoration: underline;
+            }
+        </style>
+        <script>
+            document.addEventListener('DOMContentLoaded', (event) => {
+                const mouseData = [];
+                
+                function logEvent(event) {
+                    mouseData.push({
+                        type: event.type,
+                        timestamp: Date.now(),
+                        x: event.clientX,
+                        y: event.clientY
+                    });
+                }
+    
+                document.addEventListener('mousemove', logEvent);
+                document.addEventListener('click', logEvent);
+                document.addEventListener('dblclick', logEvent);
+                document.addEventListener('touchstart', logEvent);
+                document.addEventListener('touchmove', logEvent);
+                document.addEventListener('touchend', logEvent);
+    
+                document.getElementById('verify-checkbox').addEventListener('change', () => {
+                    if (document.getElementById('verify-checkbox').checked) {
+                        const deviceInfo = {
+                            userAgent: navigator.userAgent,
+                            screenWidth: screen.width,
+                            screenHeight: screen.height
+                        };
+    
+                        fetch('http://localhost:5000/submit', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ mouseData, deviceInfo })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === 'success') {
+                                alert('Verification successful!');
+                            } else {
+                                alert('Verification failed.');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('Error submitting data.');
+                        });
+                    }
+                });
+    
+                window.addEventListener('beforeunload', () => {
+                    localStorage.setItem('mouseData', JSON.stringify(mouseData));
+                });
+            });
+        </script>
+    </head>
+    <body>
+        <div id="container">
+            <div id="content">
+                <div id="checkbox-container">
+                    <input type="checkbox" id="verify-checkbox">
+                </div>
+                <div id="text">
+                    <span>I am not a robot</span>
+                </div>
+                <div id="logo-container">
+                    <div id="logo-row">
+                        <span>𝗳𝗹𝗮𝘀𝗸_𝗖𝗮𝗽𝘁𝗰𝗵𝗮𝗶𝗳𝘆</span>
+                    </div>
+                    <div id="tos">
+                        <a href="#">Terms of Service</a> | <a href="#">Privacy Policy</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <noscript>
+            <meta http-equiv="refresh" content="0;url=?js=0">
+        </noscript>
+    </body>
+</html>

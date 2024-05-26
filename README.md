@@ -205,6 +205,7 @@ For more information, see the sample code above.
    | reverse        | str  | Reverse DNS lookup result.                                    | unn-169-150-196-74.datapacket.com                                                |
    | mobile         | bool | Boolean indicating if the connection is via a mobile network. | False                                                                            |
    | proxy          | bool | Boolean indicating if the client is using a proxy.            | True                                                                             |
+   | tor            | bool | Boolean indicating if the client is using Tor.                | False                                                                            |
    | hosting        | bool | Boolean indicating if the client is using a hosting service.  | True                                                                             |
    | forum_spammer  | bool | Boolean indicating if the client is a known forum spammer.    | True                                                                             |
    | netloc         | str  | Network location part of the URL. (includes Port)             | domain.example.com:80                                                            |
@@ -427,8 +428,8 @@ For more information, see the sample code above.
    Possible entries would be:
    | Abbreviation         | Who is requested and how does the evaluation mechanism work?                                                                           |
    | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-   | tor                  | [SecOps-Institute/Tor-IP-Addresses](https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst) on GitHub is asked for Tor Ipv4 and Ipv6 addresses and the Ip address is compared with this list |
-   | ipapi                | [Ipapi](https://ipapi.com) is requested with the Ip and the result of the fields "proxy" and "hosting" is used                                              |
+   | tor                  | Uses dnspython to check if an IP is a Tor Exit Node. See [Stackoverflow #78535126](https://stackoverflow.com/questions/78535126/is-there-a-way-to-find-out-if-a-particular-ip-is-coming-from-tor-or-acting-as-a)|
+   | ipapi                | [Ipapi](https://ipapi.com) is requested with the Ip and the result of the fields "proxy" and "hosting" is used                         |
    | stopforumspam        | [StopForumSpam](https://stopforumspam.com) is requested and the result is used                                                         |
 
 

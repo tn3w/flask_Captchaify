@@ -26,7 +26,7 @@ from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
 from flask import Flask, Response, request, g, abort, send_file, make_response, redirect
 from .utils import JSON, PICKLE, Hashing, SymmetricCrypto, SSES, WebPage, get_work_dir,\
-    get_client_ip, generate_random_string, get_ip_info, remove_args_from_url, request_tor_ips,\
+    get_client_ip, generate_random_string, get_ip_info, remove_args_from_url, is_tor_ip,\
     render_template, is_stopforumspam_spammer, search_languages, get_random_image,\
     manipulate_image_bytes, convert_image_to_base64, get_return_path, get_return_url,\
     extract_path_and_args, rearrange_url, handle_exception, does_match_rule, download_geolite,\
@@ -244,16 +244,6 @@ class Captchaify:
 
         if 'geoip' in self.third_parties:
             download_geolite()
-
-        if 'tor' in self.third_parties:
-            tor_exit_ips = request_tor_ips()
-
-            if not isinstance(tor_exit_ips, list):
-                tor_exit_ips = []
-        else:
-            tor_exit_ips = []
-
-        self.tor_exit_ips = tor_exit_ips
 
         if self.crawler_hints:
             self.crawler_hints_cache = {}
@@ -563,7 +553,10 @@ class Captchaify:
         Checks whether the client uses Tor to request the website
         """
 
-        return self._client_ip in self.tor_exit_ips
+        if 'tor' not in self.third_parties or self._client_invalid_ip:
+            return False
+
+        return is_tor_ip(self._client_ip)
 
 
     @property
@@ -602,7 +595,7 @@ class Captchaify:
             "continent": None, "continent_code": None, "country": None, "country_code": None, "region": None,
             "region_code": None, "city": None, "district": None, "zip": None, "lat": None, "lon": None,
             "timezone": None, "offset": None, "currency": None, "isp": None, "org": None, "as": None,
-            "as_code": None, "reverse": None, "mobile": None, "proxy": None, "hosting": None, "forum_spammer": None,
+            "as_code": None, "reverse": None, "mobile": None, "proxy": None, "tor": None, "hosting": None, "forum_spammer": None,
             "netloc": url_info.netloc, "hostname": url_info.hostname, "domain": get_domain_from_url(url),
             "path": url_info.path, "scheme": url_info.scheme, "url": url
         }
@@ -638,6 +631,9 @@ class Captchaify:
                         })
                 except Exception as exc:
                     handle_exception(exc, is_app_error = False)
+
+            if 'tor' in self.third_parties and not self._client_invalid_ip:
+                data["tor"] = is_tor_ip(self._client_ip)
 
             if 'ipapi' in self.third_parties:
                 client_info = self._client_ip_info

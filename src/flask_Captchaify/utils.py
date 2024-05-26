@@ -28,6 +28,8 @@ import pickle
 from typing import Union, Optional, Final, Tuple
 import time
 from concurrent.futures import ThreadPoolExecutor
+import dns.resolver
+import ipaddress
 from PIL import Image, ImageFilter
 from werkzeug import Request
 from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
@@ -307,18 +309,27 @@ def extract_path_and_args(url: str) -> str:
 
 def get_domain_from_url(url: str) -> str:
     """
-    Extracts the domain from a given URL.
+    Extracts the domain or IP address from a given URL, excluding the port if present.
 
-    :param url: The URL from which to extract the domain.
-    :return: The domain extracted from the URL.
+    :param url: The URL from which to extract the domain or IP address.
+    :return: The domain or IP address extracted from the URL.
     """
 
     parsed_url = urlparse(url)
-    domain_parts = parsed_url.netloc.split('.')
+    netloc = parsed_url.netloc
+
+    if ':' in netloc:
+        netloc = netloc.split(':')[0]
+
+    domain_parts = netloc.split('.')
+    if all(part.isdigit() for part in netloc.split('.')):
+        return netloc
+
     if len(domain_parts) > 2:
         domain = '.'.join(domain_parts[-2:])
     else:
-        domain = parsed_url.netloc
+        domain = netloc
+
     return domain
 
 
@@ -1480,42 +1491,43 @@ class SSES:
             return None
 
 
-def request_tor_ips() -> list | None:
+def reverse_ip(ip):
     """
-    Requests and returns a list of Tor exit IPs. If the list has been recently fetched and cached,
-    it returns the cached list, otherwise it fetches the list from the specified URL.
-
-    :return: A list of Tor exit IPs.
+    Reverse the IP address for DNS lookup.
     """
+    try:
+        ip_obj = ipaddress.ip_address(ip)
+        if isinstance(ip_obj, ipaddress.IPv4Address):
+            return '.'.join(reversed(ip.split('.'))) + '.dnsel.torproject.org'
+        elif isinstance(ip_obj, ipaddress.IPv6Address):
+            return '.'.join(reversed(ip_obj.exploded.replace(':', ''))) + '.dnsel.torproject.org'
+    except ValueError as exc:
+        handle_exception(exc, is_app_error = False)
 
-    cache = Cache('tor_ips')
 
-    tor_exit_ips = None
-    ip_data = cache.load()
-    if isinstance(ip_data.get('time'), int):
-        if int(time.time()) - int(ip_data.get('time', time.time())) <= 604800:
-            if isinstance(ip_data.get('ips'), list):
-                tor_exit_ips = ip_data.get('ips')
+def is_tor_ip(ip):
+    """
+    Check if the given IP address is a Tor exit node.
+    
+    :param ip: str - IP address to check (IPv4 or IPv6)
+    :return: bool - True if the IP is a Tor exit node, False otherwise
+    """
+    query = reverse_ip(ip)
 
-    if tor_exit_ips is None:
-        tor_exit_ips = []
-        try:
-            response = requests.get(
-                TOR_EXIT_IPS_URL,
-                headers = {'User-Agent': random_user_agent()},
-                timeout = 3
-            )
-        except Exception as exc:
-            handle_exception(exc)
-            return []
+    try:
+        answers = dns.resolver.resolve(query, 'A')
+        for rdata in answers:
+            if rdata.to_text() == '127.0.0.2':
+                return True
+    except dns.resolver.NXDOMAIN:
+        return False
+    except dns.resolver.NoAnswer:
+        return False
+    except dns.exception.DNSException as e:
+        print(f"DNS query failed: {e}")
+        return False
 
-        for line in response.text.split('\n'):
-            tor_exit_ips.append(line.strip())
-
-        cache['time'] = time.time()
-        cache['ips'] = tor_exit_ips
-
-    return tor_exit_ips
+    return False
 
 
 def download_geolite() -> None:
