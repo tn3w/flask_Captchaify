@@ -14,16 +14,8 @@ requirements = [str(requirement.requirement)\
 with open('README.md', 'r', encoding='utf-8') as readable_file:
     long_description = readable_file.read()
 
-long_description = long_description.split("# flask_Captchaify")[1]
-long_description = '<p align="center"><a rel="noreferrer noopener" href="https://github.com/tn3w/'+\
-                   'flask_Captchaify"><img alt="Github" src="https://img.shields.io/badge/Github-'+\
-                    '141e24.svg?&style=for-the-badge&logo=github&logoColor=white"></a>  <a rel="n'+\
-                    'oreferrer noopener" href="https://pypi.org/project/flask-Captchaify/"><img a'+\
-                    'lt="PyPI" src="https://img.shields.io/badge/PyPi-141e24.svg?&style=for-the-b'+\
-                    'adge&logo=python&logoColor=white"></a>  <a rel="noreferrer noopener" href="h'+\
-                    'ttps://libraries.io/pypi/flask-Captchaify"><img alt="Libraries.io" src="http'+\
-                    's://img.shields.io/badge/Libraries.io-141e24.svg?&style=for-the-badge&logo=n'+\
-                    'pm&logoColor=white"></a>\n' + long_description
+long_description = long_description.split('<h1 align="center">𝐟𝐥𝐚𝐬𝐤_𝐂𝐚𝐩𝐭𝐜𝐡𝐚𝐢𝐟𝐲</h1>')[1]
+long_description = '<h1 align="center">𝐟𝐥𝐚𝐬𝐤_𝐂𝐚𝐩𝐭𝐜𝐡𝐚𝐢𝐟𝐲</h1>' + long_description
 long_description = long_description.replace('[!TIP]', 'Tip:').replace('[!CAUTION]', 'Caution:')
 
 setup(
