@@ -30,7 +30,7 @@ from .utils import JSON, PICKLE, Hashing, SymmetricCrypto, SSES, WebPage, get_wo
     render_template, is_stopforumspam_spammer, search_languages, get_random_image,\
     manipulate_image_bytes, convert_image_to_base64, get_return_path, get_return_url,\
     extract_path_and_args, rearrange_url, handle_exception, does_match_rule, download_geolite,\
-    get_domain_from_url
+    get_domain_from_url, check_asterisk_rule
 
 
 WORK_DIR: Final[str] = get_work_dir()
@@ -128,36 +128,26 @@ class Captchaify:
     """
 
     def __init__ (
-        self, app: Flask, captcha_types: Optional[dict] = None,
+        self, app: Flask, rules: Optional[list[dict]] = None,
         dataset_size: Union[tuple[int], str] = 'normal', dataset_dir: Optional[str] = None,
-        actions: Optional[dict] = None, rules: Optional[list[dict]] = None,
-        hardness: Optional[dict] = None, rate_limits: Optional[dict] = None,
-        template_dirs: Optional[dict] = None, default_captcha_type: str = 'oneclick',
-        default_action: str = 'captcha', default_hardness: int = 2,
-        default_rate_limit: Optional[int] = 120, default_max_rate_limit = 1200,
-        default_template_dir: Optional[str] = None, verification_age: int = 3600,
-        without_cookies: bool = False, block_crawler: bool = True,
-        crawler_hints: bool = True, third_parties: Optional[list] = None,
-        as_route: bool = False, without_other_args: Optional[bool] = True,
+        default_captcha_type: str = 'oneclick', default_action: str = 'captcha',
+        default_hardness: int = 2, default_rate_limit: Optional[int] = 120,
+        default_max_rate_limit = 1200, default_template_dir: Optional[str] = None,
+        verification_age: int = 3600, without_cookies: bool = False,
+        block_crawler: bool = True, crawler_hints: bool = True,
+        third_parties: Optional[list] = None, as_route: bool = False,
+        without_other_args: Optional[bool] = True,
         allow_customization: bool = False) -> None:
         """
         Configures security settings for a Flask app.
 
         :param app: Your Flask App.
-        :param captcha_types: Dict with which type of captcha should be used.
-            	              Example: {"urlpath": "oneclick", "endpoint": "default"}
-        :param dataset_size: Tuple containing the number of images of each keyword and the
-                             number of keywords or a string with predefined sizes.
-        :param actions: Dict with actions for different routes.
-                        Example: {"urlpath": "fight", "endpoint": "block"}. Default is None.
         :param rules: Dict with rules and actions that occur in certain cases.
                       Example: {["ip", "==", "8.8.8.8"]: {"action": "block"}}
-        :param hardness: Dict with hardness for different routes.
-                         Example: {"urlpath": 1, "endpoint": 2}. Default is None.
-        :param rate_limits: Dict with rate limit and max rate limit for different routes.
-                            Default is None.
-        :param template_dirs: Dict with template folder for different routes.
-                              Default is None.
+        :param dataset_size: Tuple containing the number of images of each keyword and the
+                             number of keywords or a string with predefined sizes.
+        :param dataset_dir: Where the datasets are located, default datasets are
+                            stored in the default dataset folder.
         :param default_captcha_type: Default value of all pages if no special captcha type is given.
         :param default_action: Default value of all pages if no special action is given
                                in actions. Default is "captcha".
@@ -191,7 +181,18 @@ class Captchaify:
         """
 
         if app is None:
+            handle_exception(
+                'No Flask app has been saved, which means that your own'+
+                ' routes and endpoints are not visible.', is_app_error = False
+            )
             app = Flask(__name__)
+
+        if default_captcha_type.startswith('text'):
+            default_captcha_type = 'text'
+        elif default_captcha_type == 'oneclick':
+            default_captcha_type = 'oneclick_keys'
+        elif default_captcha_type == 'multiclick':
+            default_captcha_type = 'multiclick_animals'
 
         if isinstance(dataset_size, str):
             self.max_dataset_images, self.max_dataset_keys =\
@@ -203,22 +204,8 @@ class Captchaify:
             self.max_dataset_keys = 100
 
         self.app = app
-
-        self.captcha_types = captcha_types if isinstance(captcha_types, dict) else {}
-        self.dataset_dir = dataset_dir if isinstance(dataset_dir, str) else None
-        self.actions = actions if isinstance(actions, dict) else {}
         self.rules = rules if isinstance(rules, list) else []
-        self.hardness = hardness if isinstance(hardness, dict) else {}
-        self.rate_limits = rate_limits if isinstance(rate_limits, dict) else {}
-        self.template_dirs = template_dirs if isinstance(template_dirs, dict) else {}
-
-        if default_captcha_type.startswith('text'):
-            default_captcha_type = 'text'
-        elif default_captcha_type == 'oneclick':
-            default_captcha_type = 'oneclick_keys'
-        elif default_captcha_type == 'multiclick':
-            default_captcha_type = 'multiclick_animals'
-
+        self.dataset_dir = dataset_dir if isinstance(dataset_dir, str) else None
         self.default_captcha_type = default_captcha_type if default_captcha_type\
                                     in ALL_CAPTCHA_TYPES else 'default'
         self.default_action = default_action if default_action in ALL_ACTIONS else 'captcha'
@@ -386,37 +373,6 @@ class Captchaify:
         This property returns a dictionary of preferences based on the current route or endpoint.
         """
 
-        url_path = urlparse(self._client_url).path
-
-        def is_correct_route(path: str):
-            """
-            Helper function to determine if the provided path matches the current route or endpoint.
-
-            :param path: The path to check against the current route or endpoint
-            """
-
-            url_endpoint = request.endpoint
-
-            url = url_path
-            if not '/' in path:
-                url = url_endpoint
-
-            if '*' in path:
-                real_path = path.replace('*', '')
-                if (path.startswith('*') and path.endswith('*') and real_path in url) or \
-                    (path.startswith('*') and url.endswith(real_path)) or \
-                        (path.endswith('*') and url.startswith(real_path)):
-                    return True
-                first_part, second_part = path.split('*')[0], path.split('*')[1]
-
-                if url.startswith(first_part) and url.endswith(second_part):
-                    return True
-            else:
-                if path == url:
-                    return True
-
-            return False
-
         current_url = {
             'captcha_type': self.default_captcha_type,
             'action': self.default_action,
@@ -425,32 +381,6 @@ class Captchaify:
             'max_rate_limit': self.default_max_rate_limit,
             'template_dir': self.default_template_dir,
         }
-
-        preferences = {
-            'captcha_type': self.captcha_types,
-            'action': self.actions,
-            'hardness': self.hardness,
-            'rate_limit': self.rate_limits,
-            'template_dir': self.template_dirs
-        }
-
-        for preference_name, preference in preferences.items():
-            if len(preference) == 0:
-                continue
-            for path, path_preference in preference.items():
-                if is_correct_route(path):
-                    if preference_name != 'rate_limit':
-                        if preference_name == 'captcha_type':
-                            if path_preference.startswith('text'):
-                                path_preference = 'text'
-                            elif path_preference == 'oneclick':
-                                path_preference = 'oneclick_keys'
-                            elif path_preference == 'multiclick':
-                                path_preference = 'multiclick_animals'
-
-                        current_url[preference_name] = path_preference
-                    else:
-                        current_url['rate_limit'], current_url['max_rate_limit'] = path_preference
 
         for rule in self.rules:
             rule, preferences = rule['rule'], rule['change']
@@ -470,9 +400,13 @@ class Captchaify:
                         current_url['rate_limit'], current_url['max_rate_limit'] = preference
 
         if self.as_route:
-            if url_path in ('/blocked-' + self.route_id, '/rate_limited-'\
-                            + self.route_id, '/captcha-' + self.route_id,
-                            '/change_language-' + self.route_id):
+            routes = ['/blocked-' + self.route_id,
+                      '/rate_limited-' + self.route_id,
+                      '/captcha-' + self.route_id]
+            if self.allow_customization:
+                routes.append('/change_language-' + self.route_id)
+
+            if request.path in routes:
                 current_url['action'] = 'allow'
 
         if self.dataset_dir is not None:
@@ -629,7 +563,8 @@ class Captchaify:
             "as": None, "as_code": None, "reverse": None, "mobile": None, "proxy": None,
             "tor": None, "hosting": None, "forum_spammer": None, "netloc": url_info.netloc,
             "hostname": url_info.hostname, "domain": get_domain_from_url(url),
-            "path": url_info.path, "scheme": url_info.scheme, "url": url
+            "path": url_info.path, "endpoint": request.endpoint,
+            "scheme": url_info.scheme, "url": url
         }
 
         if not self._client_invalid_ip:

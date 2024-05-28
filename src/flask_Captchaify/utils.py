@@ -198,6 +198,39 @@ def handle_exception(error_message: str, print_error: bool =\
     WRITE_EXECUTOR.submit(write_to_file, LOG_FILE, long_error_message)
 
 
+def check_asterisk_rule(obj: str, asterisk_rule: str) -> bool:
+    """
+    Check if a string matches a given asterisk rule pattern.
+    
+    :param obj: The string to be checked.
+    :param asterisk_rule: The asterisk rule pattern to match against.
+                          The asterisk (*) serves as a wildcard, representing any number
+                          of characters including zero.
+    :return: True if the string matches the asterisk rule pattern, False otherwise.
+    """
+
+    if isinstance(obj, str) and isinstance(asterisk_rule, str)\
+        and '*' in asterisk_rule:
+
+        parts = asterisk_rule.split('*')
+
+        if len(parts) == 2:
+            start, end = parts
+
+            return obj.startswith(start) and obj.endswith(end)
+        else:
+            first_asterisk_index = asterisk_rule.index('*')
+            last_asterisk_index = asterisk_rule.rindex('*')
+
+            start = asterisk_rule[:first_asterisk_index]
+            middle = asterisk_rule[first_asterisk_index + 1:last_asterisk_index]
+            end = asterisk_rule[last_asterisk_index + 1:]
+
+            return obj.startswith(start) and obj.endswith(end) and middle in obj
+
+    return obj == asterisk_rule
+
+
 def does_match_rule(rule: list, client_info: dict) -> bool:
     """
     Evaluates whether a given client information matches the specified rule.
@@ -232,22 +265,25 @@ def does_match_rule(rule: list, client_info: dict) -> bool:
             ' field in the rules argument (valid: `ip`, invalid: `ipadd`)'
         )
 
-    if operator in ('==', 'equals', 'equal', 'is'):
-        return client_info.get(field) == value
-    if operator in ('!=', 'does not equal', 'does not equals', 'not equals', 'not equal', 'not is'):
-        return client_info.get(field) != value
-    if operator in ('contains', 'contain'):
-        return value in client_info.get(field, '')
-    if operator in ('does not contain', 'does not contains', 'not contain', 'not contains'):
-        return value not in client_info.get(field, '')
-    if operator in ('is in', 'in'):
-        return client_info.get(field) in value
-    if operator in ('is not in', 'not is in', 'not in'):
-        return client_info.get(field) not in value
-    if operator in ('greater than', 'larger than'):
-        return client_info(field) > value
-    if operator == 'less than':
-        return client_info(field) < value
+    try:
+        if operator in ('==', 'equals', 'equal', 'is'):
+            return check_asterisk_rule(client_info.get(field), value)
+        if operator in ('!=', 'does not equal', 'does not equals', 'not equals', 'not equal', 'not is'):
+            return not check_asterisk_rule(client_info.get(field), value)
+        if operator in ('contains', 'contain'):
+            return value in client_info.get(field, '')
+        if operator in ('does not contain', 'does not contains', 'not contain', 'not contains'):
+            return value not in client_info.get(field, '')
+        if operator in ('is in', 'in'):
+            return client_info.get(field) in value
+        if operator in ('is not in', 'not is in', 'not in'):
+            return client_info.get(field) not in value
+        if operator in ('greater than', 'larger than'):
+            return client_info(field) > value
+        if operator == 'less than':
+            return client_info(field) < value
+    except Exception as exc:
+        handle_exception(exc, is_app_error = False)
 
     short_error_message = f'UnknownOperatorError: {operator} is not known.'
     handle_exception(

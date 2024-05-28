@@ -35,9 +35,9 @@ In situations where it is deemed necessary, a captivating challenge may be prese
 >
 > If you use Ip to Domain tools like Cloudflared or Nginx it can happen that no ipv4 IP can be found.
 
-# Instructions
+<br>
 
-## Installation guide
+# Installation guide
 1. Make sure you have the latest version of Python and Pip installed, you also need git installed.
 2. Install the script with pip `pip install flask_Captchaify` or manually via `git clone https://github.com/tn3w/flask_Captchaify` or download the zip.
 3. If you installed it manually, make sure your python script is in the folder where there is a subfolder flask_Captchaify, and make sure you run `pip install -r requirements.txt` in the flask_Captchaify folder.
@@ -55,12 +55,13 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```
 For more information, see the sample code above.
 > [!CAUTION]
-> In the latest version, the let action is now set as `allow`.
->
-> In the latest version customization options like language and theme are not shown by default, to change this set `allow_customization` to `True`. And `without_other_args` Arg is now set to `True` by default.
+> From now on all routes and client specific rules are set via the `rules` arg, arguments `captcha_types`, `actions`, `hardness`, `rate_limits` and `template_dirs` have been deprecated.
 
-## Personalization
-1. `app` Arg
+
+<br>
+
+# Personalization
+## 1. `app` Arg
 
    A Flask() object of a Flask app that is modified by Captchaify so that each request is checked for bots
 
@@ -74,79 +75,7 @@ For more information, see the sample code above.
    ```
 
 
-2. `captcha_types` Arg
-
-   To change the captcha type in the case of certain routes / endpoints, you can use the captcha_types parameter.
-   
-   Example of a website that uses an oneclick captcha on the main page and enforces text captchas on the login page.
-   ```python
-   captchaify = Captchaify(app, captcha_types={"/": "oneclick", "/login": "text"})
-   ```
-
-   When using "\*" before or after the urlpath / endpoint you can address multiple urls. "\*" means every possible letter / number or special character.
-
-   Example of a website where all urls with "/dev/" e.g. `/account/dev/settings` or `/dev/portal` are using oneclick captchas, all urls starting with "/login" e.g. `/login` or `/login/2fa` displays an text based captcha and all urls ending with "/register/" e.g. `/register` or `/game/register` have oneclick captchas:
-   ```python
-   captchaify = Captchaify(app, captcha_types={"*/dev/*": "oneclick", "/login*": "text", "*/register": "oneclick"})
-   ```
-   
-   All captcha types:
-   | Name of captcha type | Displayed Captchas                                                        |
-   | --------------       | ------------------------------------------------------------------------- |
-   | oneclick (Default)   | The user only needs one click to confirm that he is not a bot             |
-   | multiclick           | The user must select several images that match a motif (harder)           |
-   | text                 | The user enters a text combination from an image into an input (obsolete) |
-
-   To specify the exact data set, you have to add it after the captcha_type with a `_` as separator, e.g. `oneclick_animals` or if you use a custom data set: `oneclick_custom`. If you use a text captcha, you do not need a data set.
-
-   Here are all the ready-made data sets:
-   | Name of dataset | Displayed Captchas                                                                                 |
-   | --------------- | -------------------------------------------------------------------------------------------------- |
-   | keys            | Displays images based on specific keywords of landscapes, objects, and more (default for oneclick) |
-   | animals         | Displays 50 different animal species (default for multiclick)                                      |
-
-
-3. `dataset_size` Arg
-
-   The size of the data set with e.g. images and keywords that determine how much of a data set is used, if a lot is used this can reduce RAM capacity but also increase security.
-   Either a tuple of 2 numbers where the first indicates how many images per keyword (always the first ones) can be used (recommended around 20, maximum 200 or more depending on the data set) and the second number how many keywords are e.g. (images_per_keyword, number_of_keywords), default setting: (20, 100).
-
-   But can also be a string for prefabricated dimensions:
-   | value             | corresponding tuple |
-   | ----------------- | ------------------- |
-   | largest           | (200, 140)          |
-   | large             | (20, 140)           |
-   | medium            | (100, 100)          |
-   | normal (default)  | (20, 100)           |
-   | small             | (20, 36)            |
-   | smaller           | (20, 8)             |
-   | little            | (6, 8)              |
-
-   The more images per keyword, the more inaccurate the user rate becomes, as images further behind in the image search and in the data set could no longer show the keyword.
-   It is recommended that you generate your own dataset as the default data could be trained, use the script written in `src/flask_Captchaify/datasets` and put the file in a folder and use the `dataset_dir` Arg to use it.
-
-   Example of a website that uses 100 images per keyword and 140 keywords:
-   ```python
-   captchaify = Captchaify(app, dataset_size=(100, 140))
-   ```
-
-
-4. `dataset_dir` Arg
-
-   Specifies where the program can find data sets.
-
-   Example of a website that specifies its own dataset folder:
-   ```python
-   captchaify = Captchaify(app, dataset_dir='/path/to/my/dataset')
-   ```
-
-   A data set should be a json file and have the following names in the folder:
-   ```
-   dataset_dir\
-          \keys.json
-   ```
-
-5. `rules` Arg
+## 2. `rules` Arg
 
    Certain changes based on specific criteria such as IP, proxy, hosting or geo information
 
@@ -159,6 +88,8 @@ For more information, see the sample code above.
    ```python
    rules = [{"rule": ['ip', 'is in', ['127.0.0.1', '10.0.0.1'], 'or', 'proxy', 'is', True]}, "change": {"action": "block"}]
    ```
+
+   ### Client Info
 
    The following client info fields can be compared:
    | Name of field  | Type | Information                                                   | Example                                                                          |
@@ -194,8 +125,9 @@ For more information, see the sample code above.
    | hostname       | str  | Fully qualified domain name (FQDN) of the server.             | domain.example.com                                                               |
    | domain         | str  | Primary domain name, which is a subset of the hostname.       | example.com                                                                      |
    | path           | str  | Path component of the URL, indicates a specific resource.     | /login                                                                           |
-   | scheme         | str  | Protocol used to access the resource.                         | http                                                                             |
-   | url            | str  | Complete URL that combines all the individual components.     | http://domain.example.com/login                                                  |
+   | endpoint       | str  | The `request.endpoint` Endpoint Information.                  | login                                                                            |
+   | scheme         | str  | Protocol used to access the resource.                         | https                                                                            |
+   | url            | str  | Complete URL that combines all the individual components.     | https://domain.example.com/login                                                 |
 
    The following operators are available:
    | Name of Operator                                                   | The same as        |
@@ -208,6 +140,7 @@ For more information, see the sample code above.
    | is not in, not is in, not in                                       | field not in value |
    | greater than, larger than                                          | field > value      |
    | less than                                                          | field < value      |
+   
    Where field is the type of data e.g. `ip` and value is the value it should have e.g. `169.150.196.74`.
 
    All changes that can be made by these rules:
@@ -220,43 +153,45 @@ For more information, see the sample code above.
    | template_dir       | str             | /path/to/template/dir  |
 
 
-6. `actions` Arg
+   ### Asterik `*`
+   The asterisk creates the customization options for information comparisons. The asterisk (*) serves as a wildcard, representing any number of characters including zero.
 
-   To change the response in the case of certain routes / endpoints, you can use the actions parameter.
-   
-   Example of a website that allows all bots on the main page, enforces captchas on the login page, and blocks all robots on the registration page:
+   Example of a rule that all routes that start with /login then have a string and then have /development as route e.g. `/login/api/development` or `/login/2fa/development`:
    ```python
-   captchaify = Captchaify(app, actions={"/": "allow", "/login": "fight", "/register": "block"})
+   rules = [{"rule": ['path', 'is', '/login*/development']}, "change": {"action": "block"}]
    ```
 
-   When using "\*" before or after the urlpath / endpoint you can address multiple urls. "\*" means every possible letter / number or special character.
 
-   Example of a website where all urls with /api/ are allowed through, all urls starting with "/dogs/" show everyone a captcha and all urls ending with "/cats/" block bots:
-   ```python
-   captchaify = Captchaify(app, actions={"*/api/*": "allow", "/dogs/*": "fight", "*/cats/": "block"})
-   ```
-   
-   All actions:
+   Here are all the things that can be changed:
+
+   ### Captcha types (`captcha_type`):
+   | Name of captcha type | Displayed Captchas                                                        |
+   | --------------       | ------------------------------------------------------------------------- |
+   | oneclick (Default)   | The user only needs one click to confirm that he is not a bot             |
+   | multiclick           | The user must select several images that match a motif (harder)           |
+   | text                 | The user enters a text combination from an image into an input (obsolete) |
+
+   To specify the exact data set, you have to add it after the captcha_type with a `_` as separator, e.g. `oneclick_animals` or if you use a custom data set: `oneclick_custom`. If you use a text captcha, you do not need a data set.
+
+   Here are all the ready-made data sets:
+   | Name of dataset | Displayed Captchas                                                                                 |
+   | --------------- | -------------------------------------------------------------------------------------------------- |
+   | keys            | Displays images based on specific keywords of landscapes, objects, and more (default for oneclick) |
+   | animals         | Displays 50 different animal species (default for multiclick)                                      |
+
+
+   ### Actions (`action`):
    | Name of action | Executing Action                                                     |
    | -------------- | -------------------------------------------------------------------- |
-   | allow            | Allows all traffic through, regardless of whether the IP is blocked. |
+   | allow          | Allows all traffic through, regardless of whether the IP is blocked. |
    | block          | Blocks all traffic if it is blocked, without captcha.                |
    | fight          | Displays a captcha to all traffic, whether suspicious or not.        |
    | captcha        | Default value, shows only suspicious traffic captchas.               |
 
 
-7. `hardness` Arg
-   
-   To change the hardness of a captcha for specific routes or endpoints use hardness.
+   ### Hardness (`hardness`):
+   (Currently only changes the strength of text captchas see [Issue #9](https://github.com/tn3w/flask_Captchaify/issues/9))
 
-   Example of a website that sets the hardness of the main page to 1 (= easy), on the login page to 2 (= normal) and on the register page to 3 (= hard):
-   ```python
-   captchaify = Captchaify(app, hardness={"/": 1, "/login": 2, "/register": 3})
-   ```
-
-   When using "*" before or after the urlpath / endpoint you can address multiple urls, like actions.
-
-   All hardness levels:
    | Hardness Level | Captcha modification                                                                                                               |
    | -------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
    | 1              | The captcha is easy. Only a text captcha with 6 - 8 characters is displayed                                                        |
@@ -264,30 +199,12 @@ For more information, see the sample code above.
    | 3              | The hardness of the captcha is hard, a 9 - 14 number audio captcha is displayed in addition to the 10 - 12 character text captcha. |
 
 
-8. `rate_limits` Arg
-
-   To change the rate_limit and max_rate_limit for a specific route or endpoint use the rate_limits arg.
-
-   When using "*" before or after the urlpath / endpoint you can address multiple urls, like actions.
-
-   The syntax is a bit different from the others, because two values are specified `{"route": (rate_limit, max_rate_limit), "endpoint": (rate_limit, max_rate_limit)}`. The variable rate_limit must be a number indicating how many requests per minute can come from a given ip. max_rate_limit indicates how many requests can come from all ips per minute, also a number.
-
-   Example of a website that has a specific rate_limit on /api/:
-   ```python
-   captchaify = Captchaify(app, template_dirs={"/api/*": (60, 600)})
-   ```
+   ### Rate Limits (`rate_limit`):
+   The syntax is a bit different from the others, because two values are specified `(rate_limit, max_rate_limit)`. The variable rate_limit must be a number indicating how many requests per minute can come from a given ip. max_rate_limit indicates how many requests can come from all ips per minute, also a number.
 
 
-9. `template_dirs` Arg
-
+   ### Template Dir (`template_dir`):
    To change the template directory of a particular route use the template_dirs arg.
-
-   Example of a website that has a specific template directory on /api/:
-   ```python
-   captchaify = Captchaify(app, template_dirs={"/api/*": "/path/to/special/template/directory"})
-   ```
-
-   When using "*" before or after the urlpath / endpoint you can address multiple urls, like actions.
 
    A template directory can look like this:
    ```
@@ -302,7 +219,49 @@ For more information, see the sample code above.
 
    If one of the three templates does not exist in the folder, a 404 error is displayed when calling it. e.g. if you remove the changelanguage page at apis.
 
-9. `default_captcha_type` Arg
+
+## 3. `dataset_size` Arg
+
+   The size of the data set with e.g. images and keywords that determine how much of a data set is used, if a lot is used this can reduce RAM capacity but also increase security.
+   Either a tuple of 2 numbers where the first indicates how many images per keyword (always the first ones) can be used (recommended around 20, maximum 200 or more depending on the data set) and the second number how many keywords are e.g. (images_per_keyword, number_of_keywords), default setting: (20, 100).
+
+   But can also be a string for prefabricated dimensions:
+   | value             | corresponding tuple |
+   | ----------------- | ------------------- |
+   | largest           | (200, 140)          |
+   | large             | (20, 140)           |
+   | medium            | (100, 100)          |
+   | normal (default)  | (20, 100)           |
+   | small             | (20, 36)            |
+   | smaller           | (20, 8)             |
+   | little            | (6, 8)              |
+
+   The more images per keyword, the more inaccurate the user rate becomes, as images further behind in the image search and in the data set could no longer show the keyword.
+   It is recommended that you generate your own dataset as the default data could be trained, use the script written in `src/flask_Captchaify/datasets` and put the file in a folder and use the `dataset_dir` Arg to use it.
+
+   Example of a website that uses 100 images per keyword and 140 keywords:
+   ```python
+   captchaify = Captchaify(app, dataset_size=(100, 140))
+   ```
+
+
+## 4. `dataset_dir` Arg
+
+   Specifies where the program can find data sets.
+
+   Example of a website that specifies its own dataset folder:
+   ```python
+   captchaify = Captchaify(app, dataset_dir='/path/to/my/dataset')
+   ```
+
+   A data set should be a json file and have the following names in the folder:
+   ```
+   dataset_dir\
+          \keys.json
+   ```
+
+
+## 5. `default_captcha_type` Arg
 
    To specify the default captcha type of all routes or endpoints use the default_captcha_type arg.
 
@@ -311,7 +270,7 @@ For more information, see the sample code above.
    captchaify = Captchaify(app, default_captcha_type="text")
    ```
 
-9. `default_action` Arg
+## 6. `default_action` Arg
 
    To specify the default action of all routes or endpoints use the default_action arg.
 
@@ -321,7 +280,7 @@ For more information, see the sample code above.
    ```
 
 
-9. `default_hardness` Arg
+## 7. `default_hardness` Arg
 
    To specify the default hardness of all routes or endpoints use the default_hardness arg.
 
@@ -330,7 +289,7 @@ For more information, see the sample code above.
    captchaify = Captchaify(app, default_hardness=3)
    ```
 
-9. `default_rate_limit` Arg
+## 8. `default_rate_limit` Arg
 
    To specify the default requests of an IP per minute for all routes use the default_rate_limit variable. (Default: 120 = 2 requests per second per IP)
 
@@ -339,7 +298,7 @@ For more information, see the sample code above.
    captchaify = Captchaify(app, default_rate_limit=60)
    ```
 
-9. `default_max_rate_limit` Arg
+## 9. `default_max_rate_limit` Arg
 
    To specify the default requests of all IPs per minute for all routes use the default_max_rate_limit variable. (Default: 1200 = 2 requests per second from 10 IPs)
 
@@ -349,7 +308,7 @@ For more information, see the sample code above.
    ```
 
 
-9. `default_template_dir` Arg
+## 10. `default_template_dir` Arg
 
    To specify the default template_dir of all routes or endpoints use the default_template_dir arg.
 
@@ -359,7 +318,7 @@ For more information, see the sample code above.
    ```
 
 
-9. `verification_age` Arg
+## 11. `verification_age` Arg
 
    Indicates the time in seconds how long a solved captcha is valid (Default: 3600 = 1 hour)
 
@@ -369,7 +328,7 @@ For more information, see the sample code above.
    ```
 
 
-9. `without_cookies` Arg
+## 12. `without_cookies` Arg
 
    If True, no cookies are created, and verification is proven via URL args (Default: False)
 
@@ -378,7 +337,7 @@ For more information, see the sample code above.
    captchaify = Captchaify(app, without_cookies=True)
    ```
 
-9. `block_crawler` Arg
+## 13. `block_crawler` Arg
 
    If True, crawlers like Googlebot, further are estimated via their user agent as suspicious and not the website, good for websites that should not be crawled (Default: True)
 
@@ -388,7 +347,7 @@ For more information, see the sample code above.
    ```
 
 
-9. `crawler_hints` Arg:
+## 14. `crawler_hints` Arg:
 
    If True, crawlers like Googlebot, are shown meta tags and the title of a normal web page, while they would have to solve a captcha. (Default: True)
    
@@ -398,7 +357,7 @@ For more information, see the sample code above.
    ```
 
 
-9. `third_parties` Arg:
+## 15. `third_parties` Arg:
 
    Specifies which third parties are used to check the IP addresses. By default, all 3 third parties are used. (See list)
 
@@ -415,7 +374,7 @@ For more information, see the sample code above.
    | stopforumspam        | [StopForumSpam](https://stopforumspam.com) is requested and the result is used                                                         |
 
 
-9. `as_route` Arg:
+## 16. `as_route` Arg:
 
    Specifies whether Captchaify pages are displayed as separate routes in order not to confuse the cache between normal pages and Captchaify pages (e.g. for Cloudflare)
 
@@ -425,7 +384,7 @@ For more information, see the sample code above.
    ```
 
 
-9. `without_other_args` Arg:
+## 17. `without_other_args` Arg:
 
    After solving the captcha, arguments such as language and theme are deleted from the url bar
 
@@ -434,7 +393,7 @@ For more information, see the sample code above.
    captchaify = Captchaify(app, without_other_args = True)
    ```
 
-9. `allow_customization` Arg:
+## 18. `allow_customization` Arg:
 
    If True, the user can change their language or theme via pages or an anchor. However, these are normally detected automatically.
    If activated, protects less against DDOS attacks against flask_Captchaify websites such as Change Language (not recommended).
@@ -445,10 +404,7 @@ For more information, see the sample code above.
    ```
 
 ## To-Do's
-- [x] Captcha type with multiclick
-- [x] Captcha data set with animals
-- [x] Add used captcha id to text captcha
 - [x] Captcha or blocking rules based on client_ip and client_ip_info (e.g. blocking of certain IP countries)
-- [ ] add `*` to rules Arg
-- [ ] `hardness` Arg also changes hardness of oneclick and multiclick captcha
+- [x] add `*` to rules Arg
+- [ ] https://github.com/tn3w/flask_Captchaify/issues/9
 - [ ] Captcha data set with emojis
