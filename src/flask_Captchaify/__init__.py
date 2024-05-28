@@ -16,7 +16,7 @@ import re
 import random
 import secrets
 import socket
-from typing import Optional, Final, Union
+from typing import Optional, Final, Union, Tuple
 from time import time
 from urllib.parse import urlparse, quote
 from base64 import b64encode
@@ -138,7 +138,8 @@ class Captchaify:
         default_template_dir: Optional[str] = None, verification_age: int = 3600,
         without_cookies: bool = False, block_crawler: bool = True,
         crawler_hints: bool = True, third_parties: Optional[list] = None,
-        as_route: bool = False, without_other_args: Optional[bool] = False) -> None:
+        as_route: bool = False, without_other_args: Optional[bool] = True,
+        allow_customization: bool = False) -> None:
         """
         Configures security settings for a Flask app.
 
@@ -185,6 +186,8 @@ class Captchaify:
                          (e.g. Cloudflare).
         :param without_other_args: After solving the captcha, delete args like language or theme
                                    from the URL
+        :param allow_customization: Allow the user to change their language and theme (can allow
+                                    DDOS attacks on flask_Captchaify websites like Change Language)
         """
 
         if app is None:
@@ -235,7 +238,9 @@ class Captchaify:
         self.third_parties = third_parties if isinstance(third_parties, list) else ALL_THIRD_PARTIES
         self.as_route = as_route if isinstance(as_route, bool) else False
         self.without_other_args = without_other_args if isinstance(without_other_args, bool)\
-                                  else False
+                                  else True
+        self.allow_customization = allow_customization if isinstance(allow_customization, bool)\
+                                   else False
 
         captcha_secret = generate_random_string(32)
         self.captcha_secret = captcha_secret
@@ -286,16 +291,17 @@ class Captchaify:
                     return_url = return_url, route_id = self.route_id
                 ), 418
 
-            @app.route('/change_language-' + route_id)
-            def change_language_captchaify():
-                return_path = get_return_path(request)
-                if return_path is None:
-                    return_path = '/'
+            if self.allow_customization:
+                @app.route('/change_language-' + route_id)
+                def change_language_captchaify():
+                    return_path = get_return_path(request)
+                    if return_path is None:
+                        return_path = '/'
 
-                change_language_template = self._display_change_language(return_path)
-                if change_language_template:
-                    return change_language_template
-                return abort(404)
+                    change_language_template = self._display_change_language(return_path)
+                    if change_language_template:
+                        return change_language_template
+                    return abort(404)
 
             @app.route('/captcha-' + route_id)
             @app.route('/captcha-' + route_id + '/')
@@ -312,6 +318,7 @@ class Captchaify:
                     hardness = preferences['hardness']
 
                     if self._is_to_many_attempts(action, hardness):
+                        g.captchaify_page = True
                         return redirect(self._create_route_url('block'))
 
                     is_valid_ct, is_failed_captcha = self._is_ct_valid()
@@ -331,16 +338,21 @@ class Captchaify:
                         elif request.cookies.get('captcha') is not None:
                             captcha_string = request.cookies.get('captcha')
 
-                        return_url += char + 'captcha=' + str(captcha_string)
+                        if self._without_cookies[0] and captcha_string is not None:
+                            return_url += char + 'captcha=' + captcha_string
 
                         if not self.without_other_args:
                             theme, is_default_theme = WebPage.client_theme(request)
                             language, is_default_language = WebPage.client_language(request)
+                            without_cookies, is_default_choice = self._without_cookies
                             if not is_default_theme:
                                 return_url += '&theme=' + theme
                             if not is_default_language:
                                 return_url += '&language=' + language
+                            if not is_default_choice:
+                                return_url += '&wc=' + str(int(without_cookies))
 
+                        g.captchaify_page = True
                         return redirect(return_url)
 
                     if is_failed_captcha:
@@ -351,17 +363,20 @@ class Captchaify:
                     )
                 except Exception as exc:
                     handle_exception(exc)
+
+                    g.captchaify_page = True
                     return redirect(self._create_route_url('blocked'))
-        else:
+
+        elif allow_customization:
             app.before_request(self._change_language)
 
         app.before_request(self._rate_limit)
         app.before_request(self._fight_bots)
 
         app.after_request(self._add_rate_limit)
-        if self.without_cookies:
-            app.after_request(self._add_args)
-        else:
+        app.after_request(self._add_args)
+
+        if not self.without_cookies:
             app.after_request(self._set_cookies)
 
         if self.crawler_hints:
@@ -474,6 +489,22 @@ class Captchaify:
             )
 
         return current_url
+
+
+    @property
+    def _without_cookies(self) -> Tuple[bool, bool]:
+        """
+        The cookie Consent of the client
+        """
+
+        if self.without_cookies:
+            return True, True
+
+        if request.args.get('wc') is not None:
+            return request.args.get('wc', '0') == '1', False
+        if request.cookies.get('cookieConsent') is not None:
+            return request.cookies.get('cookieConsent', '1') == '0', False
+        return False, True
 
 
     @property
@@ -770,6 +801,7 @@ class Captchaify:
 
             if client_ip is None or client_user_agent is None:
                 if self.as_route:
+                    g.captchaify_page = True
                     return redirect(self._create_route_url('blocked'))
 
                 emoji = random.choice(EMOJIS)
@@ -783,6 +815,7 @@ class Captchaify:
         except Exception as exc:
             handle_exception(exc)
             if self.as_route:
+                g.captchaify_page = True
                 return redirect(self._create_route_url('blocked'))
 
             emoji = random.choice(EMOJIS)
@@ -796,6 +829,8 @@ class Captchaify:
         :param template_type: The type of template to retrieve and render
         :param **args: Additional keyword arguments to be passed to the template renderer
         """
+
+        g.captchaify_page = True
 
         if not template_type in ALL_TEMPLATE_TYPES[:5]:
             template_type = 'block'
@@ -816,7 +851,16 @@ class Captchaify:
         page_ext = page_path.split('.')[-1]
 
         if page_ext == 'html':
-            return render_template(template_dir, file_name, request, **args)
+            args['allow_customization'] = self.allow_customization
+
+            without_cookies, is_default_choice = self._without_cookies
+            args['is_default_choice'] = is_default_choice
+            args['without_cookies'] = without_cookies
+            return render_template(
+                template_dir, file_name, request,
+                without_customization = not self.allow_customization,
+                **args
+            )
         if page_ext == 'json':
             return JSON.load(page_path)
         if page_ext == 'pkl':
@@ -857,6 +901,8 @@ class Captchaify:
                 if self.as_route:
                     if request.path.startswith('/rate_limited-' + self.route_id):
                         return
+
+                    g.captchaify_page = True
                     return redirect(self._create_route_url('rate_limited'))
 
                 emoji = random.choice(TEA_EMOJIS)
@@ -864,6 +910,7 @@ class Captchaify:
         except Exception as exc:
             handle_exception(exc)
             if self.as_route:
+                g.captchaify_page = True
                 return redirect(self._create_route_url('blocked'))
 
             emoji = random.choice(EMOJIS)
@@ -892,10 +939,22 @@ class Captchaify:
                     if return_path is not None:
                         return_url = get_return_url(return_path, request)
 
+                    without_cookies, is_default_choice = self._without_cookies
+
+                    kwargs = {
+                        "search": search, "languages": languages,
+                        "return_path": return_path, "return_url": return_url,
+                        "allow_customization": self.allow_customization,
+                        "is_default_choice": is_default_choice,
+                        "without_cookies": without_cookies
+                    }
+
+                    g.captchaify_page = True
+
                     return render_template(
-                        template_dir, file_name, request, search = search,
-                        languages = languages, return_path = return_path,
-                        return_url = return_url
+                        template_dir, file_name, request,
+                        without_customization = not self.allow_customization,
+                        **kwargs
                     )
         except Exception as exc:
             handle_exception(exc)
@@ -973,6 +1032,7 @@ class Captchaify:
             captcha_token = self.sses.encrypt(captcha_token_data)
             if captcha_token is None:
                 if self.as_route:
+                    g.captchaify_page = True
                     return redirect(self._create_route_url('blocked'))
 
                 emoji = random.choice(EMOJIS)
@@ -1042,6 +1102,7 @@ class Captchaify:
             captcha_token = self.sses.encrypt(captcha_token_data)
             if captcha_token is None:
                 if self.as_route:
+                    g.captchaify_page = True
                     return redirect(self._create_route_url('blocked'))
 
                 emoji = random.choice(EMOJIS)
@@ -1114,6 +1175,7 @@ class Captchaify:
             captcha_token = self.sses.encrypt(captcha_token_data)
             if captcha_token is None:
                 if self.as_route:
+                    g.captchaify_page = True
                     return redirect(self._create_route_url('blocked'))
 
                 emoji = random.choice(EMOJIS)
@@ -1387,16 +1449,21 @@ class Captchaify:
         if '?' not in url:
             char = '?'
 
-        url += char + 'captcha=' + quote(str(captcha_id + captcha_token))
+        if self._without_cookies[0]:
+            url += char + 'captcha=' + quote(str(captcha_id + captcha_token))
 
         if not self.without_other_args:
             theme, is_default_theme = WebPage.client_theme(request)
             language, is_default_language = WebPage.client_language(request)
+            without_cookies, is_default_choice = self._without_cookies
             if not is_default_theme:
                 url += '&theme=' + theme
             if not is_default_language:
                 url += '&language=' + language
+            if not is_default_choice:
+                url += '&wc=' + str(int(without_cookies))
 
+        g.captchaify_page = True
         return redirect(url)
 
 
@@ -1472,6 +1539,7 @@ class Captchaify:
 
             if action == 'block' or self._is_to_many_attempts(action, hardness):
                 if self.as_route:
+                    g.captchaify_page = True
                     return redirect(self._create_route_url('blocked'))
 
                 emoji = random.choice(EMOJIS)
@@ -1488,6 +1556,7 @@ class Captchaify:
                 self._add_failed_captcha(client_ip)
 
             if self.as_route:
+                g.captchaify_page = True
                 return redirect(self._create_route_url('captcha'))
 
             return self._display_captcha(is_error = is_failed_captcha)
@@ -1495,6 +1564,7 @@ class Captchaify:
             handle_exception(exc)
 
             if self.as_route:
+                g.captchaify_page = True
                 return redirect(self._create_route_url('blocked'))
 
             emoji = random.choice(EMOJIS)
@@ -1540,41 +1610,6 @@ class Captchaify:
             handle_exception(exc)
 
 
-    def _set_cookies(self, response: Response) -> Response:
-        """
-        Set cookies in the response object based on various conditions.
-
-        :param response: The response object to be returned
-        """
-
-        try:
-            response = make_response(response)
-
-            if self.without_cookies:
-                return response
-
-            if hasattr(g, 'captchaify_captcha'):
-                if g.captchaify_captcha is not None:
-                    response.set_cookie('captcha', g.captchaify_captcha,
-                                        max_age = self.verification_age, httponly = True,
-                                        secure = self.app.config.get('HTTPS'))
-
-            theme, is_default_theme = WebPage.client_theme(request)
-            if not is_default_theme:
-                response.set_cookie('theme', theme, max_age = 93312000,
-                                    httponly = True, secure = self.app.config.get('HTTPS'))
-
-            language, is_default_language = WebPage.client_language(request)
-            if not is_default_language:
-                response.set_cookie('language', language,
-                                    max_age = 93312000, httponly = True,
-                                    secure = self.app.config.get('HTTPS'))
-
-            return response
-        except Exception as exc:
-            handle_exception(exc)
-
-
     def _add_args(self, response: Response) -> Response:
         """
         Modifies HTML content of a response by adding arguments to links and forms.
@@ -1583,20 +1618,90 @@ class Captchaify:
         """
 
         try:
-            if not response.content_type == 'text/html; charset=utf-8':
+            if not response.content_type.startswith('text/html'):
                 return response
 
-            args = {}
+            without_cookies, is_default_choice = self._without_cookies
+
+            if not without_cookies and getattr(g, 'captchaify_page', False) is True:
+                return response
+
+            kwargs = {}
+
+            if not is_default_choice:
+                kwargs['wc'] = str(int(without_cookies))
+
             is_captcha_set = False
             if hasattr(g, 'captchaify_captcha'):
                 if g.captchaify_captcha is not None:
-                    args['captcha'] = g.captchaify_captcha
+                    kwargs['captcha'] = g.captchaify_captcha
                     is_captcha_set = True
 
             if request.args.get('captcha') is not None and not is_captcha_set:
-                args['captcha'] = request.args.get('captcha')
+                kwargs['captcha'] = request.args.get('captcha')
 
-            response.data = WebPage.add_args(response.data, request, **args)
+            if self.allow_customization and without_cookies:
+                theme, is_default_theme = WebPage.client_theme(request)
+                if not is_default_theme:
+                    kwargs['theme'] = theme
+
+                language, is_default_language = WebPage.client_language(request)
+                if not is_default_language:
+                    kwargs['language'] = language
+
+            response.data = WebPage.add_args(response.data, request, **kwargs)
+
+            return response
+        except Exception as exc:
+            handle_exception(exc)
+
+
+    def _set_cookies(self, response: Response) -> Response:
+        """
+        Set cookies in the response object based on various conditions.
+
+        :param response: The response object to be returned
+        """
+
+        try:
+            without_cookies, is_default_choice = self._without_cookies
+            if getattr(g, 'captchaify_page', False) is False:
+                if self.without_other_args:
+                    response.set_cookie('theme', '', max_age=0)
+                    response.set_cookie('language', '', max_age=0)
+
+                return response
+
+            if without_cookies:
+                cookies = request.cookies
+                for cookie in cookies:
+                    response.set_cookie(cookie, '', max_age=0)
+
+                return response
+
+            kwargs = {}
+            if not is_default_choice and request.args.get('cookieConsent') != '1':
+                kwargs["cookieConsent"] = '1'
+
+            if hasattr(g, 'captchaify_captcha'):
+                if isinstance(g.captchaify_captcha, str):
+                    kwargs["captcha"] = g.captchaify_captcha
+
+            if self.allow_customization:
+                theme, is_default_theme = WebPage.client_theme(request)
+                if not is_default_theme:
+                    kwargs["theme"] = theme
+
+                language, is_default_language = WebPage.client_language(request)
+                if not is_default_language:
+                    kwargs["language"] = language
+
+            for key, value in kwargs.items():
+                response.set_cookie(
+                    key, value, max_age = 93312000, samesite = 'Lax',
+                    secure = self.app.config.get('HTTPS'),
+                    domain = urlparse(request.url).netloc
+                )
 
             return response
         except Exception as exc:

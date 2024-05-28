@@ -935,9 +935,9 @@ TRANSLATIONS_FILE_PATH = os.path.join(DATA_DIR, 'translations.pkl')
 translator = Translator()
 
 
-def render_template(template_dir: str, file_name: str,
-                    request: Request, template_language:\
-                    Optional[str] = None, **args) -> str:
+def render_template(template_dir: str, file_name: str, request: Request,
+                    template_language: Optional[str] = None,
+                    without_customization: bool = False, **args) -> str:
     """
     Renders a template file into HTML content, optionally translating it to the specified language.
 
@@ -946,6 +946,8 @@ def render_template(template_dir: str, file_name: str,
     :param request: The request object providing information about the client's language preference.
     :param template_language: The language code specifying the language of the template content. 
                               If not provided, defaults to 'en' (English).
+    :param without_customization: Whether cookies and language or theme arguments
+                                  should be taken into account.
     :param **args: Additional keyword arguments to pass to the template rendering function.
 
     :return: The rendered HTML content of the template.
@@ -954,21 +956,24 @@ def render_template(template_dir: str, file_name: str,
     if template_language is None:
         template_language = "en"
 
-    client_theme, is_default_theme = WebPage.client_theme(request)
-    client_language, is_default_language = WebPage.client_language(request)
+    if not without_customization:
+        client_theme, is_default_theme = WebPage.client_theme(request)
+        client_language, is_default_language = WebPage.client_language(request)
+    else:
+        client_theme, is_default_theme = 'dark', True
+        client_language, is_default_language =\
+            WebPage.best_language(request, 'en'), True
 
     args["theme"] = client_theme
     args["is_default_theme"] = is_default_theme
     args["language"] = client_language
     args["is_default_language"] = is_default_language
-    args["alternate_languages"] = LANGUAGE_CODES
+    args["alternate_languages"] = LANGUAGE_CODES if not without_customization else []
 
-    current_url = WebPage.client_url(request)
+    current_url = rearrange_url(WebPage.client_url(request), ['theme', 'language'])
     args["current_url"] = rearrange_url(current_url, ['ct', 'ci', 'captcha', 'return_path'])
-    args["current_url_without_ccl_and_lang"] = rearrange_url(current_url, ['ccl', 'language'])
     args["current_url_without_ccl"] = rearrange_url(current_url, ['ccl'])
-    args["current_url_without_theme"] = rearrange_url(current_url, ['theme'])
-    args["current_url_without_language"] = rearrange_url(current_url, ['language'])
+    args["current_url_without_wc"] = rearrange_url(current_url, ['wc'])
     args["current_path"] = quote(
         extract_path_and_args(
             rearrange_url(request.url, ['theme', 'language'])
@@ -1025,6 +1030,24 @@ class WebPage:
 
 
     @staticmethod
+    def best_language(request: Request, default: any = None) -> str:
+        """
+        Determines the best language match from the request's accepted languages.
+
+        :param request: The HTTP request object containing the accepted languages.
+        :param default: The default language code to return if no match is found.
+        :return: The best matching language code or the default if no match is found.
+        """
+
+        best_match = request.accept_languages.best_match(LANGUAGE_CODES)
+
+        if best_match not in LANGUAGE_CODES:
+            return default
+
+        return best_match
+
+
+    @staticmethod
     def client_language(request: Request) -> Tuple[str, bool]:
         """
         Which language the client prefers
@@ -1052,10 +1075,10 @@ class WebPage:
         )
 
         if chosen_language is None:
-            preferred_language = request.accept_languages.best_match(LANGUAGE_CODES)
+            best_match = WebPage.best_language(request)
 
-            if preferred_language is not None:
-                return preferred_language, True
+            if best_match is not None:
+                return best_match, True
         else:
             return chosen_language, False
 
@@ -1237,14 +1260,6 @@ class WebPage:
         :param request: The Flask Request object containing information about the current request.
         :return: The HTML content with arguments added to links and forms.
         """
-
-        theme, is_default_theme = WebPage.client_theme(request)
-        if not is_default_theme:
-            args['theme'] = theme
-
-        language, is_default_language = WebPage.client_language(request)
-        if not is_default_language:
-            args['language'] = language
 
         soup = BeautifulSoup(html, 'html.parser')
 

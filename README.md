@@ -12,9 +12,9 @@ A DDoS defense system for flask applications, first sends users to a captcha pag
 
 
 > [!CAUTION]
-> Captchaify must now no longer be imported as Captcha, i.e. `from flask_Captchaify import Captcha`, but as Captchaify (`from flask_Captchaify import Captchaify`)
-> 
 > In the latest version, the let action is now set as `allow`.
+>
+> In the latest version customization options like language and theme are not shown by default, to change this set `allow_customization` to `True`. And `without_other_args` Arg is now set to `True` by default.
 
 Todos:
 - [x] Captcha type with multiclick
@@ -452,4 +452,14 @@ For more information, see the sample code above.
    Web page where this is activated:
    ```python
    captchaify = Captchaify(app, without_other_args = True)
+   ```
+
+9. `allow_customization` Arg:
+
+   If True, the user can change their language or theme via pages or an anchor. However, these are normally detected automatically.
+   If activated, protects less against DDOS attacks against flask_Captchaify websites such as Change Language (not recommended).
+
+   Web page where this is activated:
+   ```python
+   captchaify = Captchaify(app, allow_customization = True)
    ```
