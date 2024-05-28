@@ -375,9 +375,7 @@ class Captchaify:
 
         app.after_request(self._add_rate_limit)
         app.after_request(self._add_args)
-
-        if not self.without_cookies:
-            app.after_request(self._set_cookies)
+        app.after_request(self._set_cookies)
 
         if self.crawler_hints:
             app.after_request(self._crawler_hints)
@@ -1664,7 +1662,6 @@ class Captchaify:
         """
 
         try:
-            without_cookies, is_default_choice = self._without_cookies
             if getattr(g, 'captchaify_page', False) is False:
                 if self.without_other_args:
                     response.set_cookie('theme', '', max_age=0)
@@ -1672,6 +1669,7 @@ class Captchaify:
 
                 return response
 
+            without_cookies, is_default_choice = self._without_cookies
             if without_cookies:
                 cookies = request.cookies
                 for cookie in cookies:

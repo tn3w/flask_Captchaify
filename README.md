@@ -1,63 +1,39 @@
 <center>
    <picture align="center">
-      <source width="800px" media="(prefers-color-scheme: dark)" srcset="https://github.com/tn3w/flask_Captchaify/releases/download/img_v1.7/oneclick_dark.png">
-      <source width="800px" media="(prefers-color-scheme: light)" srcset="https://github.com/tn3w/flask_Captchaify/releases/download/img_v1.7/oneclick_light.png">
-      <img width="800px" alt="Picture from Block Page" src="https://github.com/tn3w/flask_Captchaify/releases/download/img_v1.7/oneclick_dark.png">
+      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/tn3w/flask_Captchaify/releases/download/img_v1.7/oneclick_dark.png">
+      <source media="(prefers-color-scheme: light)" srcset="https://github.com/tn3w/flask_Captchaify/releases/download/img_v1.7/oneclick_light.png">
+      <img alt="Picture from Block Page" src="https://github.com/tn3w/flask_Captchaify/releases/download/img_v1.7/oneclick_dark.png">
    </picture>
 </center>
-<p align="center"><a rel="noreferrer noopener" href="https://github.com/tn3w/flask_Captchaify"><img alt="Github" src="https://img.shields.io/badge/Github-141e24.svg?&style=for-the-badge&logo=github&logoColor=white"></a>  <a rel="noreferrer noopener" href="https://pypi.org/project/flask-Captchaify/"><img alt="PyPI" src="https://img.shields.io/badge/PyPi-141e24.svg?&style=for-the-badge&logo=python&logoColor=white"></a>  <a rel="noreferrer noopener" href="https://libraries.io/pypi/flask-Captchaify"><img alt="Libraries.io" src="https://img.shields.io/badge/Libraries.io-141e24.svg?&style=for-the-badge&logo=npm&logoColor=white"></a>
+<h1 align="center">𝐟𝐥𝐚𝐬𝐤_𝐂𝐚𝐩𝐭𝐜𝐡𝐚𝐢𝐟𝐲</h1>
+<p align="center"><a rel="noreferrer noopener" href="https://github.com/tn3w/flask_Captchaify"><img alt="Github" src="https://img.shields.io/badge/Github-141e24.svg?&style=for-the-badge&logo=github&logoColor=white"></a>  <a rel="noreferrer noopener" href="https://pypi.org/project/flask-Captchaify/"><img alt="PyPI" src="https://img.shields.io/badge/PyPi-141e24.svg?&style=for-the-badge&logo=python&logoColor=white"></a>  <a rel="noreferrer noopener" href="https://libraries.io/pypi/flask-Captchaify"><img alt="Libraries.io" src="https://img.shields.io/badge/Libraries.io-141e24.svg?&style=for-the-badge&logo=npm&logoColor=white"></a></p>
 
-# flask_Captchaify
-A DDoS defense system for flask applications, first sends users to a captcha page without a javascript script and creates a confirmation cookie/url arg after the captcha.
+<p align="center">A robust Captcha and Bot protection system tailored for Flask, packed with extra features including rate limiting, client-specific rules, crawler detection hints, and seamless automatic bot identification.</p>
 
+<br>
 
-> [!CAUTION]
-> In the latest version, the let action is now set as `allow`.
->
-> In the latest version customization options like language and theme are not shown by default, to change this set `allow_customization` to `True`. And `without_other_args` Arg is now set to `True` by default.
-
-Todos:
-- [x] Captcha type with multiclick
-- [x] Captcha data set with animals
-- [x] Add used captcha id to text captcha
-- [x] Captcha or blocking rules based on client_ip and client_ip_info (e.g. blocking of certain IP countries)
-- [ ] add `*` to rules Arg
-- [ ] `hardness` Arg also changes hardness of oneclick and multiclick captcha
-- [ ] Captcha data set with emojis
-
-## How does flask_Captchaify work?
-If needed, a captcha is displayed to the user (or the robot) based on the strength set. Javascript is not needed for this, as the content is rendered on the server. If the captcha is fulfilled correctly, a token is created that stores the client's data in encrypted form and is used to confirm fulfillment with each request. It is stored as a cookie and as the url Arg `captcha`.
-
-> [!TIP]
-> The `captcha`, `language` and `theme` Arg is automatically inserted in all anchors on your HTML page
->
-> If you use Ip to Domain tools like Cloudflared or Nginx it can happen that no ipv4 IP can be found.
-
-An example script could look like this:
 ```python
 from flask import Flask
 from flask_Captchaify import Captchaify
 
 app = Flask(__name__)
-captchaify = Captchaify(app, default_action = "fight")
+captchaify = Captchaify(app, default_action = 'fight')
 
-@app.route("/")
+@app.route('/')
 def index():
     return 'Hello Human!'
 
-if __name__ == "__main__":
-    app.run(host = "localhost", port = 8080)
+if __name__ == '__main__':
+    app.run(host = 'localhost', port = 9000)
 ```
 
-## Application purposes
-A few application purposes:
-  - Protect against DDoS attacks
-  - Your website contains content that should not be read by a robot
-  - A login website
-  - A dark web page
+## How does it work?
+In situations where it is deemed necessary, a captivating challenge may be presented to either the user or any automated agents, depending on the predetermined level of security required. Upon successful completion of this captivating challenge, a unique token is generated. This token serves as a secure vessel, encapsulating the client's information in an encrypted format. Subsequently, this token is deployed as both a cookie within the client's browser or as a parameter in the URL, denoted as 'captcha'. This mechanism ensures the continual validation of legitimacy with each subsequent request.
 
-### Why should you use Captchaify if you host a Flask server?
-A quick and easy implementation allows even small websites or a small team of developers to quickly get bot protection. It also doesn't use third-party providers, which limits data collection from Google, Facebook and the creepy data brokers. Everything is open source, meaning you can rewrite the code yourself and perhaps make it more private.
+> [!TIP]
+> The `captcha`, `language` and `theme` Arg is automatically inserted in all anchors on your HTML page
+>
+> If you use Ip to Domain tools like Cloudflared or Nginx it can happen that no ipv4 IP can be found.
 
 # Instructions
 
@@ -78,6 +54,10 @@ A quick and easy implementation allows even small websites or a small team of de
    from flask_Captchaify import Captchaify
    ```
 For more information, see the sample code above.
+> [!CAUTION]
+> In the latest version, the let action is now set as `allow`.
+>
+> In the latest version customization options like language and theme are not shown by default, to change this set `allow_customization` to `True`. And `without_other_args` Arg is now set to `True` by default.
 
 ## Personalization
 1. `app` Arg
@@ -463,3 +443,12 @@ For more information, see the sample code above.
    ```python
    captchaify = Captchaify(app, allow_customization = True)
    ```
+
+## To-Do's
+- [x] Captcha type with multiclick
+- [x] Captcha data set with animals
+- [x] Add used captcha id to text captcha
+- [x] Captcha or blocking rules based on client_ip and client_ip_info (e.g. blocking of certain IP countries)
+- [ ] add `*` to rules Arg
+- [ ] `hardness` Arg also changes hardness of oneclick and multiclick captcha
+- [ ] Captcha data set with emojis

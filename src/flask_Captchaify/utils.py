@@ -1414,7 +1414,6 @@ class SymmetricCrypto:
 
             return urlsafe_b64encode(salt + iv + ciphertext).decode()
         except Exception as exc:
-            handle_exception(exc, is_app_error=False)
             return None
 
 
@@ -1449,7 +1448,6 @@ class SymmetricCrypto:
 
             return plaintext.decode()
         except Exception as exc:
-            handle_exception(exc, False, False)
             return None
 
 
