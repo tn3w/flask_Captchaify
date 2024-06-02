@@ -27,21 +27,16 @@ if __name__ == '__main__':
     app.run(host = 'localhost', port = 9000)
 ```
 
-## How does it work?
+### How does it work?
 In situations where it is deemed necessary, a captivating challenge may be presented to either the user or any automated agents, depending on the predetermined level of security required. Upon successful completion of this captivating challenge, a unique token is generated. This token serves as a secure vessel, encapsulating the client's information in an encrypted format. Subsequently, this token is deployed as both a cookie within the client's browser or as a parameter in the URL, denoted as 'captcha'. This mechanism ensures the continual validation of legitimacy with each subsequent request.
-
-> [!TIP]
-> The `captcha`, `language` and `theme` Arg is automatically inserted in all anchors on your HTML page
->
-> If you use Ip to Domain tools like Cloudflared or Nginx it can happen that no ipv4 IP can be found.
 
 <br>
 
-# Installation guide
+## Installation guide
 1. Make sure you have the latest version of Python and Pip installed, you also need git installed.
 2. Install the script with pip `pip install flask_Captchaify` or manually via `git clone https://github.com/tn3w/flask_Captchaify` or download the zip.
 3. If you installed it manually, make sure your python script is in the folder where there is a subfolder flask_Captchaify, and make sure you run `pip install -r requirements.txt` in the flask_Captchaify folder.
-5. Make sure that after:
+4. Make sure that after:
    ```python
    app = Flask(__name__)
    ```
@@ -53,15 +48,12 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```python
    from flask_Captchaify import Captchaify
    ```
-For more information, see the sample code above.
-> [!CAUTION]
-> From now on all routes and client specific rules are set via the `rules` arg, arguments `captcha_types`, `actions`, `hardness`, `rate_limits` and `template_dirs` have been deprecated.
 
 
 <br>
 
-# Personalization
-## 1. `app` Arg
+## Personalization
+### 1. `app` Arg
 
    A Flask() object of a Flask app that is modified by Captchaify so that each request is checked for bots
 
@@ -75,7 +67,7 @@ For more information, see the sample code above.
    ```
 
 
-## 2. `rules` Arg
+### 2. `rules` Arg
 
    Certain changes based on specific criteria such as IP, proxy, hosting or geo information
 
@@ -89,7 +81,7 @@ For more information, see the sample code above.
    rules = [{"rule": ['ip', 'is in', ['127.0.0.1', '10.0.0.1'], 'or', 'proxy', 'is', True]}, "change": {"action": "block"}]
    ```
 
-   ### Client Info
+   #### ~ Client Info ~
 
    The following client info fields can be compared:
    | Name of field  | Type | Information                                                   | Example                                                                          |
@@ -148,12 +140,11 @@ For more information, see the sample code above.
    | ------------------ | --------------- | ---------------------- |
    | captcha_type       | str             | multiclick             |
    | action             | str             | allow                  |
-   | hardness           | int             | 1                      |
    | rate_limit         | Tuple[int, int] | (20, 100)              |
    | template_dir       | str             | /path/to/template/dir  |
 
 
-   ### Asterik `*`
+   #### ~ Asterik `*` ~
    The asterisk creates the customization options for information comparisons. The asterisk (*) serves as a wildcard, representing any number of characters including zero.
 
    Example of a rule that all routes that start with /login then have a string and then have /development as route e.g. `/login/api/development` or `/login/2fa/development`:
@@ -164,14 +155,16 @@ For more information, see the sample code above.
 
    Here are all the things that can be changed:
 
-   ### Captcha types (`captcha_type`):
+   #### ~ Captcha types (`captcha_type`) ~
    | Name of captcha type | Displayed Captchas                                                        |
    | --------------       | ------------------------------------------------------------------------- |
    | oneclick (Default)   | The user only needs one click to confirm that he is not a bot             |
    | multiclick           | The user must select several images that match a motif (harder)           |
    | text                 | The user enters a text combination from an image into an input (obsolete) |
+   | audio                | The user enters a text combination from an audio into an input (obsolete) |
+   | text&audio           | The user enters a text and an audio combination into an input (obsolete)  |
 
-   To specify the exact data set, you have to add it after the captcha_type with a `_` as separator, e.g. `oneclick_animals` or if you use a custom data set: `oneclick_custom`. If you use a text captcha, you do not need a data set.
+   To specify the exact data set, you have to add it after the captcha_type with a `_` as separator, e.g. `oneclick_animals` or if you use a custom data set: `oneclick_custom`. If you use a text or audio captcha, you do not need a data set.
 
    Here are all the ready-made data sets:
    | Name of dataset | Displayed Captchas                                                                                 |
@@ -180,7 +173,7 @@ For more information, see the sample code above.
    | animals         | Displays 50 different animal species (default for multiclick)                                      |
 
 
-   ### Actions (`action`):
+   #### ~ Actions (`action`) ~
    | Name of action | Executing Action                                                     |
    | -------------- | -------------------------------------------------------------------- |
    | allow          | Allows all traffic through, regardless of whether the IP is blocked. |
@@ -189,21 +182,11 @@ For more information, see the sample code above.
    | captcha        | Default value, shows only suspicious traffic captchas.               |
 
 
-   ### Hardness (`hardness`):
-   (Currently only changes the strength of text captchas see [Issue #9](https://github.com/tn3w/flask_Captchaify/issues/9))
-
-   | Hardness Level | Captcha modification                                                                                                               |
-   | -------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-   | 1              | The captcha is easy. Only a text captcha with 6 - 8 characters is displayed                                                        |
-   | 2              | The captcha is normal. Only a text captcha with 9 - 11 characters is displayed                                                     |
-   | 3              | The hardness of the captcha is hard, a 9 - 14 number audio captcha is displayed in addition to the 10 - 12 character text captcha. |
-
-
-   ### Rate Limits (`rate_limit`):
+   #### ~ Rate Limits (`rate_limit`) ~
    The syntax is a bit different from the others, because two values are specified `(rate_limit, max_rate_limit)`. The variable rate_limit must be a number indicating how many requests per minute can come from a given ip. max_rate_limit indicates how many requests can come from all ips per minute, also a number.
 
 
-   ### Template Dir (`template_dir`):
+   #### ~ Template Dir (`template_dir`) ~
    To change the template directory of a particular route use the template_dirs arg.
 
    A template directory can look like this:
@@ -220,7 +203,7 @@ For more information, see the sample code above.
    If one of the three templates does not exist in the folder, a 404 error is displayed when calling it. e.g. if you remove the changelanguage page at apis.
 
 
-## 3. `dataset_size` Arg
+### 3. `dataset_size` Arg
 
    The size of the data set with e.g. images and keywords that determine how much of a data set is used, if a lot is used this can reduce RAM capacity but also increase security.
    Either a tuple of 2 numbers where the first indicates how many images per keyword (always the first ones) can be used (recommended around 20, maximum 200 or more depending on the data set) and the second number how many keywords are e.g. (images_per_keyword, number_of_keywords), default setting: (20, 100).
@@ -245,7 +228,7 @@ For more information, see the sample code above.
    ```
 
 
-## 4. `dataset_dir` Arg
+### 4. `dataset_dir` Arg
 
    Specifies where the program can find data sets.
 
@@ -261,7 +244,7 @@ For more information, see the sample code above.
    ```
 
 
-## 5. `default_captcha_type` Arg
+### 5. `default_captcha_type` Arg
 
    To specify the default captcha type of all routes or endpoints use the default_captcha_type arg.
 
@@ -270,7 +253,7 @@ For more information, see the sample code above.
    captchaify = Captchaify(app, default_captcha_type="text")
    ```
 
-## 6. `default_action` Arg
+### 6. `default_action` Arg
 
    To specify the default action of all routes or endpoints use the default_action arg.
 
@@ -279,17 +262,7 @@ For more information, see the sample code above.
    captchaify = Captchaify(app, default_action="fight")
    ```
 
-
-## 7. `default_hardness` Arg
-
-   To specify the default hardness of all routes or endpoints use the default_hardness arg.
-
-   Example of a very paranoid website that has set its hardness to 3 (= hard) for all routes:
-   ```python
-   captchaify = Captchaify(app, default_hardness=3)
-   ```
-
-## 8. `default_rate_limit` Arg
+### 7. `default_rate_limit` Arg
 
    To specify the default requests of an IP per minute for all routes use the default_rate_limit variable. (Default: 120 = 2 requests per second per IP)
 
@@ -298,7 +271,7 @@ For more information, see the sample code above.
    captchaify = Captchaify(app, default_rate_limit=60)
    ```
 
-## 9. `default_max_rate_limit` Arg
+### 8. `default_max_rate_limit` Arg
 
    To specify the default requests of all IPs per minute for all routes use the default_max_rate_limit variable. (Default: 1200 = 2 requests per second from 10 IPs)
 
@@ -308,7 +281,7 @@ For more information, see the sample code above.
    ```
 
 
-## 10. `default_template_dir` Arg
+### 9. `default_template_dir` Arg
 
    To specify the default template_dir of all routes or endpoints use the default_template_dir arg.
 
@@ -318,7 +291,7 @@ For more information, see the sample code above.
    ```
 
 
-## 11. `verification_age` Arg
+### 10. `verification_age` Arg
 
    Indicates the time in seconds how long a solved captcha is valid (Default: 3600 = 1 hour)
 
@@ -328,7 +301,7 @@ For more information, see the sample code above.
    ```
 
 
-## 12. `without_cookies` Arg
+### 11. `without_cookies` Arg
 
    If True, no cookies are created, and verification is proven via URL args (Default: False)
 
@@ -337,7 +310,7 @@ For more information, see the sample code above.
    captchaify = Captchaify(app, without_cookies=True)
    ```
 
-## 13. `block_crawler` Arg
+### 12. `block_crawler` Arg
 
    If True, crawlers like Googlebot, further are estimated via their user agent as suspicious and not the website, good for websites that should not be crawled (Default: True)
 
@@ -347,7 +320,7 @@ For more information, see the sample code above.
    ```
 
 
-## 14. `crawler_hints` Arg:
+### 13. `crawler_hints` Arg:
 
    If True, crawlers like Googlebot, are shown meta tags and the title of a normal web page, while they would have to solve a captcha. (Default: True)
    
@@ -357,7 +330,7 @@ For more information, see the sample code above.
    ```
 
 
-## 15. `third_parties` Arg:
+### 14. `third_parties` Arg:
 
    Specifies which third parties are used to check the IP addresses. By default, all 3 third parties are used. (See list)
 
@@ -374,7 +347,7 @@ For more information, see the sample code above.
    | stopforumspam        | [StopForumSpam](https://stopforumspam.com) is requested and the result is used                                                         |
 
 
-## 16. `as_route` Arg:
+### 15. `as_route` Arg:
 
    Specifies whether Captchaify pages are displayed as separate routes in order not to confuse the cache between normal pages and Captchaify pages (e.g. for Cloudflare)
 
@@ -384,7 +357,7 @@ For more information, see the sample code above.
    ```
 
 
-## 17. `without_other_args` Arg:
+### 16. `without_other_args` Arg:
 
    After solving the captcha, arguments such as language and theme are deleted from the url bar
 
@@ -393,7 +366,7 @@ For more information, see the sample code above.
    captchaify = Captchaify(app, without_other_args = True)
    ```
 
-## 18. `allow_customization` Arg:
+### 17. `allow_customization` Arg:
 
    If True, the user can change their language or theme via pages or an anchor. However, these are normally detected automatically.
    If activated, protects less against DDOS attacks against flask_Captchaify websites such as Change Language (not recommended).

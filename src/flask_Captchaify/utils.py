@@ -1245,7 +1245,7 @@ class WebPage:
         soup = BeautifulSoup(html, 'html.parser')
 
         tags = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5',
-                              'h6', 'a', 'p', 'button'])
+                              'h6', 'a', 'p', 'button', 'li', 'span'])
         for tag in tags:
             if str(tag) and 'ntr' not in tag.attrs:
                 translate_tag(tag, from_lang, to_lang)
@@ -1428,6 +1428,9 @@ class SymmetricCrypto:
         :param plaintext: The text to be encrypted
         """
 
+        if isinstance(plain_text, str):
+            plain_text = plain_text.encode()
+
         try:
             salt = secrets.token_bytes(self.salt_length)
 
@@ -1445,12 +1448,14 @@ class SymmetricCrypto:
             cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
             encryptor = cipher.encryptor()
             padder = padding.PKCS7(algorithms.AES.block_size).padder()
-            padded_data = padder.update(plain_text.encode()) + padder.finalize()
+            padded_data = padder.update(plain_text) + padder.finalize()
             ciphertext = encryptor.update(padded_data) + encryptor.finalize()
 
             return urlsafe_b64encode(salt + iv + ciphertext).decode()
-        except Exception as exc:
-            return None
+        except Exception:
+            pass
+
+        return None
 
 
     def decrypt(self, cipher_text: str) -> Optional[str]:
@@ -1482,9 +1487,14 @@ class SymmetricCrypto:
             decrypted_data = decryptor.update(cipher_text) + decryptor.finalize()
             plaintext = unpadder.update(decrypted_data) + unpadder.finalize()
 
-            return plaintext.decode()
-        except Exception as exc:
-            return None
+            try:
+                return plaintext.decode()
+            except UnicodeDecodeError:
+                return plaintext
+        except Exception:
+            pass
+
+        return None
 
 
 class Hashing:
@@ -1544,18 +1554,19 @@ class SSES:
     Space-saving encryption scheme (SSES) for encrypting data without keys and decrypting with keys.
     """
 
-    def __init__(self, symmetric_crypto: SymmetricCrypto, separator: str = '--') -> None:
+    def __init__(self, password: str, separator: str = '--', with_keys: bool = False) -> None:
         """
         Initializes the SSES instance with the specified symmetric cryptography object and separator
 
-        :param symmetric_crypto: The symmetric cryptography object to
-                                 use for encryption and decryption.
+        :param password: A secure encryption password, should be at least 32 characters long.
         :param separator: The separator string to use for joining
                           values before encryption. Defaults to '--'.
+        :param with_keys: Whether the keys should also be encrypted.
         """
 
-        self.symmetric_crypto = symmetric_crypto
+        self.password = password
         self.separator = separator
+        self.with_keys = with_keys
 
 
     def encrypt(self, data_dict: dict) -> Optional[str]:
@@ -1567,21 +1578,26 @@ class SSES:
         """
 
         try:
-            values = list(data_dict.values())
+            if not self.with_keys:
+                values = list(data_dict.values())
 
-            new_values = []
-            for value in values:
-                if isinstance(value, (list, dict)):
-                    value = '§§' + b64encode(pickle.dumps(value)).decode('utf-8')
-                new_values.append(value)
+                new_values = []
+                for value in values:
+                    if isinstance(value, (list, dict)):
+                        value = '§§' + b64encode(pickle.dumps(value)).decode('utf-8')
+                    new_values.append(value)
 
-            text_data = self.separator.join(new_values)
-            encrypted_data = self.symmetric_crypto.encrypt(text_data)
+                text_data = self.separator.join(new_values)
+            else:
+                text_data = pickle.dumps(data_dict)
+
+            encrypted_data = SymmetricCrypto(self.password).encrypt(text_data)
 
             return encrypted_data
         except Exception as exc:
             handle_exception(exc)
-            return None
+
+        return None
 
 
     def decrypt(self, encrypted_data: str, dict_keys:\
@@ -1595,25 +1611,28 @@ class SSES:
         """
 
         try:
-            decrypted_data = self.symmetric_crypto.decrypt(encrypted_data)
+            decrypted_data = SymmetricCrypto(self.password).decrypt(encrypted_data)
             if decrypted_data is None:
                 return None
 
-            values = decrypted_data.split(self.separator)
+            if not self.with_keys:
+                values = decrypted_data.split(self.separator)
 
-            if not isinstance(dict_keys, list) or len(dict_keys) == 0:
-                return values
+                if not isinstance(dict_keys, list) or len(dict_keys) == 0:
+                    return values
 
-            data_dict = {}
-            for i, dict_key in enumerate(dict_keys):
-                if len(values) - 1 < i:
-                    break
+                data_dict = {}
+                for i, dict_key in enumerate(dict_keys):
+                    if len(values) - 1 < i:
+                        break
 
-                value = values[i]
-                if value.startswith('§§'):
-                    value = pickle.loads(b64decode(value[1:].encode('utf-8')))
+                    value = values[i]
+                    if value.startswith('§§'):
+                        value = pickle.loads(b64decode(value[1:].encode('utf-8')))
 
-                data_dict[dict_key] = value
+                    data_dict[dict_key] = value
+            else:
+                data_dict = pickle.loads(decrypted_data)
 
             return data_dict
         except Exception as exc:

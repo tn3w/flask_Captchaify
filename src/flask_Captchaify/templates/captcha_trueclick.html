@@ -5,25 +5,34 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>I Am Not a Robot</title>
         <style>
-            body {
-                font-family: 'Consolas', monospace;
-                letter-spacing: -0.05em;
-                background-color: #fff;
+            html, body {
                 margin: 0;
+                padding: 0;
+                overflow: hidden;
+                height: 100%;
             }
             #container {
+                font-family: 'Consolas', monospace;
+                letter-spacing: -0.05em;
+                font-size: 0.9rem;
                 border: 1px solid #ddd;
-                padding: 20px;
                 border-radius: 8px;
                 background-color: #fafafa;
                 box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-                width: 300px;
+                height: 100%;
+                width: 100%;
                 text-align: center;
+                box-sizing: border-box;
+                display: flex;
+                align-items: center;
             }
             #content {
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
+                padding: 0 10px;
+                box-sizing: border-box;
+                width: 100%;
             }
             #checkbox-container {
                 flex: 0 0 20px;
@@ -37,7 +46,7 @@
             }
             #text {
                 flex: 1;
-                margin-left: 10px;
+                margin-left: 5px;
                 display: flex;
                 justify-content: flex-start;
                 align-items: center;
@@ -62,6 +71,7 @@
                 font-size: 8px;
                 color: #888;
                 text-align: center;
+                width: max-content;
             }
             #tos a {
                 color: #888;
@@ -74,7 +84,7 @@
         <script>
             document.addEventListener('DOMContentLoaded', (event) => {
                 const mouseData = [];
-                
+
                 function logEvent(event) {
                     mouseData.push({
                         type: event.type,
@@ -83,14 +93,14 @@
                         y: event.clientY
                     });
                 }
-    
+
                 document.addEventListener('mousemove', logEvent);
                 document.addEventListener('click', logEvent);
                 document.addEventListener('dblclick', logEvent);
                 document.addEventListener('touchstart', logEvent);
                 document.addEventListener('touchmove', logEvent);
                 document.addEventListener('touchend', logEvent);
-    
+
                 document.getElementById('verify-checkbox').addEventListener('change', () => {
                     if (document.getElementById('verify-checkbox').checked) {
                         const deviceInfo = {
@@ -98,7 +108,7 @@
                             screenWidth: screen.width,
                             screenHeight: screen.height
                         };
-    
+
                         fetch('http://localhost:5000/submit', {
                             method: 'POST',
                             headers: {
@@ -120,7 +130,7 @@
                         });
                     }
                 });
-    
+
                 window.addEventListener('beforeunload', () => {
                     localStorage.setItem('mouseData', JSON.stringify(mouseData));
                 });
@@ -134,7 +144,7 @@
                     <input type="checkbox" id="verify-checkbox">
                 </div>
                 <div id="text">
-                    <span>I am not a robot</span>
+                    <p>I am not a robot</p>
                 </div>
                 <div id="logo-container">
                     <div id="logo-row">

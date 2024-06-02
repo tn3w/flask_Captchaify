@@ -177,7 +177,7 @@
                 }
             }
         </style>
-        {% if is_default_choice and not without_cookies %}
+        {% if is_default_choice and without_cookies %}
         <style>{% if theme == "light" and not is_default_theme %}
             :root {
                 --background-color: #f2f2f2;
@@ -277,7 +277,7 @@
         {% endif %}
     </head>
     <body>
-        {% if is_default_choice and not without_cookies %}
+        {% if is_default_choice and without_cookies %}
         <div id="cookie-banner" class="cookie-banner">
             <h2 ntr="1">🍪 Cookies?</h2>
             <p>We use cookies to remember that you are not a robot. If you choose 'Reject', this information will not be saved. Consequently, each time you close and reopen the tab, you will need to solve a new captcha.</p>
@@ -297,10 +297,12 @@
                 </p>
                 {% endif %}
                 <form action="{{ current_url }}" method="GET">
+                    {% if text_captcha|default %}
                     <div class="captcha-image">
                         <img src="{{ text_captcha }}" alt="Captcha Image">
                         <input type="text" name="tc" placeholder="Enter what you see in the picture." required>
                     </div>
+                    {% endif %}
                     {% if audio_captcha|default %}
                     <div class="captcha-audio">
                         <audio controls>
@@ -326,11 +328,11 @@
                     <li id="choose-light"><a href="{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}theme=light">Light Mode</a></li>
                     <li id="choose-dark"><a href="{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}theme=dark">Dark Mode</a></li>
                     {% endif %}
-                    <li>Bot protection from <a href="https://github.com/tn3w/flask_Captchaify" target="_blank">Captchaify</a></li>
+                    <li>Bot protection by <a href="https://github.com/tn3w/flask_Captchaify" target="_blank" ntr="1">Captchaify</a></li>
                 </ul>
             </nav>
         </footer>
-        {% if is_default_choice and not without_cookies %}
+        {% if is_default_choice and without_cookies %}
         <noscript>
             <style>
                 .cookie-banner { bottom: 20px; }
@@ -394,11 +396,28 @@
                         }
 
                         function appendQueryParams(url, params) {
-                            const urlObj = new URL(url, window.location.origin);
-                            for (const [key, value] of Object.entries(params)) {
-                                urlObj.searchParams.append(key, value);
+                            try {
+                                const urlObj = new URL(url, window.location.origin);
+                                if (urlObj.origin === window.location.origin) {
+                                    for (const [key, value] of Object.entries(params)) {
+                                        if (!urlObj.searchParams.has(key)) {
+                                            urlObj.searchParams.append(key, value);
+                                        }
+                                    }
+                                }
+                                return urlObj.toString();
+                            } catch (error) {
+                                if (url.startsWith('/')) {
+                                    const urlObj = new URL(url, window.location.origin);
+                                    for (const [key, value] of Object.entries(params)) {
+                                        if (!urlObj.searchParams.has(key)) {
+                                            urlObj.searchParams.append(key, value);
+                                        }
+                                    }
+                                    return urlObj.toString();
+                                }
+                                return url;
                             }
-                            return urlObj.toString();
                         }
 
                         function addHiddenInputs(form, params) {
