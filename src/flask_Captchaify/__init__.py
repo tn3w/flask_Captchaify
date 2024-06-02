@@ -407,12 +407,12 @@ class Captchaify:
         """
 
         if self.without_cookies:
-            return True, True
+            return True, False
 
         if request.args.get('wc') is not None:
-            return request.args.get('wc', '1') == '1', False
+            return request.args.get('wc', '0') == '1', False
         if request.cookies.get('cookieConsent') is not None:
-            return request.cookies.get('cookieConsent', '0') == '0', False
+            return request.cookies.get('cookieConsent', '1') == '0', False
         return True, True
 
 
@@ -1110,9 +1110,6 @@ class Captchaify:
         try:
             url_path = urlparse(request.url).path
             client_ip = self.ip
-
-            preferences = self._preferences
-            captcha_type = preferences['captcha_type'].split('_')[0]
 
             if request.args.get('ct') is not None or captcha_token is not None:
                 if captcha_token is None:
