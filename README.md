@@ -379,5 +379,5 @@ In situations where it is deemed necessary, a captivating challenge may be prese
 ## To-Do's
 - [x] Captcha or blocking rules based on client_ip and client_ip_info (e.g. blocking of certain IP countries)
 - [x] add `*` to rules Arg
-- [ ] https://github.com/tn3w/flask_Captchaify/issues/9
+- [x] https://github.com/tn3w/flask_Captchaify/issues/9 fixed with https://github.com/tn3w/flask_Captchaify/commit/3426b8fdafdc938c4951012a0dadf80b96b01776
 - [ ] Captcha data set with emojis
