@@ -31,10 +31,10 @@ if __name__ == '__main__':
     app.run(host = 'localhost', port = 9000)
 ```
 
+
 ### How does it work?
 In situations where it is deemed necessary, a captivating challenge may be presented to either the user or any automated agents, depending on the predetermined level of security required. Upon successful completion of this captivating challenge, a unique token is generated. This token serves as a secure vessel, encapsulating the client's information in an encrypted format. Subsequently, this token is deployed as both a cookie within the client's browser or as a parameter in the URL, denoted as 'captcha'. This mechanism ensures the continual validation of legitimacy with each subsequent request.
 
-<br>
 
 ## Installation guide
 1. Make sure you have the latest version of Python and Pip installed, you also need git installed.
@@ -53,8 +53,6 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    from flask_Captchaify import Captchaify
    ```
 
-
-<br>
 
 ## Personalization
 ### 1. `app` Arg
