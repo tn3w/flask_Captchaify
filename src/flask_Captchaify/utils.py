@@ -218,15 +218,15 @@ def check_asterisk_rule(obj: str, asterisk_rule: str) -> bool:
             start, end = parts
 
             return obj.startswith(start) and obj.endswith(end)
-        else:
-            first_asterisk_index = asterisk_rule.index('*')
-            last_asterisk_index = asterisk_rule.rindex('*')
 
-            start = asterisk_rule[:first_asterisk_index]
-            middle = asterisk_rule[first_asterisk_index + 1:last_asterisk_index]
-            end = asterisk_rule[last_asterisk_index + 1:]
+        first_asterisk_index = asterisk_rule.index('*')
+        last_asterisk_index = asterisk_rule.rindex('*')
 
-            return obj.startswith(start) and obj.endswith(end) and middle in obj
+        start = asterisk_rule[:first_asterisk_index]
+        middle = asterisk_rule[first_asterisk_index + 1:last_asterisk_index]
+        end = asterisk_rule[last_asterisk_index + 1:]
+
+        return obj.startswith(start) and obj.endswith(end) and middle in obj
 
     return obj == asterisk_rule
 
@@ -266,24 +266,36 @@ def does_match_rule(rule: list, client_info: dict) -> bool:
         )
 
     try:
+        if client_info.get(field) is None:
+            return False
+
+        if isinstance(operator, str):
+            operator = operator.strip(' ')
+
         if operator in ('==', 'equals', 'equal', 'is'):
             return check_asterisk_rule(client_info.get(field), value)
-        if operator in ('!=', 'does not equal', 'does not equals', 'not equals', 'not equal', 'not is'):
+        if operator in ('!=', 'doesnotequal', 'doesnotequals',
+                        'notequals', 'notequal', 'notis'):
             return not check_asterisk_rule(client_info.get(field), value)
         if operator in ('contains', 'contain'):
-            return value in client_info.get(field, '')
-        if operator in ('does not contain', 'does not contains', 'not contain', 'not contains'):
-            return value not in client_info.get(field, '')
-        if operator in ('is in', 'in'):
+            return value in client_info.get(field)
+        if operator in ('doesnotcontain', 'doesnotcontains', 'notcontain', 'notcontains'):
+            return value not in client_info.get(field)
+        if operator in ('isin', 'in'):
             return client_info.get(field) in value
-        if operator in ('is not in', 'not is in', 'not in'):
+        if operator in ('isnotin', 'notisin', 'notin'):
             return client_info.get(field) not in value
-        if operator in ('greater than', 'larger than'):
-            return client_info(field) > value
-        if operator == 'less than':
-            return client_info(field) < value
+        if operator in ('greaterthan', 'largerthan'):
+            return client_info.get(field) > value
+        if operator == 'lessthan':
+            return client_info.get(field) < value
+        if operator in ('startswith', 'beginswith'):
+            return client_info.get(field).startswith(value)
+        if operator in ('endswith', 'concludeswith', 'finisheswith'):
+            return client_info.get(field).endswith(value)
     except Exception as exc:
         handle_exception(exc, is_app_error = False)
+        return False
 
     short_error_message = f'UnknownOperatorError: {operator} is not known.'
     handle_exception(

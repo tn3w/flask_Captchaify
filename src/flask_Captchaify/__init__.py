@@ -31,7 +31,7 @@ from .utils import JSON, PICKLE, Hashing, SymmetricCrypto, SSES, WebPage, get_wo
     render_template, is_stopforumspam_spammer, search_languages, get_random_image,\
     manipulate_image_bytes, convert_image_to_base64, get_return_path, get_return_url,\
     extract_path_and_args, rearrange_url, handle_exception, does_match_rule, download_geolite,\
-    get_domain_from_url, check_asterisk_rule
+    get_domain_from_url
 
 
 WORK_DIR: Final[str] = get_work_dir()
@@ -218,7 +218,13 @@ class Captchaify:
             self.route_id = route_id
 
             @app.route('/blocked-' + route_id)
-            def blocked_captchaify():
+            def blocked_captchaify() -> Response:
+                """
+                Render a block page with a captcha challenge.
+
+                :return: A Flask response object.
+                """
+
                 return_path = get_return_path(request)
                 if return_path is None:
                     return_path = '/'
@@ -232,7 +238,13 @@ class Captchaify:
                 )
 
             @app.route('/rate_limited-' + route_id)
-            def rate_limited_captchaify():
+            def rate_limited_captchaify() -> Tuple[Response, int]:
+                """
+                Render a rate-limited page with a captcha challenge.
+
+                :return: A tuple containing a Flask response object and an HTTP status code 429.
+                """
+
                 return_path = get_return_path(request)
                 if return_path is None:
                     return_path = '/'
@@ -243,23 +255,25 @@ class Captchaify:
                 return self._correct_template(
                     'rate_limited', emoji = emoji, return_path = return_path,
                     return_url = return_url, route_id = self.route_id
-                ), 418
-
-            if self.allow_customization:
-                @app.route('/change_language-' + route_id)
-                def change_language_captchaify():
-                    return_path = get_return_path(request)
-                    if return_path is None:
-                        return_path = '/'
-
-                    change_language_template = self._display_change_language(return_path)
-                    if change_language_template:
-                        return change_language_template
-                    return abort(404)
+                ), 429
 
             @app.route('/captcha-' + route_id)
             @app.route('/captcha-' + route_id + '/')
-            def captcha_captchaify():
+            def captcha_captchaify() -> Response:
+                """
+                Handle requests for captcha verification.
+
+                Workflow:
+                1. Retrieve the return path from the request or set it to '/' if not provided.
+                2. Check for too many attempts and redirect to the block page if necessary.
+                3. Validate the captcha token and redirect based on its validity.
+                4. Handle additional URL parameters and manage cookies as needed.
+                5. Display the captcha challenge if validation fails.
+                6. Handle exceptions and redirect to the blocked page if an error occurs.
+
+                :return: A Flask response object.
+                """
+
                 try:
                     return_path = get_return_path(request)
                     if return_path is None:
@@ -270,7 +284,7 @@ class Captchaify:
                     preferences = self._preferences
                     action = preferences['action']
 
-                    if self._is_to_many_attempts(action):
+                    if self._to_many_attempts(action):
                         g.captchaify_page = True
                         return redirect(self._create_route_url('block'))
 
@@ -278,7 +292,7 @@ class Captchaify:
                     if is_valid_ct:
                         return self._valid_captcha(return_path)
 
-                    if self._is_captcha_token_valid():
+                    if self._is_captcha_verifier_valid():
                         return_url = get_return_url(return_path, request)
                         if '?' not in return_url:
                             char = '?'
@@ -309,7 +323,7 @@ class Captchaify:
                         return redirect(return_url)
 
                     if is_failed_captcha:
-                        self._add_failed_captcha(client_ip)
+                        self._add_failed_captcha_attempt(client_ip)
 
                     return self._display_captcha(
                         is_error = is_failed_captcha, return_path = quote(return_path)
@@ -319,6 +333,24 @@ class Captchaify:
 
                     g.captchaify_page = True
                     return redirect(self._create_route_url('blocked'))
+
+            if self.allow_customization:
+                @app.route('/change_language-' + route_id)
+                def change_language_captchaify() -> Response:
+                    """
+                    Handle requests for changing the language preference.
+
+                    :return: A Flask response object.
+                    """
+
+                    return_path = get_return_path(request)
+                    if return_path is None:
+                        return_path = '/'
+
+                    change_language_template = self._display_change_language(return_path)
+                    if change_language_template:
+                        return change_language_template
+                    return abort(404)
 
         elif self.allow_customization:
             app.before_request(self._change_language)
@@ -343,7 +375,8 @@ class Captchaify:
     @property
     def _preferences(self) -> dict:
         """
-        This property returns a dictionary of preferences based on the current route or endpoint.
+        This property returns a dictionary of preferences
+        based on the current route or endpoint.
         """
 
         current_url = {
@@ -451,7 +484,7 @@ class Captchaify:
 
 
     @property
-    def ip_info(self) -> dict | None:
+    def ip_info(self) -> Optional[dict]:
         """
         The information about the Ip address of the client
         """
@@ -816,7 +849,7 @@ class Captchaify:
                     return redirect(self._create_route_url('rate_limited'))
 
                 emoji = random.choice(TEA_EMOJIS)
-                return self._correct_template('rate_limited', emoji = emoji), 418
+                return self._correct_template('rate_limited', emoji = emoji), 429
         except Exception as exc:
             handle_exception(exc)
             if self.as_route:
@@ -879,7 +912,17 @@ class Captchaify:
             return self._display_change_language()
 
 
-    def _display_captcha(self, is_error: bool = False, return_path: Optional[str] = None):
+    def _display_captcha(self, is_error: bool = False,
+                         return_path: Optional[str] = None) -> Response:
+        """
+        Display the appropriate captcha challenge based on preferences.
+
+        :param is_error: Flag indicating if there was an error in the previous captcha attempt.
+        :param return_path: The path to return to after successful captcha completion.
+
+        :return: A Flask response object.
+        """
+
         url_path = urlparse(self.url).path
         client_ip = self.ip
 
@@ -888,6 +931,12 @@ class Captchaify:
         dataset_file = preferences['dataset_file']
 
         def display_captcha_text_audio() -> str:
+            """
+            Generate and display a text and/or audio captcha challenge.
+
+            :return: The HTML content of the captcha template rendered with the captcha data.
+            """
+
             captcha_id = generate_random_string(30)
 
             captcha_token_data = {
@@ -948,7 +997,13 @@ class Captchaify:
                 route_id = self.route_id, return_path = return_path
             )
 
+
         def display_captcha_oneclick() -> str:
+            """
+            Generate and display a one-click image captcha challenge.
+
+            :return: The HTML content of the captcha template rendered with the one-click captcha data.
+            """
             captcha_id = generate_random_string(30)
 
             captcha_token_data = {
@@ -1016,7 +1071,14 @@ class Captchaify:
                 captcha_token = captcha_token, return_path = return_path
             )
 
+
         def display_captcha_multiclick() -> str:
+            """
+            Generate and display a multi-click image captcha challenge.
+
+            :return: The HTML content of the captcha template rendered with the multi-click captcha data.
+            """
+
             captcha_id = generate_random_string(30)
 
             captcha_token_data = {
@@ -1105,6 +1167,13 @@ class Captchaify:
 
 
     def _is_ct_valid(self, captcha_token: Optional[str] = None) -> bool:
+        """
+        Check the validity of the captcha token.
+        
+        :param captcha_token: The captcha token to validate. Defaults to None.
+        :return: True if the captcha token is valid, False otherwise.
+        """
+
         is_failed_captcha = False
 
         try:
@@ -1190,7 +1259,13 @@ class Captchaify:
         return False, is_failed_captcha
 
 
-    def _is_captcha_token_valid(self) -> bool:
+    def _is_captcha_verifier_valid(self) -> bool:
+        """
+        Check the validity of the captcha verifier.
+
+        :return: True if the captcha token is valid, False otherwise.
+        """
+
         try:
             client_ip = self.ip
 
@@ -1228,7 +1303,14 @@ class Captchaify:
         return False
 
 
-    def _is_to_many_attempts(self, action: str) -> bool:
+    def _to_many_attempts(self, action: str) -> bool:
+        """
+        Check if there are too many failed attempts for the specified action.
+
+        :param action: The action for which to check the failed attempts.
+        :return: True if there are too many failed attempts, False otherwise.
+        """
+
         try:
             client_ip = self.ip
             failed_captchas = PICKLE.load(FAILED_CAPTCHAS_PATH)
@@ -1251,11 +1333,12 @@ class Captchaify:
         return False
 
 
-    def _add_failed_captcha(self, client_ip: str) -> None:
+    def _add_failed_captcha_attempt(self, client_ip: str) -> None:
         """
-        This function manages the records of failed captcha attempts,
-        updating the records based on the client's IP. It checks
-        existing records and adds new ones as necessary.
+        Add a failed captcha attempt for the specified client IP.
+
+        :param client_ip: The IP address of the client
+                          for which to add the failed attempt.
         """
 
         try:
@@ -1416,7 +1499,7 @@ class Captchaify:
             if not any(criteria):
                 return
 
-            if action == 'block' or self._is_to_many_attempts(action):
+            if action == 'block' or self._to_many_attempts(action):
                 if self.as_route:
                     g.captchaify_page = True
                     return redirect(self._create_route_url('blocked'))
@@ -1428,11 +1511,11 @@ class Captchaify:
             if is_valid_ct:
                 return self._valid_captcha()
 
-            if self._is_captcha_token_valid():
+            if self._is_captcha_verifier_valid():
                 return
 
             if is_failed_captcha:
-                self._add_failed_captcha(client_ip)
+                self._add_failed_captcha_attempt(client_ip)
 
             if self.as_route:
                 g.captchaify_page = True
