@@ -28,8 +28,8 @@ import pickle
 from typing import Union, Optional, Final, Tuple
 import time
 from concurrent.futures import ThreadPoolExecutor
-import dns.resolver
 import ipaddress
+import dns.resolver
 from PIL import Image, ImageFilter
 from werkzeug import Request
 from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
@@ -389,10 +389,12 @@ def get_return_path(request: Request) -> Optional[str]:
     :return: The return path extracted from the request's arguments.
     """
 
-    return_path = request.args.get('return_path')
-    if return_path is None:
-        return None
-    return extract_path_and_args(return_path)
+    if request.args.get('return_path') is not None:
+        return extract_path_and_args(request.args.get('return_path'))
+    if request.form.get('return_path') is not None:
+        return extract_path_and_args(request.form.get('return_path'))
+
+    return None
 
 
 def get_return_url(return_path: str, request: Request) -> Optional[str]:
@@ -536,65 +538,6 @@ def manipulate_image_bytes(image_data: bytes, is_small: bool = False) -> bytes:
     shifted_img.save(output_bytes, format='WebP')
     output_bytes.seek(0)
     return output_bytes.read()
-
-
-def get_client_ip(request: Request) -> Union[Optional[str], bool]:
-    """
-    Get the client IP in v4 or v6
-    """
-
-    invalid_ips = []
-
-    client_ip = request.remote_addr
-    invalid_ips.append(client_ip)
-    if is_valid_ip(client_ip):
-        return client_ip, False
-
-    other_client_ips = [
-        request.environ.get('HTTP_X_REAL_IP', None),
-        request.environ.get('REMOTE_ADDR', None),
-        request.environ.get('HTTP_X_FORWARDED_FOR', None),
-    ]
-
-    for client_ip in other_client_ips:
-        invalid_ips.append(client_ip)
-        if is_valid_ip(client_ip):
-            return client_ip, False
-
-    try:
-        client_ip = request.headers.getlist('X-Forwarded-For')[0].rpartition(' ')[-1]
-    except Exception:
-        pass
-    else:
-        invalid_ips.append(client_ip)
-        if is_valid_ip(client_ip):
-            return client_ip, False
-
-    headers_to_check = [
-        'X-Forwarded-For',
-        'X-Real-Ip',
-        'CF-Connecting-IP',
-        'True-Client-Ip',
-    ]
-
-    for header in headers_to_check:
-        if header in request.headers:
-            client_ip = request.headers[header]
-            client_ip = client_ip.split(',')[0].strip()
-            invalid_ips.append(client_ip)
-            if is_valid_ip(client_ip):
-                return client_ip, False
-
-    for invalid_ip in invalid_ips:
-        if isinstance(invalid_ip, str):
-            if is_valid_ip(invalid_ip, True):
-                return invalid_ip, True
-
-    for invalid_ip in invalid_ips:
-        if isinstance(invalid_ip, str):
-            return invalid_ip, True
-
-    return None, False
 
 
 def get_client_ip(request: Request, return_list: bool = False)\
@@ -1018,8 +961,8 @@ def render_template(template_dir: str, file_name: str, request: Request,
     args["is_default_language"] = is_default_language
     args["alternate_languages"] = LANGUAGE_CODES if not without_customization else []
 
-    current_url = rearrange_url(WebPage.client_url(request), ['theme', 'language'])
-    args["current_url"] = rearrange_url(current_url, ['ct', 'ci', 'captcha', 'return_path'])
+    current_url = rearrange_url(WebPage.client_url(request), ['theme', 'language', 'wc'])
+    args["current_url"] = rearrange_url(current_url, ['ct', 'ci', 'captcha'])
     args["current_url_without_ccl"] = rearrange_url(current_url, ['ccl'])
     args["current_url_without_wc"] = rearrange_url(current_url, ['wc'])
     args["current_path"] = quote(

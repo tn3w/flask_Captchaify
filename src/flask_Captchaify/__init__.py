@@ -73,7 +73,8 @@ LANGUAGE_CODES: Final[list] = [language['code'] for language in LANGUAGES]
 
 ALL_CAPTCHA_TYPES: Final[list] = [
     'text', 'audio', 'oneclick_keys', 'multiclick_keys',
-    'oneclick_animals', 'multiclick_animals', 'text&audio'
+    'oneclick_animals', 'multiclick_animals', 'text&audio',
+    'audio&text'
 ]
 DATASET_SIZES: Final[dict] = {
     'largest': (200, 140),
@@ -257,8 +258,8 @@ class Captchaify:
                     return_url = return_url, route_id = self.route_id
                 ), 429
 
-            @app.route('/captcha-' + route_id)
-            @app.route('/captcha-' + route_id + '/')
+            @app.route('/captcha-' + route_id, methods = ['GET', 'POST'])
+            @app.route('/captcha-' + route_id + '/', methods = ['GET', 'POST'])
             def captcha_captchaify() -> Response:
                 """
                 Handle requests for captcha verification.
@@ -444,6 +445,8 @@ class Captchaify:
 
         if request.args.get('wc') is not None:
             return request.args.get('wc', '0') == '1', False
+        if request.form.get('wc') is not None:
+            return request.form.get('wc', '0') == '1', False
         if request.cookies.get('cookieConsent') is not None:
             return request.cookies.get('cookieConsent', '1') == '0', False
         return True, True
@@ -711,10 +714,13 @@ class Captchaify:
 
         self._clean_used_captcha_ids()
         hashed_captcha_id = Hashing().hash(captcha_id)
-        self.used_captcha_ids[hashed_captcha_id] = int(time())
+
+        used_captcha_ids = self.used_captcha_ids.copy()
+        used_captcha_ids[hashed_captcha_id] = int(time())
+        self.used_captcha_ids = used_captcha_ids
 
 
-    def _check_used_captcha_id(self, captcha_id: str) -> bool:
+    def _was_already_used(self, captcha_id: str) -> bool:
         """
         Check if a captcha id has been previously used.
 
@@ -722,10 +728,10 @@ class Captchaify:
         :return: True if the captcha id has been used, False otherwise.
         """
 
-        self._clean_used_captcha_ids()
-        for hashed_captcha_id, _ in self.used_captcha_ids.items():
+        for hashed_captcha_id in self.used_captcha_ids:
             if Hashing().compare(captcha_id, hashed_captcha_id):
                 return True
+
         return False
 
 
@@ -799,6 +805,7 @@ class Captchaify:
             without_cookies, is_default_choice = self._without_cookies
             args['is_default_choice'] = is_default_choice
             args['without_cookies'] = without_cookies
+            args['as_route'] = self.as_route
             return render_template(
                 template_dir, file_name, request,
                 without_customization = not self.allow_customization,
@@ -889,7 +896,8 @@ class Captchaify:
                         "return_path": return_path, "return_url": return_url,
                         "allow_customization": self.allow_customization,
                         "is_default_choice": is_default_choice,
-                        "without_cookies": without_cookies
+                        "without_cookies": without_cookies,
+                        "as_route": self.as_route
                     }
 
                     g.captchaify_page = True
@@ -1002,8 +1010,10 @@ class Captchaify:
             """
             Generate and display a one-click image captcha challenge.
 
-            :return: The HTML content of the captcha template rendered with the one-click captcha data.
+            :return: The HTML content of the captcha template
+                     rendered with the one-click captcha data.
             """
+
             captcha_id = generate_random_string(30)
 
             captcha_token_data = {
@@ -1076,7 +1086,8 @@ class Captchaify:
             """
             Generate and display a multi-click image captcha challenge.
 
-            :return: The HTML content of the captcha template rendered with the multi-click captcha data.
+            :return: The HTML content of the captcha template
+                     rendered with the multi-click captcha data.
             """
 
             captcha_id = generate_random_string(30)
@@ -1180,15 +1191,20 @@ class Captchaify:
             url_path = urlparse(request.url).path
             client_ip = self.ip
 
-            if request.args.get('ct') is not None or captcha_token is not None:
+            if request.method.lower() == 'post':
+                ct = request.form.get('ct')
+            else:
+                ct = request.args.get('ct')
+
+            if ct is not None or captcha_token is not None:
                 if captcha_token is None:
-                    captcha_token = request.args.get('ct')
+                    captcha_token = ct
 
                 decrypted_token_data = self.sses.decrypt(captcha_token)
                 if decrypted_token_data is not None:
 
                     captcha_id = decrypted_token_data['id']
-                    if not self._check_used_captcha_id(captcha_id):
+                    if not self._was_already_used(captcha_id):
                         token_captcha_type = decrypted_token_data['type']
 
                         if token_captcha_type in ['oneclick', 'multiclick']:
@@ -1207,7 +1223,12 @@ class Captchaify:
                                         original_keyword_indices.append(i)
 
                                 request_indices = []
-                                for key, value in request.args.items():
+                                if request.method.lower() == 'post':
+                                    data = request.form
+                                else:
+                                    data = request.args
+
+                                for key, value in data.items():
                                     if (
                                         value.lower() == '1' and
                                         key.startswith('ci') and
@@ -1219,8 +1240,12 @@ class Captchaify:
                                 if original_keyword_indices != request_indices:
                                     is_failed_captcha = True
                         else:
-                            text_captcha = request.args.get('tc')
-                            audio_captcha = request.args.get('ac')
+                            if request.method.lower() == 'post':
+                                text_captcha = request.form.get('tc')
+                                audio_captcha = request.form.get('ac')
+                            else:
+                                text_captcha = request.args.get('tc')
+                                audio_captcha = request.args.get('ac')
 
                             if 'text' in token_captcha_type:
                                 captcha_token_text = decrypted_token_data['text']
@@ -1235,6 +1260,7 @@ class Captchaify:
                                 if str(audio_captcha) != str(captcha_token_audio):
                                     is_failed_captcha = True
 
+                        self._add_used_captcha_id(captcha_id)
                         if not is_failed_captcha:
                             comparison_path = Hashing()\
                                 .compare(url_path, decrypted_token_data['path'])
@@ -1246,7 +1272,6 @@ class Captchaify:
                                 .compare(self.user_agent,
                                         decrypted_token_data['user_agent'])
 
-                            self._add_used_captcha_id(captcha_id)
                             if not comparison_path or \
                                 int(time()) - int(decrypted_token_data['time']) > 120 or \
                                     (not comparison_ip and not comparison_user_agent):
@@ -1446,7 +1471,7 @@ class Captchaify:
         if return_path is None:
             return_path = quote(
                 extract_path_and_args(
-                    rearrange_url(self.url, ['theme', 'language', 'captcha', 'return_path'])
+                    rearrange_url(self.url, ['theme', 'language', 'captcha', 'return_path', 'wc'])
                 )
             )
 
@@ -1454,10 +1479,13 @@ class Captchaify:
 
         theme, is_default_theme = WebPage.client_theme(request)
         language, is_default_language = WebPage.client_language(request)
+        without_cookies, is_default_choice = self._without_cookies
         if not is_default_theme:
             redirect_url += '&theme=' + theme
         if not is_default_language:
             redirect_url += '&language=' + language
+        if not is_default_choice and without_cookies:
+            redirect_url += '&wc=' + str(int(without_cookies))
 
         return redirect_url
 
@@ -1642,7 +1670,7 @@ class Captchaify:
                 return response
 
             kwargs = {}
-            if not is_default_choice and request.args.get('cookieConsent') != '1':
+            if not is_default_choice and request.cookies.get('cookieConsent') != '1':
                 kwargs["cookieConsent"] = '1'
 
             if hasattr(g, 'captchaify_captcha'):

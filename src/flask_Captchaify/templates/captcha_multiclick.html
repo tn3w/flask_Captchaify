@@ -298,7 +298,7 @@
                     {{ error_message }}
                 </p>
                 {% endif %}
-                <form action="{{ current_url }}" method="GET">
+                <form action="{{ current_url }}" method="{% if not as_route %}GET{% else %}POST{% endif %}">
                     <input type="hidden" name="ct" value="{{ captcha_token }}">
                     <div class="grid-container">
                         {% for image in captcha_images %}

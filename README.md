@@ -22,10 +22,10 @@ captchaify = Captchaify(app)
 @app.route('/')
 def index():
     """
-    Route protected from bots
+    Very good protected Route
     """
 
-    return 'Hello Human!'
+    return 'Hello human!🖐️'
 
 if __name__ == '__main__':
     app.run(host = 'localhost', port = 9000)
@@ -124,17 +124,19 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    | url            | str  | Complete URL that combines all the individual components.     | https://domain.example.com/login                                                 |
 
    The following operators are available:
-   | Name of Operator                                                   | The same as        |
-   | ------------------------------------------------------------------ | ------------------ |
-   | ==, equals, equal, is                                              | field == value     |
-   | !=, does not equal, does not equals, not equals, not equal, not is | field != value     |
-   | contains, contain                                                  | value in field     |
-   | does not contain, does not contains, not contain, not contains     | value not in field |
-   | is in, in                                                          | field in value     |
-   | is not in, not is in, not in                                       | field not in value |
-   | greater than, larger than                                          | field > value      |
-   | less than                                                          | field < value      |
-   
+   | Name of Operator                                                   | The same as             |
+   | ------------------------------------------------------------------ | ----------------------- |
+   | ==, equals, equal, is                                              | field == value          |
+   | !=, does not equal, does not equals, not equals, not equal, not is | field != value          |
+   | contains, contain                                                  | value in field          |
+   | does not contain, does not contains, not contain, not contains     | value not in field      |
+   | is in, in                                                          | field in value          |
+   | is not in, not is in, not in                                       | field not in value      |
+   | greater than, larger than                                          | field > value           |
+   | less than                                                          | field < value           |
+   | starts with, begins with                                           | field.startswith(value) |
+   | ends with, concludes with, finishes with                           | field.endswith(value)   |
+
    Where field is the type of data e.g. `ip` and value is the value it should have e.g. `169.150.196.74`.
 
    All changes that can be made by these rules:

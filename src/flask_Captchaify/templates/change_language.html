@@ -127,17 +127,18 @@
 
             .container {
                 display: grid;
-                grid-template-columns: repeat(11, 1fr);
+                grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
                 gap: 20px;
                 padding: 20px;
-                max-width: 800px;
+                max-width: 90%;
                 margin: 0 auto;
-                justify-content: center;
+                justify-items: center;
                 align-items: center;
             }
 
             .item {
                 position: relative;
+                text-align: center;
             }
 
             .item a {
@@ -164,32 +165,22 @@
                 font-size: 14px;
             }
 
+            .language {
+                position: absolute;
+                bottom: 10px;
+                left: 10px;
+                background-color: rgba(0, 0, 0, 0.5);
+                padding: 5px 10px;
+                border-radius: 5px;
+                font-size: 14px;
+            }
+
             .back-button img {
                 content: var(--back-button);
             }
 
             .search-button img {
                 content: var(--search-button);
-            }
-
-            .captchaify-text {
-                font-size: 12px;
-                margin-top: 10px;
-                text-align: center;
-                font-weight: lighter;
-                align-items: center;
-                justify-content: center;
-                display: flex;
-                color: var(--ancher-color);
-            }
-
-            .captchaify-text a {
-                color: var(--ancher-color);
-                text-decoration: none;
-            }
-
-            .captchaify-text a:hover {
-                text-decoration: underline;
             }
 
             footer {
@@ -219,82 +210,13 @@
                 text-decoration: underline;
             }
 
-            @media screen and (min-width: 1200px) {
+            @media (max-width: 400px) {
+                .container {
+                    grid-template-columns: repeat(auto-fit, minmax(33.3%, 1fr));
+                }
+
                 h1 {
-                    font-size: 32px;
-                }
-
-                .search-input {
-                    margin-right: 10px;
-                }
-            }
-
-            @media screen and (max-width: 1635px) {
-                .container {
-                    grid-template-columns: repeat(10, 1fr);
-                }
-            }
-            
-            @media screen and (max-width: 1470px) {
-                .container {
-                    grid-template-columns: repeat(9, 1fr);
-                }
-            }
-
-            @media screen and (max-width: 1330px) {
-                .container {
-                    grid-template-columns: repeat(8, 1fr);
-                }
-            }
-
-            @media screen and (max-width: 1199px) {
-                h1 {
-                    font-size: 24px;
-                }
-                
-                .container {
-                    grid-template-columns: repeat(7, 1fr);
-                }
-            }
-
-            @media screen and (max-width: 1010px) {
-                .container {
-                    grid-template-columns: repeat(6, 1fr);
-                }
-
-            }
-
-            @media screen and (max-width: 991px) {
-                .container {
-                    grid-template-columns: repeat(5, 1fr);
-                }
-
-            }
-
-            @media screen and (max-width: 730px) {
-                h1 {
-                    font-size: 20px;
-                }
-
-                .search-input {
-                    max-width: 100%;
-                    margin: 0 auto 10px;
-                }
-
-                .container {
-                    grid-template-columns: repeat(4, 1fr);
-                }
-            }
-
-            @media screen and (max-width: 586px) {
-                .container {
-                    grid-template-columns: repeat(3, 1fr);
-                }
-            }
-
-            @media screen and (max-width: 430px) {
-                .container {
-                    grid-template-columns: repeat(2, 1fr);
+                    font-size: 1.5rem;
                 }
             }
         </style>
