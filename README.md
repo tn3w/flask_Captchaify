@@ -31,8 +31,10 @@ if __name__ == '__main__':
     app.run(host = 'localhost', port = 9000)
 ```
 
+
 ### How does it work?
 In situations where it is deemed necessary, a captivating challenge may be presented to either the user or any automated agents, depending on the predetermined level of security required. Upon successful completion of this captivating challenge, a unique token is generated. This token serves as a secure vessel, encapsulating the client's information in an encrypted format. Subsequently, this token is deployed as both a cookie within the client's browser or as a parameter in the URL, denoted as 'captcha'. This mechanism ensures the continual validation of legitimacy with each subsequent request.
+
 
 ### Installation guide
 1. Make sure you have the latest version of Python and Pip installed, you also need git installed.
@@ -51,6 +53,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    from flask_Captchaify import Captchaify
    ```
 
+
 ### To-Do's
 - [x] add `*` to rules Arg
 - [x] https://github.com/tn3w/flask_Captchaify/issues/9 fixed with https://github.com/tn3w/flask_Captchaify/commit/3426b8fdafdc938c4951012a0dadf80b96b01776
@@ -58,6 +61,8 @@ In situations where it is deemed necessary, a captivating challenge may be prese
 - [ ] Integrate Captchaify Trueclick as captcha type
 - [ ] Add option that can integrate Captchaify Trueclick, Google reCaptcha, hCaptcha or Cloudflare Turnstile into forms like https://github.com/KnugiHK/flask-hcaptcha
 - [ ] Captcha data set with emojis
+
+<br>
 
 ## Personalization
 1. ***`app` Arg***
@@ -73,6 +78,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    captchaify = Captchaify(app)
    ```
 
+<br>
 
 2. ***`rules` Arg***
 
@@ -227,6 +233,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
 
    If one of the three templates does not exist in the folder, a 404 error is displayed when calling it. e.g. if you remove the changelanguage page at apis.
 
+<br>
 
 3. ***`dataset_size` Arg***
 
@@ -252,6 +259,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    captchaify = Captchaify(app, dataset_size=(100, 140))
    ```
 
+<br>
 
 4. ***`dataset_dir` Arg***
 
@@ -266,8 +274,10 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```
    dataset_dir\
           \keys.json
+          \animals.json
    ```
 
+<br>
 
 5. ***`default_captcha_type` Arg***
 
@@ -291,6 +301,8 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    | hcaptcha             | Uses HCaptcha for verification. Set `site_key` and `secret`.             |
    | turnstile            | Uses Cloudflare Turnstile for verification. Set `site_key` and `secret`. |
 
+<br>
+
 6. ***`default_action` Arg***
 
    To specify the default action of all routes or endpoints use the default_action arg.
@@ -299,6 +311,8 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```python
    captchaify = Captchaify(app, default_action="fight")
    ```
+
+<br>
 
 7. ***`default_rate_limit` Arg***
 
@@ -309,6 +323,8 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    captchaify = Captchaify(app, default_rate_limit=60)
    ```
 
+<br>
+
 8. ***`default_max_rate_limit` Arg***
 
    To specify the default requests of all IPs per minute for all routes use the default_max_rate_limit variable. (Default: 1200 = 2 requests per second from 10 IPs)
@@ -318,6 +334,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    captchaify = Captchaify(app, default_max_rate_limit=600)
    ```
 
+<br>
 
 9. ***`default_template_dir` Arg***
 
@@ -328,6 +345,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    captchaify = Captchaify(app, default_template_dir="/path/to/my/custom/template/directory")
    ```
 
+<br>
 
 9. ***`verification_age` Arg***
 
@@ -338,6 +356,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    captchaify = Captchaify(app, verification_age=10800)
    ```
 
+<br>
 
 9. ***`without_cookies` Arg***
 
@@ -348,6 +367,8 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    captchaify = Captchaify(app, without_cookies=True)
    ```
 
+<br>
+
 9. ***`block_crawler` Arg***
 
    If True, crawlers like Googlebot, further are estimated via their user agent as suspicious and not the website, good for websites that should not be crawled (Default: True)
@@ -357,6 +378,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    captchaify = Captchaify(app, block_crawler=True)
    ```
 
+<br>
 
 9. ***`crawler_hints` Arg***
 
@@ -367,6 +389,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    captchaify = Captchaify(app, crawler_hints=False)
    ```
 
+<br>
 
 9. ***`third_parties` Arg***
 
@@ -384,6 +407,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    | ipapi                | [Ipapi](https://ipapi.com) is requested with the Ip and the result of the fields "proxy" and "hosting" is used                         |
    | stopforumspam        | [StopForumSpam](https://stopforumspam.com) is requested and the result is used                                                         |
 
+<br>
 
 9. ***`as_route` Arg***
 
@@ -394,6 +418,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    captchaify = Captchaify(app, as_route = True)
    ```
 
+<br>
 
 9. ***`without_other_args` Arg***
 
@@ -404,6 +429,8 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    captchaify = Captchaify(app, without_other_args = True)
    ```
 
+<br>
+
 9. ***`allow_customization` Arg***
 
    If True, the user can change their language or theme via pages or an anchor. However, these are normally detected automatically.
@@ -413,6 +440,8 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```python
    captchaify = Captchaify(app, allow_customization = True)
    ```
+
+<br>
 
 9. ***`site_key` Arg***
 
@@ -426,6 +455,8 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```python
    captchaify = Captchaify(app, site_key = '<site-key>')
    ```
+
+<br>
 
 9. ***`secret` Arg***
 
