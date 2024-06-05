@@ -8,7 +8,7 @@
 <h1 align="center">𝐟𝐥𝐚𝐬𝐤_𝐂𝐚𝐩𝐭𝐜𝐡𝐚𝐢𝐟𝐲</h1>
 <p align="center"><a rel="noreferrer noopener" href="https://github.com/tn3w/flask_Captchaify"><img alt="Github" src="https://img.shields.io/badge/Github-141e24.svg?&style=for-the-badge&logo=github&logoColor=white"></a>  <a rel="noreferrer noopener" href="https://pypi.org/project/flask-Captchaify/"><img alt="PyPI" src="https://img.shields.io/badge/PyPi-141e24.svg?&style=for-the-badge&logo=python&logoColor=white"></a>  <a rel="noreferrer noopener" href="https://libraries.io/pypi/flask-Captchaify"><img alt="Libraries.io" src="https://img.shields.io/badge/Libraries.io-141e24.svg?&style=for-the-badge&logo=npm&logoColor=white"></a></p>
 
-<p align="center">A robust Captcha and Bot protection system tailored for Flask, packed with extra features including rate limiting, client-specific rules, crawler detection hints, and seamless automatic bot identification.</p>
+<p align="center">A robust Captcha and Bot protection system tailored for Flask, packed with extra features including rate limiting, client-specific rules, crawler detection hints, and seamless automatic bot identification. Supports Google reCaptcha, hCaptcha and Cloudflare Turnstile and also offers custom verification options such as images, text or audio captchas.</p>
 
 <br>
 
@@ -31,12 +31,10 @@ if __name__ == '__main__':
     app.run(host = 'localhost', port = 9000)
 ```
 
-
 ### How does it work?
 In situations where it is deemed necessary, a captivating challenge may be presented to either the user or any automated agents, depending on the predetermined level of security required. Upon successful completion of this captivating challenge, a unique token is generated. This token serves as a secure vessel, encapsulating the client's information in an encrypted format. Subsequently, this token is deployed as both a cookie within the client's browser or as a parameter in the URL, denoted as 'captcha'. This mechanism ensures the continual validation of legitimacy with each subsequent request.
 
-
-## Installation guide
+### Installation guide
 1. Make sure you have the latest version of Python and Pip installed, you also need git installed.
 2. Install the script with pip `pip install flask_Captchaify` or manually via `git clone https://github.com/tn3w/flask_Captchaify` or download the zip.
 3. If you installed it manually, make sure your python script is in the folder where there is a subfolder flask_Captchaify, and make sure you run `pip install -r requirements.txt` in the flask_Captchaify folder.
@@ -53,9 +51,16 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    from flask_Captchaify import Captchaify
    ```
 
+### To-Do's
+- [x] add `*` to rules Arg
+- [x] https://github.com/tn3w/flask_Captchaify/issues/9 fixed with https://github.com/tn3w/flask_Captchaify/commit/3426b8fdafdc938c4951012a0dadf80b96b01776
+- [ ] Google reCaptcha, hCaptcha or Cloudflare Turnstile response timestamp check
+- [ ] Integrate Captchaify Trueclick as captcha type
+- [ ] Add option that can integrate Captchaify Trueclick, Google reCaptcha, hCaptcha or Cloudflare Turnstile into forms like https://github.com/KnugiHK/flask-hcaptcha
+- [ ] Captcha data set with emojis
 
 ## Personalization
-### 1. `app` Arg
+1. ***`app` Arg***
 
    A Flask() object of a Flask app that is modified by Captchaify so that each request is checked for bots
 
@@ -69,7 +74,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```
 
 
-### 2. `rules` Arg
+2. ***`rules` Arg***
 
    Certain changes based on specific criteria such as IP, proxy, hosting or geo information
 
@@ -83,7 +88,9 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    rules = [{"rule": ['ip', 'is in', ['127.0.0.1', '10.0.0.1'], 'or', 'proxy', 'is', True]}, "change": {"action": "block"}]
    ```
 
-   #### ~ Client Info ~
+   <br>
+
+   **Client Info**
 
    The following client info fields can be compared:
    | Name of field  | Type | Information                                                   | Example                                                                          |
@@ -147,8 +154,10 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    | rate_limit         | Tuple[int, int] | (20, 100)              |
    | template_dir       | str             | /path/to/template/dir  |
 
+   <br>
 
-   #### ~ Asterik `*` ~
+   **Asterik `*`**
+
    The asterisk creates the customization options for information comparisons. The asterisk (*) serves as a wildcard, representing any number of characters including zero.
 
    Example of a rule that all routes that start with /login then have a string and then have /development as route e.g. `/login/api/development` or `/login/2fa/development`:
@@ -159,7 +168,10 @@ In situations where it is deemed necessary, a captivating challenge may be prese
 
    Here are all the things that can be changed:
 
-   #### ~ Captcha types (`captcha_type`) ~
+   <br>
+
+   **Captcha types (`captcha_type`)**
+
    | Name of captcha type | Displayed Captchas                                                       |
    | --------------       | ------------------------------------------------------------------------ |
    | oneclick (Default)   | The user only needs one click to confirm that he is not a bot            |
@@ -179,8 +191,10 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    | keys            | Displays images based on specific keywords of landscapes, objects, and more (default for oneclick) |
    | animals         | Displays 50 different animal species (default for multiclick)                                      |
 
+   <br>
 
-   #### ~ Actions (`action`) ~
+   **Actions (`action`)**
+
    | Name of action | Executing Action                                                     |
    | -------------- | -------------------------------------------------------------------- |
    | allow          | Allows all traffic through, regardless of whether the IP is blocked. |
@@ -188,12 +202,16 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    | fight          | Displays a captcha to all traffic, whether suspicious or not.        |
    | captcha        | Default value, shows only suspicious traffic captchas.               |
 
+   <br>
 
-   #### ~ Rate Limits (`rate_limit`) ~
+   **Rate Limits (`rate_limit`)**
+
    The syntax is a bit different from the others, because two values are specified `(rate_limit, max_rate_limit)`. The variable rate_limit must be a number indicating how many requests per minute can come from a given ip. max_rate_limit indicates how many requests can come from all ips per minute, also a number.
 
+   <br>
 
-   #### ~ Template Dir (`template_dir`) ~
+   **Template Dir (`template_dir`)**
+
    To change the template directory of a particular route use the template_dirs arg.
 
    A template directory can look like this:
@@ -210,7 +228,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    If one of the three templates does not exist in the folder, a 404 error is displayed when calling it. e.g. if you remove the changelanguage page at apis.
 
 
-### 3. `dataset_size` Arg
+3. ***`dataset_size` Arg***
 
    The size of the data set with e.g. images and keywords that determine how much of a data set is used, if a lot is used this can reduce RAM capacity but also increase security.
    Either a tuple of 2 numbers where the first indicates how many images per keyword (always the first ones) can be used (recommended around 20, maximum 200 or more depending on the data set) and the second number how many keywords are e.g. (images_per_keyword, number_of_keywords), default setting: (20, 100).
@@ -235,7 +253,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```
 
 
-### 4. `dataset_dir` Arg
+4. ***`dataset_dir` Arg***
 
    Specifies where the program can find data sets.
 
@@ -251,7 +269,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```
 
 
-### 5. `default_captcha_type` Arg
+5. ***`default_captcha_type` Arg***
 
    To specify the default captcha type of all routes or endpoints use the default_captcha_type arg.
 
@@ -273,7 +291,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    | hcaptcha             | Uses HCaptcha for verification. Set `site_key` and `secret`.             |
    | turnstile            | Uses Cloudflare Turnstile for verification. Set `site_key` and `secret`. |
 
-### 6. `default_action` Arg
+6. ***`default_action` Arg***
 
    To specify the default action of all routes or endpoints use the default_action arg.
 
@@ -282,7 +300,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    captchaify = Captchaify(app, default_action="fight")
    ```
 
-### 7. `default_rate_limit` Arg
+7. ***`default_rate_limit` Arg***
 
    To specify the default requests of an IP per minute for all routes use the default_rate_limit variable. (Default: 120 = 2 requests per second per IP)
 
@@ -291,7 +309,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    captchaify = Captchaify(app, default_rate_limit=60)
    ```
 
-### 8. `default_max_rate_limit` Arg
+8. ***`default_max_rate_limit` Arg***
 
    To specify the default requests of all IPs per minute for all routes use the default_max_rate_limit variable. (Default: 1200 = 2 requests per second from 10 IPs)
 
@@ -301,7 +319,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```
 
 
-### 9. `default_template_dir` Arg
+9. ***`default_template_dir` Arg***
 
    To specify the default template_dir of all routes or endpoints use the default_template_dir arg.
 
@@ -311,7 +329,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```
 
 
-### 10. `verification_age` Arg
+9. ***`verification_age` Arg***
 
    Indicates the time in seconds how long a solved captcha is valid (Default: 3600 = 1 hour)
 
@@ -321,7 +339,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```
 
 
-### 11. `without_cookies` Arg
+9. ***`without_cookies` Arg***
 
    If True, no cookies are created, and verification is proven via URL args (Default: False)
 
@@ -330,7 +348,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    captchaify = Captchaify(app, without_cookies=True)
    ```
 
-### 12. `block_crawler` Arg
+9. ***`block_crawler` Arg***
 
    If True, crawlers like Googlebot, further are estimated via their user agent as suspicious and not the website, good for websites that should not be crawled (Default: True)
 
@@ -340,7 +358,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```
 
 
-### 13. `crawler_hints` Arg:
+9. ***`crawler_hints` Arg***
 
    If True, crawlers like Googlebot, are shown meta tags and the title of a normal web page, while they would have to solve a captcha. (Default: True)
    
@@ -350,7 +368,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```
 
 
-### 14. `third_parties` Arg:
+9. ***`third_parties` Arg***
 
    Specifies which third parties are used to check the IP addresses. By default, all 3 third parties are used. (See list)
 
@@ -367,7 +385,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    | stopforumspam        | [StopForumSpam](https://stopforumspam.com) is requested and the result is used                                                         |
 
 
-### 15. `as_route` Arg:
+9. ***`as_route` Arg***
 
    Specifies whether Captchaify pages are displayed as separate routes in order not to confuse the cache between normal pages and Captchaify pages (e.g. for Cloudflare)
 
@@ -377,7 +395,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```
 
 
-### 16. `without_other_args` Arg:
+9. ***`without_other_args` Arg***
 
    After solving the captcha, arguments such as language and theme are deleted from the url bar
 
@@ -386,7 +404,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    captchaify = Captchaify(app, without_other_args = True)
    ```
 
-### 17. `allow_customization` Arg:
+9. ***`allow_customization` Arg***
 
    If True, the user can change their language or theme via pages or an anchor. However, these are normally detected automatically.
    If activated, protects less against DDOS attacks against flask_Captchaify websites such as Change Language (not recommended).
@@ -396,7 +414,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    captchaify = Captchaify(app, allow_customization = True)
    ```
 
-### 18. `site_key` Arg:
+9. ***`site_key` Arg***
 
    Is required if Google reCaptcha, hCaptcha or Cloudflare Turnstile is used.
 
@@ -409,7 +427,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    captchaify = Captchaify(app, site_key = '<site-key>')
    ```
 
-### 19. `secret` Arg:
+9. ***`secret` Arg***
 
    Is required if Google reCaptcha, hCaptcha or Cloudflare Turnstile is used.
 
@@ -421,11 +439,3 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```python
    captchaify = Captchaify(app, secret = '<secret>')
    ```
-
-## To-Do's
-- [x] Captcha or blocking rules based on client_ip and client_ip_info (e.g. blocking of certain IP countries)
-- [x] add `*` to rules Arg
-- [x] https://github.com/tn3w/flask_Captchaify/issues/9 fixed with https://github.com/tn3w/flask_Captchaify/commit/3426b8fdafdc938c4951012a0dadf80b96b01776
-- [ ] Integrate Captchaify Trueclick as captcha type
-- [ ] Add option that can integrate Captchaify Trueclick, Google reCaptcha, hCaptcha or Cloudflare Turnstile into forms like https://github.com/KnugiHK/flask-hcaptcha
-- [ ] Captcha data set with emojis
