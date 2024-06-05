@@ -160,13 +160,16 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    Here are all the things that can be changed:
 
    #### ~ Captcha types (`captcha_type`) ~
-   | Name of captcha type | Displayed Captchas                                                        |
-   | --------------       | ------------------------------------------------------------------------- |
-   | oneclick (Default)   | The user only needs one click to confirm that he is not a bot             |
-   | multiclick           | The user must select several images that match a motif (harder)           |
-   | text                 | The user enters a text combination from an image into an input (obsolete) |
-   | audio                | The user enters a text combination from an audio into an input (obsolete) |
-   | text&audio           | The user enters a text and an audio combination into an input (obsolete)  |
+   | Name of captcha type | Displayed Captchas                                                       |
+   | --------------       | ------------------------------------------------------------------------ |
+   | oneclick (Default)   | The user only needs one click to confirm that he is not a bot            |
+   | multiclick           | The user must select several images that match a motif (harder)          |
+   | text                 | The user enters a text combination from an image into an input           |
+   | audio                | The user enters a text combination from an audio into an input           |
+   | text&audio           | The user enters a text and an audio combination into an input            |
+   | recaptcha            | Uses Google Recaptcha for verification. Set `site_key` and `secret`.     |
+   | hcaptcha             | Uses HCaptcha for verification. Set `site_key` and `secret`.             |
+   | turnstile            | Uses Cloudflare Turnstile for verification. Set `site_key` and `secret`. |
 
    To specify the exact data set, you have to add it after the captcha_type with a `_` as separator, e.g. `oneclick_animals` or if you use a custom data set: `oneclick_custom`. If you use a text or audio captcha, you do not need a data set.
 
@@ -256,6 +259,19 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```python
    captchaify = Captchaify(app, default_captcha_type="text")
    ```
+
+   All captcha types:
+
+   | Name of captcha type | Displayed Captchas                                                       |
+   | --------------       | ------------------------------------------------------------------------ |
+   | oneclick (Default)   | The user only needs one click to confirm that he is not a bot            |
+   | multiclick           | The user must select several images that match a motif (harder)          |
+   | text                 | The user enters a text combination from an image into an input           |
+   | audio                | The user enters a text combination from an audio into an input           |
+   | text&audio           | The user enters a text and an audio combination into an input            |
+   | recaptcha            | Uses Google Recaptcha for verification. Set `site_key` and `secret`.     |
+   | hcaptcha             | Uses HCaptcha for verification. Set `site_key` and `secret`.             |
+   | turnstile            | Uses Cloudflare Turnstile for verification. Set `site_key` and `secret`. |
 
 ### 6. `default_action` Arg
 
@@ -380,8 +396,36 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    captchaify = Captchaify(app, allow_customization = True)
    ```
 
+### 18. `site_key` Arg:
+
+   Is required if Google reCaptcha, hCaptcha or Cloudflare Turnstile is used.
+
+   For google reCaptcha you can get this here: [https://www.google.com/recaptcha/admin/create](https://www.google.com/recaptcha/admin/create?hl=de), for hCaptcha here: [https://dashboard.hcaptcha.com/login](https://dashboard.hcaptcha.com/login) and for Cloudflare Turnstile here: [https://dash.cloudflare.com/sign-up?to=/:account/turnstile](https://dash.cloudflare.com/sign-up?to=/:account/turnstile) (important: for Cloudflare Turnstile you need a domain)
+
+   Usually site_key and secret are displayed after creating an account or when linking a domain or ip.
+
+   Web page where this is set:
+   ```python
+   captchaify = Captchaify(app, site_key = '<site-key>')
+   ```
+
+### 19. `secret` Arg:
+
+   Is required if Google reCaptcha, hCaptcha or Cloudflare Turnstile is used.
+
+   For google reCaptcha you can get this here: [https://www.google.com/recaptcha/admin/create](https://www.google.com/recaptcha/admin/create?hl=de), for hCaptcha here: [https://dashboard.hcaptcha.com/login](https://dashboard.hcaptcha.com/login) and for Cloudflare Turnstile here: [https://dash.cloudflare.com/sign-up?to=/:account/turnstile](https://dash.cloudflare.com/sign-up?to=/:account/turnstile) (important: for Cloudflare Turnstile you need a domain)
+
+   Usually site_key and secret are displayed after creating an account or when linking a domain or ip.
+
+   Web page where this is set:
+   ```python
+   captchaify = Captchaify(app, secret = '<secret>')
+   ```
+
 ## To-Do's
 - [x] Captcha or blocking rules based on client_ip and client_ip_info (e.g. blocking of certain IP countries)
 - [x] add `*` to rules Arg
 - [x] https://github.com/tn3w/flask_Captchaify/issues/9 fixed with https://github.com/tn3w/flask_Captchaify/commit/3426b8fdafdc938c4951012a0dadf80b96b01776
+- [ ] Integrate Captchaify Trueclick as captcha type
+- [ ] Add option that can integrate Captchaify Trueclick, Google reCaptcha, hCaptcha or Cloudflare Turnstile into forms like https://github.com/KnugiHK/flask-hcaptcha
 - [ ] Captcha data set with emojis

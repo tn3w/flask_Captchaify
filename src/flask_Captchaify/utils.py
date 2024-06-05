@@ -1099,14 +1099,19 @@ class WebPage:
         
         :param html: The HTML page where the tag should be minimized
         :param tag: The HTML tag e.g. `script` or `style`
+        :return: The HTML page with minimized tag content
         """
 
-        tag_pattern = rf'<{tag}\b[^>]*>(.*?)<\/{tag}>'
+        tag_pattern = rf'(<{tag}\b[^>]*>)(.*?)(<\/{tag}>)'
 
         def minimize_tag_content(match: re.Match):
-            content = match.group(1)
-            content = re.sub(r'\s+', ' ', content)
-            return f'<{tag}>{content}</{tag}>'
+            opening_tag = match.group(1)
+            content = match.group(2)
+            closing_tag = match.group(3)
+
+            minimized_content = re.sub(r'\s+', ' ', content)
+
+            return f'{opening_tag}{minimized_content}{closing_tag}'
 
         return re.sub(tag_pattern, minimize_tag_content, html, flags=re.DOTALL | re.IGNORECASE)
 

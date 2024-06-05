@@ -5,6 +5,15 @@
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Beep beop Boop?</title>
+        {% if not is_default_theme %}
+            {% if third_partie == 'recaptcha' %}
+            <script src="https://www.google.com/recaptcha/api.js?explicit&hl={{ language }}" async defer></script>
+            {% elif third_partie == 'hcaptcha' %}
+            <script src="https://hcaptcha.com/1/api.js?explicit&hl={{ language }}" async defer></script>
+            {% elif third_partie == 'turnstile' %}
+            <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?explicit&hl={{ language }}" async defer></script>
+            {% endif %}
+        {% endif %}
         <style>{% if theme == "light" and not is_default_theme %}
             :root {
                 --background: #f2f2f2;
@@ -72,32 +81,14 @@
                 text-align: center;
             }
 
-            .square-image {
-                width: 200px;
-                height: 200px;
-                display: block;
-                margin: 0 auto;
-                border-radius: 5px;
-                box-shadow: 0 0 10px var(--border);
-            }
-
             .description {
                 margin-top: 20px;
                 font-size: 18px;
             }
-            
-            .image-grid {
-                display: grid;
-                grid-template-columns: repeat(6, 1fr);
-                grid-gap: 10px;
-                margin-top: 20px;
-            }
 
-            .grid-image {
-                width: 100px;
-                height: 100px;
-                border-radius: 5px;
-                box-shadow: 2px 2px 5px var(--border);
+            #captchaBox {
+                display: flex;
+                justify-content: center;
             }
 
             footer {
@@ -252,18 +243,20 @@
         {% endif %}
         <main>
             <div>
-                <img src="{{ original_image }}" alt="Original Image" class="square-image">
-                <p class="description">Select the picture that contains the same motif:</p>
+                <h1>🤖Beep beop Boop?</h1>
+                <p class="description">Please tick the box to confirm that you are not a robot:</p>
                 {% if error_message|default %}
                 <p style="color: #ff0000;margin:10px;">
                     {{ error_message }}
                 </p>
                 {% endif %}
-                <div class="image-grid">
-                    {% for image in captcha_images %}
-                    <a href="{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}ct={{ captcha_token }}&ci={{ image.id }}{% if return_path|default %}&return_path={{ return_path }}{% endif %}"><img src="{{ image.src }}" alt="Image {{ image.id }}" class="grid-image"></a>
-                    {% endfor %}
-                </div>
+                <form id="captchaForm" action="{{ current_url }}" method="{% if not as_route %}GET{% else %}POST{% endif %}">
+                    <div id="captchaBox" class="{% if third_partie == 'recaptcha' %}g-recaptcha{% elif third_partie == 'hcaptcha' %}h-captcha{% elif third_partie == 'turnstile' %}cf-turnstile{% endif %}" data-sitekey="{{ site_key }}" data-callback="onSuccess"{% if not is_default_theme %} data-theme="{% if theme == 'light' %}light{% elif theme == 'dark' %}dark{% else %}{% endif %}"{% endif %} data-language="{{ language }}"></div>
+                    {% if return_path|default %}
+                    <input type="hidden" name="return_path" value="{{ return_path }}">
+                    {% endif %}
+                    <input type="hidden" name="ct" value="{{ captcha_token }}">
+                </form>
             </div>
         </main>
         <footer>
@@ -278,6 +271,36 @@
                 </ul>
             </nav>
         </footer>
+        <script>
+            function onSuccess() {
+                document.getElementById('captchaForm').submit();
+            }
+        </script>
+        {% if is_default_theme %}
+        <script>
+            function getTheme() {
+                return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                const theme = getTheme();
+                document.getElementById('captchaBox').setAttribute('data-theme', theme);
+
+                const scriptElement = document.createElement('script');
+                {% if third_partie == 'recaptcha' %}
+                scriptElement.src = 'https://www.google.com/recaptcha/api.js?explicit&hl={{ language }}';
+                {% elif third_partie == 'hcaptcha' %}
+                scriptElement.src = 'https://hcaptcha.com/1/api.js?explicit&hl={{ language }}';
+                {% elif third_partie == 'turnstile' %}
+                scriptElement.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?explicit&hl={{ language }}';
+                {% endif %}
+                scriptElement.async = true;
+                scriptElement.defer = true;
+
+                document.head.appendChild(scriptElement);
+            });
+        </script>
+        {% endif %}
         {% if is_default_choice and without_cookies %}
         <noscript>
             <style>

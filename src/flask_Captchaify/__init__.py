@@ -20,6 +20,7 @@ from typing import Optional, Final, Union, Tuple
 from time import time
 from urllib.parse import urlparse, quote
 from base64 import b64encode
+import requests
 import geoip2.database
 import crawleruseragents
 from bs4 import BeautifulSoup
@@ -72,9 +73,9 @@ LANGUAGES: Final[list] = JSON.load(os.path.join(ASSETS_DIR, 'languages.json'), [
 LANGUAGE_CODES: Final[list] = [language['code'] for language in LANGUAGES]
 
 ALL_CAPTCHA_TYPES: Final[list] = [
-    'text', 'audio', 'oneclick_keys', 'multiclick_keys',
-    'oneclick_animals', 'multiclick_animals', 'text&audio',
-    'audio&text'
+    'text', 'audio', 'text&audio', 'audio&text', 'oneclick_keys',
+    'multiclick_keys', 'oneclick_animals', 'multiclick_animals',
+    'recaptcha', 'hcaptcha', 'turnstile'
 ]
 DATASET_SIZES: Final[dict] = {
     'largest': (200, 140),
@@ -89,9 +90,15 @@ ALL_ACTIONS: Final[list] = ['allow', 'block', 'fight', 'captcha']
 ALL_THIRD_PARTIES: Final[list] = ['geoip', 'tor', 'ipapi', 'stopforumspam']
 ALL_TEMPLATE_TYPES: Final[list] = [
     'captcha_text_audio', 'captcha_multiclick', 'captcha_oneclick',
-    'captcha_trueclick', 'block', 'rate_limited', 'change_language'
+    'captcha_trueclick', 'captcha_third_partie', 'block',
+    'rate_limited', 'change_language'
 ]
 ALL_THEMES: Final[list] = ['dark', 'light']
+CAPTCHA_THIRD_PARTIES_API_URLS: dict[str] = {
+    "recaptcha": "https://www.google.com/recaptcha/api/siteverify",
+    "hcaptcha": "https://hcaptcha.com/siteverify",
+    "turnstile": "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+}
 
 
 class Captchaify:
@@ -109,7 +116,8 @@ class Captchaify:
         without_cookies: bool = False, block_crawler: bool = True,
         crawler_hints: bool = True, third_parties: Optional[list] = None,
         as_route: bool = False, without_other_args: Optional[bool] = True,
-        allow_customization: bool = False, enable_trueclick: bool = False) -> None:
+        allow_customization: bool = False, enable_trueclick: bool = False,
+        site_key: Optional[str] = None, secret: Optional[str] = None) -> None:
         """
         Configures security settings for a Flask app.
 
@@ -148,6 +156,10 @@ class Captchaify:
                                    from the URL
         :param allow_customization: Allow the user to change their language and theme (can allow
                                     DDOS attacks on flask_Captchaify websites like Change Language)
+        :param site_key: Site key used for third party providers such as reCaptcha, hCaptcha and
+                         Cloudflare Turnstile
+        :param secret: Secret used for third party providers such as reCaptcha, hCaptcha and
+                       Cloudflare Turnstile
         """
 
         if app is None:
@@ -196,6 +208,8 @@ class Captchaify:
         self.allow_customization = allow_customization if isinstance(allow_customization, bool)\
                                    else False
         self.enable_trueclick = enable_trueclick if isinstance(enable_trueclick, bool) else False
+        self.site_key = site_key if isinstance(site_key, str) else None
+        self.secret = secret if isinstance(secret, str) else None
 
         captcha_secret = generate_random_string(32)
         self.captcha_secret = captcha_secret
@@ -1162,6 +1176,40 @@ class Captchaify:
             )
 
 
+        def display_captcha_third_parties() -> str:
+            """
+            Generate and display a captcha for third-party integrations.
+
+            :return: HTML content containing the captcha.
+            """
+
+            captcha_id = generate_random_string(30)
+
+            captcha_token_data = {
+                'id': captcha_id, 'type': captcha_type, 'ip': Hashing().hash(client_ip),
+                'user_agent': Hashing().hash(self.user_agent),
+                'path': Hashing().hash(url_path), 'time': str(int(time()))
+            }
+
+            captcha_token = self.sses.encrypt(captcha_token_data)
+            if captcha_token is None:
+                if self.as_route:
+                    g.captchaify_page = True
+                    return redirect(self._create_route_url('blocked'))
+
+                emoji = random.choice(EMOJIS)
+                return self._correct_template('block', emoji = emoji)
+
+            error_message = 'Something has gone wrong. Try again.' if is_error else None
+
+            return self._correct_template(
+                'captcha_third_partie', error_message = error_message,
+                route_id = self.route_id, captcha_token = captcha_token,
+                return_path = return_path, third_partie = captcha_type,
+                site_key = self.site_key
+            )
+
+
         captcha_display_functions = {
             'text': display_captcha_text_audio,
             'audio': display_captcha_text_audio,
@@ -1169,6 +1217,9 @@ class Captchaify:
             'audio&text': display_captcha_text_audio,
             'oneclick': display_captcha_oneclick,
             'multiclick': display_captcha_multiclick,
+            'recaptcha': display_captcha_third_parties,
+            'hcaptcha': display_captcha_third_parties,
+            'turnstile': display_captcha_third_parties
         }
         captcha_display_function = captcha_display_functions.get(
             captcha_type, display_captcha_oneclick
@@ -1239,6 +1290,27 @@ class Captchaify:
 
                                 if original_keyword_indices != request_indices:
                                     is_failed_captcha = True
+                        elif token_captcha_type in ['recaptcha', 'hcaptcha', 'turnstile']:
+                            third_partie_name = {
+                                'recaptcha': 'g-recaptcha', 'turnstile': 'cf-turnstile',
+                                'hcaptcha': 'h-captcha'}.get(token_captcha_type)
+                            if request.method.lower() == 'post':
+                                response_data = request.form.get(third_partie_name + '-response')
+                            else:
+                                response_data = request.args.get(third_partie_name + '-response')
+
+                            data = {
+                                'secret': self.secret,
+                                'response': response_data
+                            }
+
+                            api_url = CAPTCHA_THIRD_PARTIES_API_URLS.get(token_captcha_type)
+
+                            response = requests.post(api_url, data = data, timeout = 3)
+                            result = response.json()
+
+                            if not result.get('success'):
+                                is_failed_captcha = True
                         else:
                             if request.method.lower() == 'post':
                                 text_captcha = request.form.get('tc')
