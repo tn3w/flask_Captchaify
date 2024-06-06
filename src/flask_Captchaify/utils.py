@@ -15,6 +15,7 @@ import secrets
 import re
 import io
 import random
+from datetime import datetime, timezone, timedelta
 from base64 import urlsafe_b64encode, urlsafe_b64decode, b64decode, b64encode
 from urllib.parse import urlparse, urlunparse, parse_qs, urlencode, quote, urljoin
 import gzip
@@ -61,7 +62,6 @@ def get_work_dir():
         return CURRENT_DIR
 
     return pkg_resources.resource_filename('flask_Captchaify', '')
-
 
 WORK_DIR: Final[str] = get_work_dir()
 DATA_DIR: Final[str] = os.path.join(WORK_DIR, 'data')
@@ -363,6 +363,9 @@ def get_domain_from_url(url: str) -> str:
     :return: The domain or IP address extracted from the URL.
     """
 
+    if not url.startswith(('http://', 'https://')):
+        url = 'http://' + url
+
     parsed_url = urlparse(url)
     netloc = parsed_url.netloc
 
@@ -430,6 +433,39 @@ def get_path_from_url(url: str) -> Optional[str]:
         return parsed_url.path
 
     return None
+
+
+def validate_captcha_response(response: dict, expected_hostname: str) -> bool:
+    """
+    Validates the captcha response data.
+
+    :param response: The JSON response from the captcha service.
+    :param expected_hostname: The expected hostname to validate against.
+    :return: A bool containing validation results.
+    """
+
+    if not response.get('success', False) or\
+        ('error-codes' in response and len(response['error-codes']) != 0) or\
+            get_domain_from_url(response.get('hostname', '')) != expected_hostname:
+        return False
+
+    timestamp_str = response.get('challenge_ts', '')
+    try:
+        if 'Z' in timestamp_str:
+            timestamp_str = timestamp_str.replace('Z', '+0000')
+
+        challenge_time = datetime.strptime(timestamp_str, '%Y-%m-%dT%H:%M:%S%z')
+    except ValueError:
+        return True
+
+    if challenge_time.tzinfo is None:
+        challenge_time = challenge_time.replace(tzinfo=timezone.utc)
+
+    current_time = datetime.now(timezone.utc)
+    if current_time - challenge_time > timedelta(minutes=3):
+        return False
+
+    return True
 
 
 def random_user_agent() -> str:
@@ -961,7 +997,7 @@ def render_template(template_dir: str, file_name: str, request: Request,
     args["is_default_language"] = is_default_language
     args["alternate_languages"] = LANGUAGE_CODES if not without_customization else []
 
-    current_url = rearrange_url(WebPage.client_url(request), ['theme', 'language', 'wc'])
+    current_url = rearrange_url(WebPage.client_url(request), ['theme', 'language'])
     args["current_url"] = rearrange_url(current_url, ['ct', 'ci', 'captcha'])
     args["current_url_without_ccl"] = rearrange_url(current_url, ['ccl'])
     args["current_url_without_wc"] = rearrange_url(current_url, ['wc'])

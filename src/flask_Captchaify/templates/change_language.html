@@ -357,7 +357,7 @@
             <div class="container">
                 {% for language in languages %}
                 <div class="item">
-                    <a href="{% if return_url|default %}{{ return_url }}{% if '?' not in return_url %}?{% else %}&{% endif %}{% else %}{{ current_url_without_ccl }}{% if '?' not in current_url_without_ccl %}?{% else %}&{% endif %}{% endif %}language={{ language['code'] }}" ntr="1">
+                    <a href="{% if return_url_without_lang|default %}{{ return_url_without_lang }}{% if '?' not in return_url_without_lang %}?{% else %}&{% endif %}{% else %}{{ current_url_without_ccl }}{% if '?' not in current_url_without_ccl %}?{% else %}&{% endif %}{% endif %}language={{ language['code'] }}" ntr="1">
                         <img src="{{ language['flag'] }}" alt="{{ language['name'] }} Flag">
                         <div class="language">{{ language['name'] }}</div>
                     </a>

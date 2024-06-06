@@ -32,7 +32,7 @@ from .utils import JSON, PICKLE, Hashing, SymmetricCrypto, SSES, WebPage, get_wo
     render_template, is_stopforumspam_spammer, search_languages, get_random_image,\
     manipulate_image_bytes, convert_image_to_base64, get_return_path, get_return_url,\
     extract_path_and_args, rearrange_url, handle_exception, does_match_rule, download_geolite,\
-    get_domain_from_url
+    get_domain_from_url, validate_captcha_response
 
 
 WORK_DIR: Final[str] = get_work_dir()
@@ -90,7 +90,7 @@ ALL_ACTIONS: Final[list] = ['allow', 'block', 'fight', 'captcha']
 ALL_THIRD_PARTIES: Final[list] = ['geoip', 'tor', 'ipapi', 'stopforumspam']
 ALL_TEMPLATE_TYPES: Final[list] = [
     'captcha_text_audio', 'captcha_multiclick', 'captcha_oneclick',
-    'captcha_trueclick', 'captcha_third_partie', 'block',
+    'captcha_trueclick', 'captcha_third_partie', 'nojs', 'block',
     'rate_limited', 'change_language'
 ]
 ALL_THEMES: Final[list] = ['dark', 'light']
@@ -235,7 +235,7 @@ class Captchaify:
             @app.route('/blocked-' + route_id)
             def blocked_captchaify() -> Response:
                 """
-                Render a block page with a captcha challenge.
+                Render a block page.
 
                 :return: A Flask response object.
                 """
@@ -249,6 +249,26 @@ class Captchaify:
                 emoji = random.choice(EMOJIS)
                 return self._correct_template(
                     'block', emoji = emoji, return_path = return_path,
+                    return_url = return_url, route_id = self.route_id
+                )
+
+            @app.route('/nojs-' + route_id)
+            def nojs_captchaify() -> Response:
+                """
+                Render a nojs page.
+
+                :return: A Flask response object.
+                """
+
+                return_path = get_return_path(request)
+                if return_path is None:
+                    return_path = '/'
+
+                return_url = get_return_url(return_path, request)
+
+                emoji = random.choice(EMOJIS)
+                return self._correct_template(
+                    'nojs', emoji = emoji, return_path = return_path,
                     return_url = return_url, route_id = self.route_id
                 )
 
@@ -358,9 +378,7 @@ class Captchaify:
                     :return: A Flask response object.
                     """
 
-                    return_path = get_return_path(request)
-                    if return_path is None:
-                        return_path = '/'
+                    return_path = extract_path_and_args(self._create_route_url('captcha', False))
 
                     change_language_template = self._display_change_language(return_path)
                     if change_language_template:
@@ -386,6 +404,28 @@ class Captchaify:
 
         if self.crawler_hints:
             app.after_request(self._crawler_hints)
+
+    @property
+    def _own_routes(self) -> list:
+        """
+        Generates and returns a list of custom routes
+        specific to the instance based on its properties.
+        """
+
+        routes = []
+
+        if self.as_route:
+            routes.extend(
+                ['/blocked-' + self.route_id, '/rate_limited-' + self.route_id,
+                 '/captcha-' + self.route_id, '/nojs-' + self.route_id]
+            )
+            if self.allow_customization:
+                routes.append('/change_language-' + self.route_id)
+
+        if self.enable_trueclick:
+            routes.append('/trueclick')
+
+        return routes
 
     @property
     def _preferences(self) -> dict:
@@ -419,19 +459,7 @@ class Captchaify:
                     else:
                         current_url['rate_limit'], current_url['max_rate_limit'] = preference
 
-        routes = []
-
-        if self.as_route:
-            routes = ['/blocked-' + self.route_id,
-                      '/rate_limited-' + self.route_id,
-                      '/captcha-' + self.route_id]
-            if self.allow_customization:
-                routes.append('/change_language-' + self.route_id)
-
-        if self.enable_trueclick:
-            routes.append('/trueclick')
-
-        if request.path in routes:
+        if request.path in self._own_routes:
             current_url['action'] = 'allow'
 
         if self.dataset_dir is not None:
@@ -773,8 +801,6 @@ class Captchaify:
             g.client_ip = client_ip
             g.is_invalid_ip = is_invalid_ip
             g.client_user_agent = client_user_agent
-
-            self.info
         except Exception as exc:
             handle_exception(exc)
             if self.as_route:
@@ -795,7 +821,7 @@ class Captchaify:
 
         g.captchaify_page = True
 
-        if not template_type in ALL_TEMPLATE_TYPES[:5]:
+        if not template_type in ALL_TEMPLATE_TYPES:
             template_type = 'block'
 
         template_dir = self._preferences['template_dir']
@@ -820,6 +846,9 @@ class Captchaify:
             args['is_default_choice'] = is_default_choice
             args['without_cookies'] = without_cookies
             args['as_route'] = self.as_route
+            if self.as_route:
+                args['captcha_url'] = self._create_route_url('captcha')
+
             return render_template(
                 template_dir, file_name, request,
                 without_customization = not self.allow_customization,
@@ -908,6 +937,7 @@ class Captchaify:
                     kwargs = {
                         "search": search, "languages": languages,
                         "return_path": return_path, "return_url": return_url,
+                        "return_url_without_lang": rearrange_url(return_url, ['language']),
                         "allow_customization": self.allow_customization,
                         "is_default_choice": is_default_choice,
                         "without_cookies": without_cookies,
@@ -1183,6 +1213,14 @@ class Captchaify:
             :return: HTML content containing the captcha.
             """
 
+            if request.args.get('js', '1') == '0':
+                if self.as_route:
+                    g.captchaify_page = True
+                    return redirect(self._create_route_url('nojs', True))
+
+                emoji = random.choice(EMOJIS)
+                return self._correct_template('nojs', emoji = emoji)
+
             captcha_id = generate_random_string(30)
 
             captcha_token_data = {
@@ -1307,9 +1345,9 @@ class Captchaify:
                             api_url = CAPTCHA_THIRD_PARTIES_API_URLS.get(token_captcha_type)
 
                             response = requests.post(api_url, data = data, timeout = 3)
-                            result = response.json()
+                            if not validate_captcha_response(
+                                response.json(), get_domain_from_url(self.url)):
 
-                            if not result.get('success'):
                                 is_failed_captcha = True
                         else:
                             if request.method.lower() == 'post':
@@ -1530,24 +1568,34 @@ class Captchaify:
         return redirect(url)
 
 
-    def _create_route_url(self, template: str) -> str:
+    def _create_route_url(self, template: str, without_return_path: Optional[bool] = None) -> str:
         """
         Creates a route URL with the specified template, including return path,
         theme, and language parameters.
 
         :param template: The template to be used in constructing the URL.
+        :param without_return_path: Whether the return path should be added to the request
         :return: The constructed route URL.
         """
+
+        if not isinstance(without_return_path, bool):
+            if request.path in self._own_routes:
+                without_return_path = True
 
         return_path = get_return_path(request)
         if return_path is None:
             return_path = quote(
                 extract_path_and_args(
-                    rearrange_url(self.url, ['theme', 'language', 'captcha', 'return_path', 'wc'])
+                    rearrange_url(self.url, [
+                        'theme', 'language', 'captcha',
+                        'return_path', 'wc', 'js'
+                        ]
+                    )
                 )
             )
 
-        redirect_url = f'/{template}-' + self.route_id + '?return_path=' + return_path
+        redirect_url = f'/{template}-' + self.route_id +\
+            ('?return_path=' + return_path if not without_return_path else '')
 
         theme, is_default_theme = WebPage.client_theme(request)
         language, is_default_language = WebPage.client_language(request)
@@ -1556,7 +1604,7 @@ class Captchaify:
             redirect_url += '&theme=' + theme
         if not is_default_language:
             redirect_url += '&language=' + language
-        if not is_default_choice and without_cookies:
+        if not is_default_choice and not without_cookies:
             redirect_url += '&wc=' + str(int(without_cookies))
 
         return redirect_url

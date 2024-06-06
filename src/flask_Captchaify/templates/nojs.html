@@ -4,21 +4,12 @@
         <meta charset="UTF-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Beep beop Boop?</title>
-        {% if not is_default_theme %}
-            {% if third_partie == 'recaptcha' %}
-            <script src="https://www.google.com/recaptcha/api.js?explicit&hl={{ language }}" async defer></script>
-            {% elif third_partie == 'hcaptcha' %}
-            <script src="https://hcaptcha.com/1/api.js?explicit&hl={{ language }}" async defer></script>
-            {% elif third_partie == 'turnstile' %}
-            <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?explicit&hl={{ language }}" async defer></script>
-            {% endif %}
-        {% endif %}
+        <title>Java script disabled</title>
         <style>{% if theme == "light" and not is_default_theme %}
             :root {
                 --background: #f2f2f2;
                 --text: #181818;
-                --border: rgba(0, 0, 0, 0.5);
+                --main-ancher-color: #0000ad;
                 --ancher-color: #222;
             }
 
@@ -29,7 +20,7 @@
             :root {
                 --background: #121212;
                 --text: #f2f2f2;
-                --border: rgba(255, 255, 255, 0.1);
+                --main-ancher-color: #00BFFF;
                 --ancher-color: #999;
             }
 
@@ -40,10 +31,10 @@
             :root {
                 --background: #f2f2f2;
                 --text: #181818;
-                --border: rgba(0, 0, 0, 0.5);
+                --main-ancher-color: #0000ad;
                 --ancher-color: #222;
             }
-
+            
             #choose-light {
                 display: none;
             }
@@ -52,7 +43,7 @@
                 :root {
                     --background: #121212;
                     --text: #f2f2f2;
-                    --border: rgba(255, 255, 255, 0.1);
+                    --main-ancher-color: #00BFFF;
                     --ancher-color: #999;
                 }
 
@@ -67,32 +58,54 @@
             {% endif %}
 
             body {
-                margin: 0;
                 font-family: Consolas, Arial, sans-serif;
                 background-color: var(--background);
                 color: var(--text);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 98vh;
             }
 
-            main {
+            a {
+                text-decoration: none;
+            }
+
+            a:hover {
+                text-decoration: underline;
+            }
+    
+            .emoji {
+                height: 100px;
                 display: flex;
-                justify-content: center;
-                align-items: center;
-                height: 90vh;
+                margin: auto;
+            }
+    
+            .error-text {
+                font-size: 24px;
+                margin-top: 20px;
+                text-align: center;
+            }
+    
+            .main-link {
+                font-size: 18px;
+                margin-top: 20px;
                 text-align: center;
             }
 
-            .description {
-                margin-top: 20px;
-                font-size: 18px;
+            .main-link a {
+                color: var(--main-ancher-color);
             }
-
-            #captchaBox {
-                display: flex;
-                justify-content: center;
+    
+            p {
+                text-align: center;
+                max-width: 800px;
             }
 
             footer {
                 text-align: center;
+                margin-top: 20px;
             }
 
             footer nav ul {
@@ -117,18 +130,6 @@
 
             footer nav ul li a:hover {
                 text-decoration: underline;
-            }
-
-            @media only screen and (max-width: 670px) {
-                .image-grid {
-                    grid-template-columns: repeat(3, 1fr);
-                }
-            }
-
-            @media only screen and (max-width: 400px) {
-                .image-grid {
-                    grid-template-columns: repeat(2, 1fr);
-                }
             }
         </style>
         {% if is_default_choice and without_cookies %}
@@ -242,21 +243,11 @@
         </div>
         {% endif %}
         <main>
-            <div>
-                <h1>🤖Beep beop Boop?</h1>
-                <p class="description">Please tick the box to confirm that you are not a robot:</p>
-                {% if error_message|default %}
-                <p style="color: #ff0000;margin:10px;">
-                    {{ error_message }}
-                </p>
-                {% endif %}
-                <form id="captchaForm" action="{{ current_url }}" method="{% if not as_route %}GET{% else %}POST{% endif %}">
-                    <div id="captchaBox" class="{% if third_partie == 'recaptcha' %}g-recaptcha{% elif third_partie == 'hcaptcha' %}h-captcha{% elif third_partie == 'turnstile' %}cf-turnstile{% endif %}" data-sitekey="{{ site_key }}" data-callback="onSuccess"{% if not is_default_theme %} data-theme="{% if theme == 'light' %}light{% elif theme == 'dark' %}dark{% else %}{% endif %}"{% endif %} data-language="{{ language }}"></div>
-                    {% if return_path|default %}
-                    <input type="hidden" name="return_path" value="{{ return_path }}">
-                    {% endif %}
-                    <input type="hidden" name="ct" value="{{ captcha_token }}">
-                </form>
+            <img class="emoji" src="{{ emoji }}">
+            <h1 class="error-text">Sorry, but you have javascript disabled.</h1>
+            <p>JavaScript is employed on this site to present specific anti-captcha options and to ensure the protection of all users. Please enable JavaScript and reload the page.</p>
+            <div class="main-link">
+                <a href="{% if as_route %}{{ captcha_url }}{% elif return_url|default %}{{ return_url }}{% else %}/{% endif %}">Back to the main page</a>
             </div>
         </main>
         <footer>
@@ -271,46 +262,14 @@
                 </ul>
             </nav>
         </footer>
+        {% if is_default_choice and without_cookies %}
         <noscript>
-            <meta http-equiv="refresh" content="0;url=?js=0">
-            {% if is_default_choice and without_cookies %}
             <style>
                 .cookie-banner { bottom: 20px; }
             </style>
-            {% endif %}
         </noscript>
         <script>
-            function onSuccess() {
-                document.getElementById('captchaForm').submit();
-            }
-            {% if is_default_theme %}
-
-            function getTheme() {
-                return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-            }
-            {% endif %}
-            {% if (is_default_choice and without_cookies) or is_default_theme %}
-
             document.addEventListener('DOMContentLoaded', () => {
-                {% if is_default_theme %}
-                const theme = getTheme();
-                document.getElementById('captchaBox').setAttribute('data-theme', theme);
-
-                const scriptElement = document.createElement('script');
-                {% if third_partie == 'recaptcha' %}
-                scriptElement.src = 'https://www.google.com/recaptcha/api.js?explicit&hl={{ language }}';
-                {% elif third_partie == 'hcaptcha' %}
-                scriptElement.src = 'https://hcaptcha.com/1/api.js?explicit&hl={{ language }}';
-                {% elif third_partie == 'turnstile' %}
-                scriptElement.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?explicit&hl={{ language }}';
-                {% endif %}
-                scriptElement.async = true;
-                scriptElement.defer = true;
-
-                document.head.appendChild(scriptElement);
-
-                {% endif %}
-                {% if is_default_choice and without_cookies %}
                 const cookieBanner = document.getElementById('cookie-banner');
                 const acceptCookiesBtn = document.getElementById('accept-cookies');
                 const declineCookiesBtn = document.getElementById('decline-cookies');
@@ -473,9 +432,8 @@
                     }
                     return null;
                 }
-                {% endif %}
             });
-            {% endif %}
         </script>
+        {% endif %}
     </body>
 </html>

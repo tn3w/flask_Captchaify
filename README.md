@@ -57,7 +57,7 @@ In situations where it is deemed necessary, a captivating challenge may be prese
 ### To-Do's
 - [x] add `*` to rules Arg
 - [x] https://github.com/tn3w/flask_Captchaify/issues/9 fixed with https://github.com/tn3w/flask_Captchaify/commit/3426b8fdafdc938c4951012a0dadf80b96b01776
-- [ ] Google reCaptcha, hCaptcha or Cloudflare Turnstile response timestamp check
+- [x] Google reCaptcha, hCaptcha or Cloudflare Turnstile response timestamp check
 - [ ] Integrate Captchaify Trueclick as captcha type
 - [ ] Add option that can integrate Captchaify Trueclick, Google reCaptcha, hCaptcha or Cloudflare Turnstile into forms like https://github.com/KnugiHK/flask-hcaptcha
 - [ ] Captcha data set with emojis
