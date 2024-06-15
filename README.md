@@ -1,8 +1,8 @@
 <center>
    <picture align="center">
-      <source width="1000px" media="(prefers-color-scheme: dark)" srcset="https://github.com/tn3w/flask_Captchaify/releases/download/img_v1.7/oneclick_dark.png">
-      <source width="1000px" media="(prefers-color-scheme: light)" srcset="https://github.com/tn3w/flask_Captchaify/releases/download/img_v1.7/oneclick_light.png">
-      <img width="1000px" alt="Picture from Block Page" src="https://github.com/tn3w/flask_Captchaify/releases/download/img_v1.7/oneclick_dark.png">
+      <source width="800px" media="(prefers-color-scheme: dark)" srcset="https://github.com/tn3w/flask_Captchaify/releases/download/img_v1.7/oneclick_dark.png">
+      <source width="800px" media="(prefers-color-scheme: light)" srcset="https://github.com/tn3w/flask_Captchaify/releases/download/img_v1.7/oneclick_light.png">
+      <img width="800px" alt="Picture from Block Page" src="https://github.com/tn3w/flask_Captchaify/releases/download/img_v1.7/oneclick_dark.png">
    </picture>
 </center>
 <h1 align="center">𝐟𝐥𝐚𝐬𝐤_𝐂𝐚𝐩𝐭𝐜𝐡𝐚𝐢𝐟𝐲</h1>
