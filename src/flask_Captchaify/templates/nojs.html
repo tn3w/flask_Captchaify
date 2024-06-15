@@ -4,13 +4,21 @@
         <meta charset="UTF-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Java script disabled</title>
+        <title>Javascript disabled</title>
         <style>{% if theme == "light" and not is_default_theme %}
             :root {
                 --background: #f2f2f2;
                 --text: #181818;
                 --main-ancher-color: #0000ad;
                 --ancher-color: #222;
+                {% if is_default_choice and not without_cookies %}
+                --background-color: #f2f2f2;
+                --text-color: #181818;
+                --button-background: #007BFF;
+                --button-hover-background: #0056b3;
+                --button-color: #fff;
+                --box-shadow: rgba(0, 0, 0, 0.2);
+                {% endif %}
             }
 
             #choose-light {
@@ -22,6 +30,14 @@
                 --text: #f2f2f2;
                 --main-ancher-color: #00BFFF;
                 --ancher-color: #999;
+                {% if is_default_choice and not without_cookies %}
+                --background-color: #121212;
+                --text-color: #f2f2f2;
+                --button-background: #1E90FF;
+                --button-hover-background: #1C86EE;
+                --button-color: #fff;
+                --box-shadow: rgba(255, 255, 255, 0.2);
+                {% endif %}
             }
 
             #choose-dark {
@@ -33,6 +49,14 @@
                 --text: #181818;
                 --main-ancher-color: #0000ad;
                 --ancher-color: #222;
+                {% if is_default_choice and not without_cookies %}
+                --background-color: #f2f2f2;
+                --text-color: #181818;
+                --button-background: #007BFF;
+                --button-hover-background: #0056b3;
+                --button-color: #fff;
+                --box-shadow: rgba(0, 0, 0, 0.2);
+                {% endif %}
             }
             
             #choose-light {
@@ -45,6 +69,14 @@
                     --text: #f2f2f2;
                     --main-ancher-color: #00BFFF;
                     --ancher-color: #999;
+                    {% if is_default_choice and not without_cookies %}
+                    --background-color: #121212;
+                    --text-color: #f2f2f2;
+                    --button-background: #1E90FF;
+                    --button-hover-background: #1C86EE;
+                    --button-color: #fff;
+                    --box-shadow: rgba(255, 255, 255, 0.2);
+                    {% endif %}
                 }
 
                 #choose-dark {
@@ -65,7 +97,9 @@
                 flex-direction: column;
                 align-items: center;
                 justify-content: center;
-                height: 98vh;
+                overflow: hidden;
+                height: 100vh;
+                margin: 0;
             }
 
             a {
@@ -76,32 +110,33 @@
                 text-decoration: underline;
             }
     
-            .emoji {
+            main {
+                text-align: center;
+            }
+
+            main .emoji {
                 height: 100px;
                 display: flex;
                 margin: auto;
+                margin-bottom: 20px;
             }
-    
-            .error-text {
-                font-size: 24px;
-                margin-top: 20px;
-                text-align: center;
+
+            main .error-text {
+                max-width: 800px;
+                font-size: 18px;
+                padding: 0 20px;
             }
-    
-            .main-link {
+
+            main .anchor {
                 font-size: 18px;
                 margin-top: 20px;
                 text-align: center;
             }
 
-            .main-link a {
+            main .anchor a {
                 color: var(--main-ancher-color);
             }
-    
-            p {
-                text-align: center;
-                max-width: 800px;
-            }
+            {% if not without_customisation or not without_watermark %}
 
             footer {
                 text-align: center;
@@ -131,48 +166,9 @@
             footer nav ul li a:hover {
                 text-decoration: underline;
             }
-        </style>
-        {% if is_default_choice and without_cookies %}
-        <style>{% if theme == "light" and not is_default_theme %}
-            :root {
-                --background-color: #f2f2f2;
-                --text-color: #181818;
-                --button-background: #007BFF;
-                --button-hover-background: #0056b3;
-                --button-color: #fff;
-                --box-shadow: rgba(0, 0, 0, 0.2);
-            }
-            {% elif theme == "dark" and not is_default_theme %}
-            :root {
-                --background-color: #121212;
-                --text-color: #f2f2f2;
-                --button-background: #1E90FF;
-                --button-hover-background: #1C86EE;
-                --button-color: #fff;
-                --box-shadow: rgba(255, 255, 255, 0.2);
-            }
-            {% else %}
-            :root {
-                --background-color: #f2f2f2;
-                --text-color: #181818;
-                --button-background: #007BFF;
-                --button-hover-background: #0056b3;
-                --button-color: #fff;
-                --box-shadow: rgba(0, 0, 0, 0.2);
-            }
-
-            @media (prefers-color-scheme: dark) {
-                :root {
-                    --background-color: #121212;
-                    --text-color: #f2f2f2;
-                    --button-background: #1E90FF;
-                    --button-hover-background: #1C86EE;
-                    --button-color: #fff;
-                    --box-shadow: rgba(255, 255, 255, 0.2);
-                }
-            }
             {% endif %}
-
+            {% if is_default_choice and not without_cookies %}
+            
             .cookie-banner {
                 position: fixed;
                 bottom: -200px;
@@ -228,14 +224,14 @@
                     width: 250px;
                 }
             }
+            {% endif %}
         </style>
-        {% endif %}
     </head>
     <body>
-        {% if is_default_choice and without_cookies %}
+        {% if is_default_choice and not without_cookies %}
         <div id="cookie-banner" class="cookie-banner">
             <h2 ntr="1">🍪 Cookies?</h2>
-            <p>We use cookies to remember that you are not a robot. If you choose 'Reject', this information will not be saved. Consequently, each time you close and reopen the tab, you will need to solve a new captcha.</p>
+            <p>We use cookies to save and to determine that you are not a robot. If you select "Decline", this information will not be saved. As a result, you will have to solve a new captcha every time you close and reopen the tab.</p>
             <div class="button-container">
                 <a id="accept-cookies" href="{{ current_url_without_wc }}{% if '?' in current_url_without_wc %}&{% else %}?{% endif %}wc=0" class="cookie-button">Accept</a>
                 <a id="decline-cookies" href="{{ current_url_without_wc }}{% if '?' in current_url_without_wc %}&{% else %}?{% endif %}wc=1" class="cookie-button">Reject</a>
@@ -243,26 +239,30 @@
         </div>
         {% endif %}
         <main>
-            <img class="emoji" src="{{ emoji }}">
-            <h1 class="error-text">Sorry, but you have javascript disabled.</h1>
-            <p>JavaScript is employed on this site to present specific anti-captcha options and to ensure the protection of all users. Please enable JavaScript and reload the page.</p>
-            <div class="main-link">
-                <a href="{% if as_route %}{{ captcha_url }}{% elif return_url|default %}{{ return_url }}{% else %}/{% endif %}">Back to the main page</a>
+            <img class="emoji" src="data:image/webp;base64,UklGRmQEAABXRUJQVlA4IFgEAAAQGQCdASqAAIAAPp1In0o0KpDWyqwcWAnEoA1XoffoH5AbHn2r8pfyA6f7m3vVzOyDex/+B0rfE86UHmA/kH+S/Yj3gOkA/qvUmegB0qX7m+kBeIVdnbPLG0jUz3x4vkfQoJ5JlvsHRsysovEFMh9igozdvm5IjY3Iqg+mM0OoWdamcf9lrk5jtDooiRCat8RALa1MHnLuE5QDC1nsTdq7/7jruquomyRbxQD1HmVlj/6P2vWAwJJHJF65t6aAdrNlMtjhceQS7n1viXIn3VEAAAD+8PGo5voMsa1LSEeGsTEYpaOuAqIZf+BeiiAAfuE3FYvnt4L6onh5U5gCH8QUsED3DY5xH+tbcxXCDke53SRbjadzeFpJZzjsEc7XsJ7OTBMk4vp6mdIHhSIH2Z86S88Lcej4/5Wegp15fNKuYZb9WFEtc44zO01Sl3AQlKv/Y9aydh9yhzFb/FVR2guAr/w6t5t1Xl8q6qGTp2cU4IATiuPHU4hk2NXDJ28eIht9uyswqSSxbhEL1krSz+AM73SHud0zyZbJNJ4QH/ZdwU342Dwo4kNTthY2wx3/J78Rpiuk5/vhCUbZ5rpRtvbuXUknHpmWMsYNU+Z+yHtZPLev36St8GMyMO1Pyc9YMWf/y/tu2atrBhCB0nOQX4evRkohIC9csFEkYCQLRPcAvWSUQguKzDNE1MT8XqyyLxhyihtZTeWGxlTiMrfwfqUd9iskGIZfLb71G5kdeID8pbBf42AA2dULLb80C1HQdtmGFaOC8XfGu6CAxHyyA2f1veAmcPipYYxEOL80nqThUn9/f0WglbuCdA3V3OpbzorV4xRVEpJ5ZhZTsrGnizdav+sDpm203FZz1tDfpymHx6dwIerR/vG7d2+2PR8AUjag1gzP3Eq7rTC7up93smlb+yZzpoB8CIY5BPcq3gfY1NHLIPXdLMTX4sfpZ2UwjvuxKBUYzVj46N0s7gpvKa/W8Bbd+YSHnNLQ/H/AwymTU9OLK7T3JQgXq4LnzqvL6L6kFKYKp7PBL2PIMzSZIYpOEhX/9nKQZMpR9gqcM5/uJF4xIPPPo3gnV1Cr4+SZtyL4gkBYFFmrDphvRKkwpSgm2uMACnQWDtX54XFfoT8fObL/vTE9t6N86JBNJ1lje00pskIAj0i1n4CTvOCGC+y8eq78ExaRNriBB06ebIOc2IxoenizT8Iv/KG78yNEMTgLaEShIwQOp68xerwSKizjQr0VXhxPOKHk6q3ENXxh40yvY6rxeBZzLW4EXcr0I15JayChETO9d7jpacKUnB4PX3t8dIttZ6ffv7Fuzpy/PRc+NMf9Ej7npswIYwlKzBrPHPVOu0245IyBEZSVbAFbCjD4tgy+Wo465cMxEc6XGdhdZoXbfXE/3lgsf9KZGvs4XRGJCrxEQd62XD1UouwDHQ/G+qetbZOOmsA/qTAIVgM4eoP1MUVWrprPQ6TjhEdGgvnq6KAAAA==">
+            <h1>Javascript is deactivated.</h1>
+            <p class="error-text">JavaScript is employed on this site to present specific anti-captcha options and to ensure the protection of all users. Please enable JavaScript and reload the page.</p>
+            <div class="anchor">
+                <a href="{% if not as_route %}{{ current_url_with_config }}{% else %}/captcha{{ route_id }}{{ url_args }}{% endif %}">Back to the page</a>
             </div>
         </main>
+        {% if not without_customisation or not without_watermark %}
         <footer>
             <nav>
                 <ul>
-                    {% if allow_customization %}
-                    <li><a href="{% if route_id|default %}/change_language-{{ route_id }}?return_path={{ return_path }}{% else %}{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}ccl=1{% endif %}">🌐Change Language</a></li>
+                    {% if not without_customisation %}
+                    <li><a href="{% if route_id|default %}/change_language{{ route_id }}?return_path={{ return_path }}&rr=nojs{% else %}{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}cl=1{% endif %}">🌐Change Language</a></li>
                     <li id="choose-light"><a href="{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}theme=light">Light Mode</a></li>
                     <li id="choose-dark"><a href="{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}theme=dark">Dark Mode</a></li>
                     {% endif %}
+                    {% if not without_watermark %}
                     <li>Bot protection by <a href="https://github.com/tn3w/flask_Captchaify" target="_blank" ntr="1">Captchaify</a></li>
+                    {% endif %}
                 </ul>
             </nav>
         </footer>
-        {% if is_default_choice and without_cookies %}
+        {% endif %}
+        {% if is_default_choice and not without_cookies %}
         <noscript>
             <style>
                 .cookie-banner { bottom: 20px; }
@@ -292,15 +292,6 @@
 
                     declineCookiesBtn.addEventListener('click', () => {
                         var currentUrl = window.location.href;
-                        var updatedUrl;
-                        if (currentUrl.indexOf('?') !== -1) {
-                            updatedUrl = currentUrl + '&wc=1';
-                        } else {
-                            updatedUrl = currentUrl + '?wc=1';
-                        }
-
-                        window.history.replaceState({}, document.title, updatedUrl);
-
                         var cookies = document.cookie.split(";");
 
                         let kwargs = {
@@ -359,6 +350,9 @@
                                 form.appendChild(hiddenInput);
                             }
                         }
+
+                        var updatedUrl = appendQueryParams(currentUrl, kwargs);
+                        window.history.replaceState({}, document.title, updatedUrl);
 
                         var anchors = document.querySelectorAll('a');
                         anchors.forEach(function(anchor) {

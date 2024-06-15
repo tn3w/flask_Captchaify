@@ -12,6 +12,14 @@
                 --box-shadow: #e2e2e2;
                 --captcha-background: #c0c0c0;
                 --ancher-color: #222;
+                {% if is_default_choice and not without_cookies %}
+                --background-color: #f2f2f2;
+                --text-color: #181818;
+                --button-background: #007BFF;
+                --button-hover-background: #0056b3;
+                --button-color: #fff;
+                --box-shadow: rgba(0, 0, 0, 0.2);
+                {% endif %}
             }
 
             #choose-light {
@@ -24,6 +32,14 @@
                 --box-shadow: #2e2e2e;
                 --captcha-background: #1f1f1f;
                 --ancher-color: #999;
+                {% if is_default_choice and not without_cookies %}
+                --background-color: #121212;
+                --text-color: #f2f2f2;
+                --button-background: #1E90FF;
+                --button-hover-background: #1C86EE;
+                --button-color: #fff;
+                --box-shadow: rgba(255, 255, 255, 0.2);
+                {% endif %}
             }
 
             #choose-dark {
@@ -36,6 +52,14 @@
                 --box-shadow: #e2e2e2;
                 --captcha-background: #c0c0c0;
                 --ancher-color: #222;
+                {% if is_default_choice and not without_cookies %}
+                --background-color: #f2f2f2;
+                --text-color: #181818;
+                --button-background: #007BFF;
+                --button-hover-background: #0056b3;
+                --button-color: #fff;
+                --box-shadow: rgba(0, 0, 0, 0.2);
+                {% endif %}
             }
 
             #choose-light {
@@ -49,6 +73,14 @@
                     --box-shadow: #2e2e2e;
                     --captcha-background: #1f1f1f;
                     --ancher-color: #999;
+                    {% if is_default_choice and not without_cookies %}
+                    --background-color: #121212;
+                    --text-color: #f2f2f2;
+                    --button-background: #1E90FF;
+                    --button-hover-background: #1C86EE;
+                    --button-color: #fff;
+                    --box-shadow: rgba(255, 255, 255, 0.2);
+                    {% endif %}
                 }
 
                 #choose-dark {
@@ -73,7 +105,11 @@
             }
 
             main {
+                {% if not without_customisation or not without_watermark %}
                 height: 90vh;
+                {% else %}
+                height: 100vh;
+                {% endif %}
                 display: flex;
                 justify-content: center;
                 align-items: center;
@@ -143,6 +179,7 @@
             a:hover {
                 text-decoration: underline;
             }
+            {% if not without_customisation or not without_watermark %}
 
             footer {
                 text-align: center;
@@ -171,54 +208,15 @@
             footer nav ul li a:hover {
                 text-decoration: underline;
             }
+            {% endif %}
 
             @media screen and (max-width: 600px) {
                 .captcha-container {
                     max-width: 80%;
                 }
             }
-        </style>
-        {% if is_default_choice and without_cookies %}
-        <style>{% if theme == "light" and not is_default_theme %}
-            :root {
-                --background-color: #f2f2f2;
-                --text-color: #181818;
-                --button-background: #007BFF;
-                --button-hover-background: #0056b3;
-                --button-color: #fff;
-                --box-shadow: rgba(0, 0, 0, 0.2);
-            }
-            {% elif theme == "dark" and not is_default_theme %}
-            :root {
-                --background-color: #121212;
-                --text-color: #f2f2f2;
-                --button-background: #1E90FF;
-                --button-hover-background: #1C86EE;
-                --button-color: #fff;
-                --box-shadow: rgba(255, 255, 255, 0.2);
-            }
-            {% else %}
-            :root {
-                --background-color: #f2f2f2;
-                --text-color: #181818;
-                --button-background: #007BFF;
-                --button-hover-background: #0056b3;
-                --button-color: #fff;
-                --box-shadow: rgba(0, 0, 0, 0.2);
-            }
-
-            @media (prefers-color-scheme: dark) {
-                :root {
-                    --background-color: #121212;
-                    --text-color: #f2f2f2;
-                    --button-background: #1E90FF;
-                    --button-hover-background: #1C86EE;
-                    --button-color: #fff;
-                    --box-shadow: rgba(255, 255, 255, 0.2);
-                }
-            }
-            {% endif %}
-
+            {% if is_default_choice and not without_cookies %}
+            
             .cookie-banner {
                 position: fixed;
                 bottom: -200px;
@@ -274,14 +272,14 @@
                     width: 250px;
                 }
             }
+            {% endif %}
         </style>
-        {% endif %}
     </head>
     <body>
-        {% if is_default_choice and without_cookies %}
+        {% if is_default_choice and not without_cookies %}
         <div id="cookie-banner" class="cookie-banner">
             <h2 ntr="1">🍪 Cookies?</h2>
-            <p>We use cookies to remember that you are not a robot. If you choose 'Reject', this information will not be saved. Consequently, each time you close and reopen the tab, you will need to solve a new captcha.</p>
+            <p>We use cookies to save and to determine that you are not a robot. If you select "Decline", this information will not be saved. As a result, you will have to solve a new captcha every time you close and reopen the tab.</p>
             <div class="button-container">
                 <a id="accept-cookies" href="{{ current_url_without_wc }}{% if '?' in current_url_without_wc %}&{% else %}?{% endif %}wc=0" class="cookie-button">Accept</a>
                 <a id="decline-cookies" href="{{ current_url_without_wc }}{% if '?' in current_url_without_wc %}&{% else %}?{% endif %}wc=1" class="cookie-button">Reject</a>
@@ -321,19 +319,23 @@
                 </form>
             </div>
         </main>
+        {% if not without_customisation or not without_watermark %}
         <footer>
             <nav>
                 <ul>
-                    {% if allow_customization %}
-                    <li><a href="{% if route_id|default %}/change_language-{{ route_id }}?return_path={{ return_path }}{% else %}{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}ccl=1{% endif %}">🌐Change Language</a></li>
+                    {% if not without_customisation %}
+                    <li><a href="{% if route_id|default %}/change_language{{ route_id }}?return_path={{ return_path }}&rr=captcha{% else %}{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}cl=1{% endif %}">🌐Change Language</a></li>
                     <li id="choose-light"><a href="{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}theme=light">Light Mode</a></li>
                     <li id="choose-dark"><a href="{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}theme=dark">Dark Mode</a></li>
                     {% endif %}
+                    {% if not without_watermark %}
                     <li>Bot protection by <a href="https://github.com/tn3w/flask_Captchaify" target="_blank" ntr="1">Captchaify</a></li>
+                    {% endif %}
                 </ul>
             </nav>
         </footer>
-        {% if is_default_choice and without_cookies %}
+        {% endif %}
+        {% if is_default_choice and not without_cookies %}
         <noscript>
             <style>
                 .cookie-banner { bottom: 20px; }
@@ -363,15 +365,6 @@
 
                     declineCookiesBtn.addEventListener('click', () => {
                         var currentUrl = window.location.href;
-                        var updatedUrl;
-                        if (currentUrl.indexOf('?') !== -1) {
-                            updatedUrl = currentUrl + '&wc=1';
-                        } else {
-                            updatedUrl = currentUrl + '?wc=1';
-                        }
-
-                        window.history.replaceState({}, document.title, updatedUrl);
-
                         var cookies = document.cookie.split(";");
 
                         let kwargs = {
@@ -430,6 +423,9 @@
                                 form.appendChild(hiddenInput);
                             }
                         }
+
+                        var updatedUrl = appendQueryParams(currentUrl, kwargs);
+                        window.history.replaceState({}, document.title, updatedUrl);
 
                         var anchors = document.querySelectorAll('a');
                         anchors.forEach(function(anchor) {

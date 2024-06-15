@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="{{ language }}">
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Beep beop Boop?</title>
+        <noscript>
+            <meta http-equiv="refresh" content="0;url={% if not as_route %}{{ current_url_with_config }}{% if '?' in current_url_with_config %}&{% else %}?{% endif %}js=0{% else %}/nojs{{ route_id }}{{ url_args }}{% endif %}">
+        </noscript>
+        {% if not is_default_theme %}
+            {% if third_party == 'recaptcha' %}
+            <script src="https://www.google.com/recaptcha/api.js?explicit&hl={{ language }}" async defer></script>
+            {% elif third_party == 'hcaptcha' %}
+            <script src="https://hcaptcha.com/1/api.js?explicit&hl={{ language }}" async defer></script>
+            {% elif third_party == 'turnstile' %}
+            <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?explicit&hl={{ language }}" async defer></script>
+            {% elif third_party == 'friendlycaptcha' %}
+            <script src="https://cdn.jsdelivr.net/npm/friendly-challenge/widget.module.min.js" async defer></script>
+            {% endif %}
+        {% endif %}
+        <style>{% if theme == "light" and not is_default_theme %}
+            :root {
+                --background: #f2f2f2;
+                --text: #181818;
+                --border: rgba(0, 0, 0, 0.5);
+                --ancher-color: #222;
+                {% if is_default_choice and not without_cookies %}
+                --background-color: #f2f2f2;
+                --text-color: #181818;
+                --button-background: #007BFF;
+                --button-hover-background: #0056b3;
+                --button-color: #fff;
+                --box-shadow: rgba(0, 0, 0, 0.2);
+                {% endif %}
+            }
+
+            #choose-light {
+                display: none;
+            }
+            {% elif theme == "dark" and not is_default_theme %}
+            :root {
+                --background: #121212;
+                --text: #f2f2f2;
+                --border: rgba(255, 255, 255, 0.1);
+                --ancher-color: #999;
+                {% if is_default_choice and not without_cookies %}
+                --background-color: #121212;
+                --text-color: #f2f2f2;
+                --button-background: #1E90FF;
+                --button-hover-background: #1C86EE;
+                --button-color: #fff;
+                --box-shadow: rgba(255, 255, 255, 0.2);
+                {% endif %}
+            }
+
+            #choose-dark {
+                display: none;
+            }
+            {% else %}
+            :root {
+                --background: #f2f2f2;
+                --text: #181818;
+                --border: rgba(0, 0, 0, 0.5);
+                --ancher-color: #222;
+                {% if is_default_choice and not without_cookies %}
+                --background-color: #f2f2f2;
+                --text-color: #181818;
+                --button-background: #007BFF;
+                --button-hover-background: #0056b3;
+                --button-color: #fff;
+                --box-shadow: rgba(0, 0, 0, 0.2);
+                {% endif %}
+            }
+
+            #choose-light {
+                display: none;
+            }
+
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --background: #121212;
+                    --text: #f2f2f2;
+                    --border: rgba(255, 255, 255, 0.1);
+                    --ancher-color: #999;
+                    {% if is_default_choice and not without_cookies %}
+                    --background-color: #121212;
+                    --text-color: #f2f2f2;
+                    --button-background: #1E90FF;
+                    --button-hover-background: #1C86EE;
+                    --button-color: #fff;
+                    --box-shadow: rgba(255, 255, 255, 0.2);
+                    {% endif %}
+                }
+
+                #choose-dark {
+                    display: none;
+                }
+
+                #choose-light {
+                    display: unset;
+                }
+            }
+            {% endif %}
+
+            body {
+                font-family: Consolas, Arial, sans-serif;
+                background-color: var(--background);
+                color: var(--text);
+                margin: 0;
+                height: 100%;
+                overflow: hidden;
+            }
+
+            main {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                {% if not without_customisation or not without_watermark %}
+                height: 90vh;
+                {% else %}
+                height: 100vh;
+                {% endif %}
+                text-align: center;
+            }
+
+            .caption {
+                font-size: 18px;
+                margin: 0 auto;
+                padding-top: 20px;
+            }
+
+            #captchaContainer {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                flex-direction: column;
+                margin-top: 20px;
+                width: 100%;
+                height: 100%;
+            }
+            {% if not without_customisation or not without_watermark %}
+
+            footer {
+                text-align: center;
+                height: 10vh;
+            }
+
+            footer nav ul {
+                list-style-type: none;
+                padding: 0;
+            }
+
+            footer nav ul li {
+                color: var(--ancher-color);
+                display: inline;
+                margin-right: 20px;
+                font-size: 15px;
+                text-align: center;
+                font-weight: lighter;
+                word-break: keep-all;
+            }
+
+            footer nav ul li a {
+                color: var(--ancher-color);
+                text-decoration: none;
+            }
+
+            footer nav ul li a:hover {
+                text-decoration: underline;
+            }
+            {% endif %}
+
+            @media only screen and (max-width: 670px) {
+                .image-grid {
+                    grid-template-columns: repeat(3, 1fr);
+                }
+            }
+
+            @media only screen and (max-width: 400px) {
+                .image-grid {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+            }
+            {% if is_default_choice and not without_cookies %}
+            
+            .cookie-banner {
+                position: fixed;
+                bottom: -200px;
+                left: 20px;
+                width: 300px;
+                padding: 20px;
+                color: var(--text-color);
+                background-color: var(--background-color);
+                box-shadow: 0 2px 5px var(--box-shadow);
+                transition: bottom 0.5s ease-in-out;
+                z-index: 1000;
+            }
+
+            .cookie-banner.show {
+                bottom: 20px;
+            }
+
+            .cookie-banner h2 {
+                margin-top: 0;
+            }
+
+            .cookie-banner p {
+                margin: 10px 0;
+            }
+
+            .button-container {
+                display: flex;
+                justify-content: space-between;
+            }
+
+            .cookie-button {
+                padding: 10px 20px;
+                background-color: var(--button-background);
+                color: var(--button-color);
+                text-decoration: none;
+                border-radius: 5px;
+                cursor: pointer;
+            }
+
+            .cookie-button:hover {
+                background-color: var(--button-hover-background);
+            }
+
+            @media (max-width: 650px) {
+                .cookie-banner {
+                    left: 50%;
+                    transform: translateX(-50%);
+                }
+            }
+
+            @media (max-width: 400px) {
+                .cookie-banner {
+                    width: 250px;
+                }
+            }
+            {% endif %}
+        </style>
+    </head>
+    <body>
+        {% if is_default_choice and not without_cookies %}
+        <div id="cookie-banner" class="cookie-banner">
+            <h2 ntr="1">🍪 Cookies?</h2>
+            <p>We use cookies to save and to determine that you are not a robot. If you select "Decline", this information will not be saved. As a result, you will have to solve a new captcha every time you close and reopen the tab.</p>
+            <div class="button-container">
+                <a id="accept-cookies" href="{{ current_url_without_wc }}{% if '?' in current_url_without_wc %}&{% else %}?{% endif %}wc=0" class="cookie-button">Accept</a>
+                <a id="decline-cookies" href="{{ current_url_without_wc }}{% if '?' in current_url_without_wc %}&{% else %}?{% endif %}wc=1" class="cookie-button">Reject</a>
+            </div>
+        </div>
+        {% endif %}
+        <main>
+            <div>
+                <h1>🤖Beep beop Boop?</h1>
+                <p class="caption">Please tick the box to confirm that you are not a robot:</p>
+                {% if error_message|default %}
+                <p class="caption" style="color: #ff0000;font-size: 16px;">
+                    {{ error_message }}
+                </p>
+                {% endif %}
+                <form id="captchaForm" action="{{ current_url }}" method="{% if not as_route %}GET{% else %}POST{% endif %}">
+                    <div id="captchaContainer">
+                        <div id="captchaBox" class="
+                            {% if third_party == 'recaptcha' %}g-recaptcha
+                            {% elif third_party == 'hcaptcha' %}h-captcha
+                            {% elif third_party == 'turnstile' %}cf-turnstile
+                            {% elif third_party == 'friendlycaptcha' %}frc-captcha 
+                            {% if not is_default_theme and theme == 'dark' %}dark{% endif %}
+                            {% endif %}" 
+                            data-sitekey="{{ site_key }}" 
+                            data-callback="onSuccess"
+                            {% if not is_default_theme %} 
+                                data-theme="{% if theme == 'light' %}light
+                                            {% elif theme == 'dark' %}dark
+                                            {% else %}{% endif %}" 
+                            {% endif %}
+                            {% if not third_party == 'friendlycaptcha' %}
+                            data-language="{{ language }}"
+                            {% else %}
+                            data-lang="{{ language }}"
+                            {% endif %}>
+                        </div>
+                    </div>
+                    {% if return_path|default %}
+                    <input type="hidden" name="return_path" value="{{ return_path }}">
+                    {% endif %}
+                    <input type="hidden" name="ct" value="{{ captcha_token }}">
+                </form>
+            </div>
+        </main>
+        {% if not without_customisation or not without_watermark %}
+        <footer>
+            <nav>
+                <ul>
+                    {% if not without_customisation %}
+                    <li><a href="{% if route_id|default %}/change_language{{ route_id }}?return_path={{ return_path }}&rr=captcha{% else %}{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}cl=1{% endif %}">🌐Change Language</a></li>
+                    <li id="choose-light"><a href="{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}theme=light">Light Mode</a></li>
+                    <li id="choose-dark"><a href="{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}theme=dark">Dark Mode</a></li>
+                    {% endif %}
+                    {% if not without_watermark %}
+                    <li>Bot protection by <a href="https://github.com/tn3w/flask_Captchaify" target="_blank" ntr="1">Captchaify</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </footer>
+        {% endif %}
+        <noscript>
+            {% if is_default_choice and not without_cookies %}
+            <style>
+                .cookie-banner { bottom: 20px; }
+            </style>
+            {% endif %}
+        </noscript>
+        <script>
+            function onSuccess() {
+                document.getElementById('captchaForm').submit();
+            }
+            {% if is_default_theme %}
+
+            function getTheme() {
+                return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            {% endif %}
+            {% if (is_default_choice and not without_cookies) or is_default_theme %}
+
+            document.addEventListener('DOMContentLoaded', () => {
+                {% if is_default_theme %}
+                const theme = getTheme();
+                let captchaBox = document.getElementById('captchaBox');
+                captchaBox.setAttribute('data-theme', theme);
+                captchaBox.classList.add(theme);
+
+                const scriptElement = document.createElement('script');
+                {% if third_party == 'recaptcha' %}
+                scriptElement.src = 'https://www.google.com/recaptcha/api.js?explicit&hl={{ language }}';
+                {% elif third_party == 'hcaptcha' %}
+                scriptElement.src = 'https://hcaptcha.com/1/api.js?explicit&hl={{ language }}';
+                {% elif third_party == 'turnstile' %}
+                scriptElement.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?explicit&hl={{ language }}';
+                {% elif third_party == 'friendlycaptcha' %}
+                scriptElement.src = "https://cdn.jsdelivr.net/npm/friendly-challenge/widget.module.min.js";
+                {% endif %}
+                scriptElement.async = true;
+                scriptElement.defer = true;
+
+                document.head.appendChild(scriptElement);
+
+                {% endif %}
+                {% if is_default_choice and not without_cookies %}
+                const cookieBanner = document.getElementById('cookie-banner');
+                const acceptCookiesBtn = document.getElementById('accept-cookies');
+                const declineCookiesBtn = document.getElementById('decline-cookies');
+            
+                const cookieConsent = getCookie('cookieConsent');
+                if (cookieConsent !== null) {
+                    cookieBanner.style.display = 'none';
+                } else {
+                    setTimeout(() => {
+                        cookieBanner.classList.add('show');
+                    }, 100);
+            
+                    acceptCookiesBtn.removeAttribute('href');
+                    declineCookiesBtn.removeAttribute('href');
+            
+                    acceptCookiesBtn.addEventListener('click', () => {
+                        createCookie('cookieConsent', '1');
+                        hideBanner();
+                    });
+
+                    declineCookiesBtn.addEventListener('click', () => {
+                        var currentUrl = window.location.href;
+                        var cookies = document.cookie.split(";");
+
+                        let kwargs = {
+                            wc: '1'
+                        };
+
+                        for (let i = 0; i < cookies.length; i++) {
+                            const cookie = cookies[i];
+                            const eqPos = cookie.indexOf("=");
+
+                            let name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+
+                            let value = '';
+                            if (eqPos > -1) {
+                                value = cookie.substr(eqPos + 1).trim();
+                            }
+
+                            if (name.length > 0 && value.length > 0) {
+                                kwargs[name] = value;
+                                
+                                document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+                            }
+                        }
+
+                        function appendQueryParams(url, params) {
+                            try {
+                                const urlObj = new URL(url, window.location.origin);
+                                if (urlObj.origin === window.location.origin) {
+                                    for (const [key, value] of Object.entries(params)) {
+                                        if (!urlObj.searchParams.has(key)) {
+                                            urlObj.searchParams.append(key, value);
+                                        }
+                                    }
+                                }
+                                return urlObj.toString();
+                            } catch (error) {
+                                if (url.startsWith('/')) {
+                                    const urlObj = new URL(url, window.location.origin);
+                                    for (const [key, value] of Object.entries(params)) {
+                                        if (!urlObj.searchParams.has(key)) {
+                                            urlObj.searchParams.append(key, value);
+                                        }
+                                    }
+                                    return urlObj.toString();
+                                }
+                                return url;
+                            }
+                        }
+
+                        function addHiddenInputs(form, params) {
+                            for (const [key, value] of Object.entries(params)) {
+                                const hiddenInput = document.createElement('input');
+                                hiddenInput.type = 'hidden';
+                                hiddenInput.name = key;
+                                hiddenInput.value = value;
+                                form.appendChild(hiddenInput);
+                            }
+                        }
+
+                        var updatedUrl = appendQueryParams(currentUrl, kwargs);
+                        window.history.replaceState({}, document.title, updatedUrl);
+
+                        var anchors = document.querySelectorAll('a');
+                        anchors.forEach(function(anchor) {
+                            var href = anchor.getAttribute('href');
+                            if (href) {
+                                anchor.setAttribute('href', appendQueryParams(href, kwargs));
+                            }
+                        });
+
+                        var forms = document.querySelectorAll('form');
+                        forms.forEach(function(form) {
+                            addHiddenInputs(form, kwargs);
+                        });
+                        hideBanner();
+                    });
+                }
+            
+                function hideBanner() {
+                    cookieBanner.classList.remove('show');
+                    setTimeout(() => {
+                        cookieBanner.style.display = 'none';
+                    }, 500);
+                }
+            
+                function createCookie(name, value) {
+                    var options = {
+                        max_age: 93312000,
+                        secure: window.location.protocol === "https:",
+                        samesite: 'Lax',
+                        domain: window.location.hostname
+                    };
+
+                    var expires = options.expires;
+
+                    if (typeof expires === "number" && expires) {
+                        var d = new Date();
+                        d.setTime(d.getTime() + expires * 1000);
+                        expires = options.expires = d;
+                    }
+                    if (expires instanceof Date) {
+                        options.expires = expires.toUTCString();
+                    }
+
+                    var cookie = encodeURIComponent(name) + "=" + encodeURIComponent(value);
+
+                    for (var propName in options) {
+                        if (options.hasOwnProperty(propName)) {
+                            cookie += "; " + propName;
+                            var propValue = options[propName];
+                            if (propValue !== true) {
+                                cookie += "=" + propValue;
+                            }
+                        }
+                    }
+
+                    document.cookie = cookie;
+                }
+
+
+                function getCookie(name) {
+                    const nameEQ = `${name}=`;
+                    const ca = document.cookie.split(';');
+                    for (let i = 0; i < ca.length; i++) {
+                        let c = ca[i];
+                        while (c.charAt(0) === ' ') {
+                            c = c.substring(1, c.length);
+                        }
+                        if (c.indexOf(nameEQ) === 0) {
+                            return c.substring(nameEQ.length, c.length);
+                        }
+                    }
+                    return null;
+                }
+                {% endif %}
+            });
+            {% endif %}
+        </script>
+    </body>
+</html>

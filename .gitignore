@@ -163,3 +163,5 @@ src/flask_Captchaify/data
 test*
 log.txt
 .vscode
+smiling_dog.json
+not_smiling_dog.json

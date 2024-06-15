@@ -5,6 +5,7 @@ https://github.com/tn3w/flask_Captchaify
 Made with 💩 in Germany by TN3W
 """
 
+import re
 from setuptools import setup, find_packages
 from pip._internal.req import parse_requirements
 
@@ -17,9 +18,22 @@ with open('README.md', 'r', encoding='utf-8') as readable_file:
 long_description = long_description.split('<h1 align="center">𝐟𝐥𝐚𝐬𝐤_𝐂𝐚𝐩𝐭𝐜𝐡𝐚𝐢𝐟𝐲</h1>')[1]
 long_description = '<h1 align="center">𝐟𝐥𝐚𝐬𝐤_𝐂𝐚𝐩𝐭𝐜𝐡𝐚𝐢𝐟𝐲</h1>' + long_description
 
+sections = re.findall(r'9\. ', long_description)
+
+if sections:
+    current_number = 9
+
+    def replacement(_):
+        global current_number
+        result = f"{current_number}. "
+        current_number += 1
+        return result
+
+    updated_content = re.sub(r'9\. ', replacement, long_description)
+
 setup(
     name='flask_Captchaify',
-    version='1.6.9.9.3.1',
+    version='1.7',
     description='Protect against bots and DDoS attacks',
     long_description=long_description,
     long_description_content_type='text/markdown',
