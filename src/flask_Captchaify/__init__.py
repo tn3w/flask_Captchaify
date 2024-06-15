@@ -415,29 +415,29 @@ class Captchaify:
         if default_kwargs['as_route']:
             app.route(
                 '/blocked' + self.route_id,
-                endpoint = 'blocked' + self.route_id
+                endpoint = 'blocked_captchaify'
             )(lambda: self.render_block(True))
 
             app.route(
                 '/nojs' + self.route_id,
-                endpoint = 'nojs' + self.route_id
+                endpoint = 'nojs_captchaify'
             )(lambda: self.render_nojs(True))
 
             app.route(
                 '/rate_limited' + self.route_id,
-                endpoint = 'rate_limited' + self.route_id
+                endpoint = 'rate_limited_captchaify'
             )(lambda: self.render_rate_limit(True))
 
             app.route(
                 '/captcha' + self.route_id,
                 methods = ['GET', 'POST'],
-                endpoint = 'captcha' + self.route_id
+                endpoint = 'captcha_captchaify'
             )(lambda: self.captchaify(True))
 
             if not default_kwargs['without_customisation']:
                 app.route(
                     '/change_language' + self.route_id,
-                    endpoint = 'change_language' + self.route_id
+                    endpoint = 'change_language_captchaify'
                 )(lambda: self.render_change_language(True))
 
         elif not default_kwargs['without_customisation']:
