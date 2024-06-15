@@ -21,12 +21,9 @@ long_description = long_description.split('### Some Screenshots')[0] +\
 
 long_description = long_description.replace('   - [Some Screenshots](#some-screenshots)\n', '')
 
-with open('README2.md', 'w', encoding='utf-8') as writeable_file:
-    writeable_file.write(long_description)
-
 setup(
     name='flask_Captchaify',
-    version='1.7.1',
+    version='1.7.1.1',
     description='Protect against bots and DDoS attacks',
     long_description=long_description,
     long_description_content_type='text/markdown',
