@@ -379,7 +379,7 @@ class Captchaify:
         self.loaded_datasets = {}
 
         self.app = app
-        self.rules = rules if isinstance(rules, dict) else {}
+        self.rules = rules if isinstance(rules, list) else []
         self.route_id = None
 
         if app is not None:
@@ -540,13 +540,11 @@ class Captchaify:
         current_configuration['rate_limit'] = rate_limit[0]
         current_configuration['max_rate_limit'] = rate_limit[1]
 
-        client_info = self.req_info
-
-        for rule, configuration in self.rules.items():
-            if not matches_rule(rule, client_info):
+        for config in self.rules:
+            if not matches_rule(config['rule'], self.req_info):
                 continue
 
-            for config_name, config in configuration.items():
+            for config_name, config in config['change'].items():
                 current_configuration[config_name] = config
 
         if current_configuration['dataset'] in ['keys', 'animals', 'ai-dogs']:
@@ -1199,7 +1197,7 @@ class Captchaify:
 
             if action == 'allow':
                 return
-            
+
             if self.is_captcha_verifier_valid():
                 return
 

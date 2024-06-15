@@ -15,11 +15,12 @@ import time
 import shutil
 import socket
 import urllib.request
+from urllib.parse import urlparse
 from typing import Optional, Tuple, Union, Final
 import dns.resolver
 import geoip2.database
 from werkzeug import Request
-from .utils import PICKLE, DATA_DIR, ASSETS_DIR, handle_exception
+from .utils import PICKLE, DATA_DIR, ASSETS_DIR, handle_exception, get_domain_from_url
 
 
 CACHE_FILE_PATH: Final[str] = os.path.join(DATA_DIR, 'cache.pkl')
@@ -209,77 +210,6 @@ def matches_asterisk_rule(obj: str, asterisk_rule: str) -> bool:
         return obj.startswith(start) and obj.endswith(end) and middle in obj
 
     return obj == asterisk_rule
-
-
-def matches_rule(rule: list, client_info: dict) -> bool:
-    """
-    Recursively checks if client info matches a given rule.
-
-    :param rule: The rule to be matched against the client info.
-    :param client_info: The client info to be checked against the rule.
-    :return: True if client info matches the rule, False otherwise.
-    """
-
-    i = 0
-    while i < len(rule):
-        if rule[i] == 'and':
-            return matches_rule(rule[:i], client_info) and \
-                matches_rule(rule[i+1:], client_info)
-        if rule[i] == 'or':
-            return matches_rule(rule[:i], client_info) or \
-                matches_rule(rule[i+1:], client_info)
-        i += 1
-
-    field, operator, value = rule
-
-    if field not in client_info:
-        short_error_message = f'UnknownFieldError: {field} does not exist as client info field'
-        handle_exception(
-            short_error_message + '.', is_app_error=False, long_error_message=
-            short_error_message + ' this is because you have specified an incorrect user info '
-                                 'field in the rules argument (valid: `ip`, invalid: `ipadd`)'
-        )
-
-    try:
-        if client_info.get(field) is None:
-            return False
-
-        if isinstance(operator, str):
-            operator = operator.strip(' ')
-
-        if operator in ('==', 'equals', 'equal', 'is'):
-            return matches_asterisk_rule(client_info.get(field), value)
-        if operator in ('!=', 'doesnotequal', 'doesnotequals', 'notequals', 'notequal', 'notis'):
-            return not matches_asterisk_rule(client_info.get(field), value)
-        if operator in ('contains', 'contain'):
-            return value in client_info.get(field)
-        if operator in ('doesnotcontain', 'doesnotcontains', 'notcontain', 'notcontains'):
-            return value not in client_info.get(field)
-        if operator in ('isin', 'in'):
-            return client_info.get(field) in value
-        if operator in ('isnotin', 'notisin', 'notin'):
-            return client_info.get(field) not in value
-        if operator in ('greaterthan', 'largerthan'):
-            return client_info.get(field) > value
-        if operator == 'lessthan':
-            return client_info.get(field) < value
-        if operator in ('startswith', 'beginswith'):
-            return client_info.get(field).startswith(value)
-        if operator in ('endswith', 'concludeswith', 'finisheswith'):
-            return client_info.get(field).endswith(value)
-    except Exception as exc:
-        # Raise an exception if an error occurs during the matching process
-        handle_exception(exc, is_app_error=False)
-        return False
-
-    # Raise an exception if the operator is unknown
-    short_error_message = f'UnknownOperatorError: {operator} is not known.'
-    handle_exception(
-        short_error_message + '.', is_app_error=False, long_error_message=
-        short_error_message + ' this is because you have specified an incorrect operator '
-                             'field in the rules argument (valid: `==`, invalid: `is the same as`)'
-    )
-    return False
 
 
 class Cache(dict):
@@ -819,3 +749,76 @@ class RequestInfo:
                 scheme = 'http'
 
         return scheme + '://' + self.request.url.split('://')[1]
+
+
+def matches_rule(rule: list, req_info: RequestInfo) -> bool:
+    """
+    Recursively checks if client info matches a given rule.
+
+    :param rule: The rule to be matched against the client info.
+    :param req_info: The request info to be matched.
+    :return: True if client info matches the rule, False otherwise.
+    """
+
+    i = 0
+    while i < len(rule):
+        if rule[i] == 'and':
+            return matches_rule(rule[:i], req_info) and \
+                matches_rule(rule[i+1:], req_info)
+        if rule[i] == 'or':
+            return matches_rule(rule[:i], req_info) or \
+                matches_rule(rule[i+1:], req_info)
+        i += 1
+
+    field, operator, value = rule
+
+    current_url = req_info.get_url()
+
+    url_info = urlparse(current_url)
+    client_info = {
+        "netloc": url_info.netloc, "hostname": url_info.hostname, 
+        "domain": get_domain_from_url(current_url), "path": url_info.path,
+        "endpoint": req_info.request.endpoint, "scheme": url_info.scheme,
+        "url": current_url
+    }
+
+    if field not in client_info:
+        client_info[field] = req_info.get_ip_info([field])
+
+    info = client_info[field]
+
+    try:
+        if isinstance(operator, str):
+            operator = operator.strip(' ')
+
+        if operator in ('==', 'equals', 'equal', 'is'):
+            return matches_asterisk_rule(info, value)
+        if operator in ('!=', 'doesnotequal', 'doesnotequals', 'notequals', 'notequal', 'notis'):
+            return not matches_asterisk_rule(info, value)
+        if operator in ('contains', 'contain'):
+            return value in info
+        if operator in ('doesnotcontain', 'doesnotcontains', 'notcontain', 'notcontains'):
+            return value not in info
+        if operator in ('isin', 'in'):
+            return info in value
+        if operator in ('isnotin', 'notisin', 'notin'):
+            return info not in value
+        if operator in ('greaterthan', 'largerthan'):
+            return info > value
+        if operator == 'lessthan':
+            return info < value
+        if operator in ('startswith', 'beginswith'):
+            return info.startswith(value)
+        if operator in ('endswith', 'concludeswith', 'finisheswith'):
+            return info.endswith(value)
+    except Exception as exc:
+        handle_exception(exc, is_app_error=False)
+        return False
+
+    short_error_message = f'UnknownOperatorError: {operator} is not known.'
+    handle_exception(
+        short_error_message + '.', is_app_error=False, long_error_message=
+        short_error_message + ' this is because you have specified an incorrect operator '
+                             'field in the rules argument (valid: `==`, invalid: `is the same as`)'
+    )
+    return False
