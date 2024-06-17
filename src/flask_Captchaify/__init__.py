@@ -1062,20 +1062,24 @@ class Captchaify:
             without_cookies, is_default_choice = self.req_info\
                 .get_without_cookies(self.kwargs['without_cookies'])
 
-            args["theme"] = client_theme
-            args["without_cookies"] = without_cookies
-            args["is_default_theme"] = is_default_theme
-            args["language"] = client_language
-            args["is_default_language"] = is_default_language
-            args["alternate_languages"] = LANGUAGE_CODES\
-                if not self.kwargs['without_customisation'] else []
+            template_args = {
+                "theme": client_theme,
+                "without_cookies": without_cookies,
+                "is_default_theme": is_default_theme,
+                "language": client_language,
+                "is_default_language": is_default_language,
+                "alternate_languages": LANGUAGE_CODES
+                    if not self.kwargs['without_customisation'] else [],
+                "is_default_choice": is_default_choice,
+                "as_route": self.kwargs['as_route'],
+                "route_id": self.route_id,
+                "dataset": self.current_configuration['dataset'],
+                "without_watermark": self.kwargs['without_watermark'],
+                "without_customisation": self.kwargs['without_customisation']
+            }
 
-            args['is_default_choice'] = is_default_choice
-            args['as_route'] = self.kwargs['as_route']
-            args['route_id'] = self.route_id
-            args['dataset'] = self.current_configuration['dataset']
-            args['without_watermark'] = self.kwargs['without_watermark']
-            args['without_customisation'] = self.kwargs['without_customisation']
+            args.update(template_args)
+
             if self.kwargs['as_route']:
                 args['captcha_url'] = self.create_route_url('captcha')
 
@@ -1084,28 +1088,29 @@ class Captchaify:
                 ['theme', 'language'] +
                 (['wc'] if not without_cookies else [])
             )
-            args["current_url_with_config"] = remove_args_from_url(
-                self.req_info.get_url(), ['ct', 'ci', 'captcha', 'js']
-            )
-
-            args["url_args"] = extract_args(remove_args_from_url(
-                self.req_info.get_url(), ['ct', 'ci', 'captcha']
-            ))
-            args["url_args_without_rr"] = extract_args(remove_args_from_url(
-                self.req_info.get_url(), ['ct', 'ci', 'captcha', 'rr']
-            ))
-            args["url_args_without_lang"] = extract_args(remove_args_from_url(
-                self.req_info.get_url(), ['ct', 'ci', 'captcha', 'rr', 'language']
-            ))
-            args["current_url"] = remove_args_from_url(current_url, ['ct', 'ci', 'captcha'])
-            args["current_url_without_cl"] = remove_args_from_url(current_url, ['cl'])
-            args["current_url_without_wc"] = remove_args_from_url(self.req_info.get_url(), ['wc'])
-            args["path"] = request.path
-            args["current_path"] = quote(
-                extract_path_and_args(
-                    remove_args_from_url(self.req_info.get_url(), ['theme', 'language'])
+            args.update({
+                "current_url_with_config": remove_args_from_url(
+                    self.req_info.get_url(), ['ct', 'ci', 'captcha', 'js']
+                ),
+                "url_args": extract_args(remove_args_from_url(
+                    self.req_info.get_url(), ['ct', 'ci', 'captcha']
+                )),
+                "url_args_without_rr": extract_args(remove_args_from_url(
+                    self.req_info.get_url(), ['ct', 'ci', 'captcha', 'rr']
+                )),
+                "url_args_without_lang": extract_args(remove_args_from_url(
+                    self.req_info.get_url(), ['ct', 'ci', 'captcha', 'rr', 'language']
+                )),
+                "current_url": remove_args_from_url(current_url, ['ct', 'ci', 'captcha']),
+                "current_url_without_cl": remove_args_from_url(current_url, ['cl']),
+                "current_url_without_wc": remove_args_from_url(self.req_info.get_url(), ['wc']),
+                "path": request.path,
+                "current_path": quote(
+                    extract_path_and_args(
+                        remove_args_from_url(self.req_info.get_url(), ['theme', 'language'])
+                    )
                 )
-            )
+            })
 
             return render_template(
                 template_dir, file_name,

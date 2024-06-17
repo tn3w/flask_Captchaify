@@ -291,10 +291,9 @@ args = {
    rules = [{"rule": ['path', 'is', '/login*/development']}, "change": {"action": "block"}]
    ```
 
+   <br>
 
    Here are all the things that can be changed:
-
-   <br>
 
    **Captcha types (`captcha_type`)**
 
