@@ -12,7 +12,7 @@
                 --box-shadow: #e2e2e2;
                 --captcha-background: #c0c0c0;
                 --ancher-color: #222;
-                {% if is_default_choice and not without_cookies %}
+                {% if is_default_choice and without_cookies %}
                 --background-color: #f2f2f2;
                 --text-color: #181818;
                 --button-background: #007BFF;
@@ -32,7 +32,7 @@
                 --box-shadow: #2e2e2e;
                 --captcha-background: #1f1f1f;
                 --ancher-color: #999;
-                {% if is_default_choice and not without_cookies %}
+                {% if is_default_choice and without_cookies %}
                 --background-color: #121212;
                 --text-color: #f2f2f2;
                 --button-background: #1E90FF;
@@ -52,7 +52,7 @@
                 --box-shadow: #e2e2e2;
                 --captcha-background: #c0c0c0;
                 --ancher-color: #222;
-                {% if is_default_choice and not without_cookies %}
+                {% if is_default_choice and without_cookies %}
                 --background-color: #f2f2f2;
                 --text-color: #181818;
                 --button-background: #007BFF;
@@ -73,7 +73,7 @@
                     --box-shadow: #2e2e2e;
                     --captcha-background: #1f1f1f;
                     --ancher-color: #999;
-                    {% if is_default_choice and not without_cookies %}
+                    {% if is_default_choice and without_cookies %}
                     --background-color: #121212;
                     --text-color: #f2f2f2;
                     --button-background: #1E90FF;
@@ -215,7 +215,7 @@
                     max-width: 80%;
                 }
             }
-            {% if is_default_choice and not without_cookies %}
+            {% if is_default_choice and without_cookies %}
             
             .cookie-banner {
                 position: fixed;
@@ -276,7 +276,7 @@
         </style>
     </head>
     <body>
-        {% if is_default_choice and not without_cookies %}
+        {% if is_default_choice and without_cookies %}
         <div id="cookie-banner" class="cookie-banner">
             <h2 ntr="1">🍪 Cookies?</h2>
             <p>We use cookies to save and to determine that you are not a robot. If you select "Decline", this information will not be saved. As a result, you will have to solve a new captcha every time you close and reopen the tab.</p>
@@ -335,7 +335,7 @@
             </nav>
         </footer>
         {% endif %}
-        {% if is_default_choice and not without_cookies %}
+        {% if is_default_choice and without_cookies %}
         <noscript>
             <style>
                 .cookie-banner { bottom: 20px; }

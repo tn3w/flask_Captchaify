@@ -19,7 +19,6 @@ from base64 import b64encode
 from urllib.parse import urlparse, quote
 from typing import Optional, Final, Union, Tuple, Callable
 import requests
-import crawleruseragents
 from bs4 import BeautifulSoup
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
@@ -473,7 +472,7 @@ class Captchaify:
                 app.register_error_handler(error_code, self.render_exception)
 
         app.before_request(self.rate_limit)
-        app.before_request(self.fight_bots)
+        app.before_request(self.check_for_bots)
 
         app.after_request(self.add_rate_limit)
         app.after_request(self.add_args)
@@ -579,6 +578,112 @@ class Captchaify:
             routes.append('/trueclick')
 
         return routes
+
+
+    @property
+    def ip(self) -> str:
+        """
+        Returns the IP address of the current request.
+        """
+
+        return self.req_info.get_ip()
+
+
+    @property
+    def user_agent(self) -> str:
+        """
+        Returns the user agent of the current request.
+        """
+
+        return self.req_info.get_user_agent()
+
+
+    @property
+    def theme(self) -> Tuple[bool, str]:
+        """
+        Returns the theme of the current request.
+        """
+
+        return self.req_info.get_theme(
+            self.kwargs['without_customisation'], self.kwargs['theme']
+        )
+
+
+    @property
+    def language(self) -> Tuple[bool, str]:
+        """
+        Returns the language of the current request.
+        """
+
+        return self.req_info.get_language(
+            self.kwargs['without_customisation'], self.kwargs['language']
+        )
+
+
+    @property
+    def without_cookies(self) -> Tuple[bool, bool]:
+        """
+        Returns the cookies of the current request.
+        """
+
+        return self.req_info.get_without_cookies(self.kwargs['without_cookies'])
+
+
+    @property
+    def is_valid_ip(self) -> bool:
+        """
+        Check if the client's IP is valid.
+        """
+
+        return is_valid_ip(self.ip)
+
+
+    @property
+    def is_crawler(self) -> bool:
+        """
+        Check if the client is a crawler.
+        """
+
+        return self.req_info.is_crawler()
+
+
+    @property
+    def is_tor(self) -> bool:
+        """
+        Check if the client's IP is a Tor exit node.
+        """
+
+        if not self.is_valid_ip:
+            return False
+
+        return self.req_info.is_tor()
+
+
+    @property
+    def is_spammer(self) -> bool:
+        """
+        Check if the client is a spammer.
+        """
+
+        if not self.is_valid_ip:
+            return False
+
+        return self.req_info.is_spammer()
+
+
+    @property
+    def is_proxy(self) -> bool:
+        """
+        Check if the client is a proxy.
+        """
+
+        if not self.is_valid_ip:
+            return False
+
+        info = self.req_info.get_ip_info(['proxy', 'hosting'])
+
+        return info.get('proxy', False) is True\
+            or info.get('hosting', False) is True
 
 
     ########################
@@ -1055,12 +1160,9 @@ class Captchaify:
         if page_ext == 'html':
             g.captchaify_template = file_name
 
-            client_theme, is_default_theme = self.req_info.\
-                get_theme(self.kwargs['without_customisation'])
-            client_language, is_default_language = self.req_info.\
-                get_language(self.kwargs['without_customisation'])
-            without_cookies, is_default_choice = self.req_info\
-                .get_without_cookies(self.kwargs['without_cookies'])
+            client_theme, is_default_theme = self.theme
+            client_language, is_default_language = self.language
+            without_cookies, is_default_choice = self.without_cookies
 
             template_args = {
                 "theme": client_theme,
@@ -1148,7 +1250,7 @@ class Captchaify:
                 and request.path == '/rate_limited' + self.route_id):
                 return
 
-            client_ip = self.req_info.get_ip()
+            client_ip = self.ip
             if client_ip is None:
                 client_ip = 'None'
 
@@ -1184,7 +1286,7 @@ class Captchaify:
             return self.render_change_language()
 
 
-    def fight_bots(self):
+    def check_for_bots(self):
         """
         This method checks whether the client is a bot and combats it.
         
@@ -1197,37 +1299,19 @@ class Captchaify:
             if request.path in self.own_routes:
                 return
 
-            client_ip = self.req_info.get_ip()
             action = self.current_configuration['action']
 
-            if action == 'allow':
+            if action == 'allow' or\
+                self.is_captcha_verifier_valid():
                 return
 
-            if self.is_captcha_verifier_valid():
-                return
-
-            is_crawler = crawleruseragents.is_crawler(request.user_agent.string)
-
-            g.is_crawler = is_crawler
-
-            if not is_valid_ip(client_ip):
+            if action == 'fight' or not self.is_valid_ip:
                 return self.captchaify()
 
-            criteria = [
-                self.req_info.get_ip_info(['is_tor'], client_ip),
-                is_crawler and self.kwargs['block_crawler'],
-                action == 'fight'
-            ]
+            if self.is_crawler or self.is_proxy\
+                or self.is_spammer or self.is_tor:
+                return self.captchaify()
 
-            if not any(criteria):
-                criteria.append(self.req_info.get_ip_info(['proxy'], client_ip))
-                criteria.append(self.req_info.get_ip_info(['hosting'], client_ip))
-                criteria.append(self.req_info.get_ip_info(['forum'], client_ip))
-
-            if not any(criteria):
-                return
-
-            return self.captchaify()
         except Exception as exc:
             handle_exception(exc)
 
@@ -1242,11 +1326,8 @@ class Captchaify:
         """
 
         try:
-            if not self.current_configuration['enable_rate_limit']:
-                return response
-
-            client_ip = self.req_info.get_ip()
-            if client_ip is None:
+            client_ip = self.ip
+            if not self.current_configuration['enable_rate_limit'] or client_ip is None:
                 return response
 
             rate_limit = self.current_configuration['rate_limit']
@@ -1287,9 +1368,7 @@ class Captchaify:
             if not response.content_type.startswith('text/html'):
                 return response
 
-            without_cookies, is_default_choice = self.req_info.\
-                get_without_cookies(self.kwargs['without_cookies'])
-
+            without_cookies, is_default_choice = self.without_cookies
             if not without_cookies and getattr(g, 'captchaify_page', False) is True:
                 return response
 
@@ -1319,13 +1398,11 @@ class Captchaify:
                 args['captcha'] = request.args.get('captcha')
 
             if not self.kwargs['without_customisation'] and without_cookies:
-                theme, is_default_theme = self.req_info.\
-                    get_theme(self.kwargs['without_customisation'])
+                theme, is_default_theme = self.theme
                 if not is_default_theme:
                     args['theme'] = theme
 
-                language, is_default_language = self.req_info.\
-                    get_language(self.kwargs['without_customisation'])
+                language, is_default_language = self.language
                 if not is_default_language:
                     args['language'] = language
 
@@ -1347,8 +1424,7 @@ class Captchaify:
             if getattr(g, 'captchaify_page', False) is False:
                 return response
 
-            without_cookies, is_default_choice = self.req_info.\
-                get_without_cookies(self.kwargs['without_cookies'])
+            without_cookies, is_default_choice = self.without_cookies
             if without_cookies:
                 cookies = list(dict(request.cookies).keys())
                 for cookie in cookies:
@@ -1368,13 +1444,11 @@ class Captchaify:
                     kwargs["cookieConsent"] = '1'
 
                 if not self.kwargs['without_customisation'] and not without_cookies:
-                    theme, is_default_theme = self.req_info.\
-                        get_theme(self.kwargs['without_customisation'])
+                    theme, is_default_theme = self.theme
                     if not is_default_theme:
                         kwargs["theme"] = theme
 
-                    language, is_default_language = self.req_info.\
-                        get_language(self.kwargs['without_customisation'])
+                    language, is_default_language = self.language
                     if not is_default_language:
                         kwargs["language"] = language
             elif self.kwargs['without_arg_transfer']:
@@ -1491,7 +1565,7 @@ class Captchaify:
             if return_path is None:
                 return_path = '/'
 
-            client_ip = self.req_info.get_ip()
+            client_ip = self.ip
             action = self.current_configuration['action']
 
             if action == 'block' or self.to_many_attempts(action):
@@ -1516,16 +1590,13 @@ class Captchaify:
                 elif request.form.get('captcha') is not None:
                     captcha_string = request.form.get('captcha')
 
-                without_cookies, is_default_choice = self.req_info.\
-                    get_without_cookies(self.kwargs['without_cookies'])
+                without_cookies, is_default_choice = self.without_cookies
                 if without_cookies and captcha_string is not None:
                     return_url += char + 'captcha=' + captcha_string
 
                 if not self.kwargs['without_arg_transfer']:
-                    theme, is_default_theme = self.req_info.\
-                        get_theme(self.kwargs['without_customisation'])
-                    language, is_default_language = self.req_info.\
-                        get_language(self.kwargs['without_customisation'])
+                    theme, is_default_theme = self.theme
+                    language, is_default_language = self.language
 
                     if not is_default_theme:
                         return_url += '&theme=' + theme
@@ -1633,7 +1704,7 @@ class Captchaify:
         """
 
         url_path = urlparse(self.req_info.get_url()).path
-        client_ip = self.req_info.get_ip()
+        client_ip = self.ip
 
         captcha_type = self.current_configuration['captcha_type'].split('_')[0]
         captcha_id = generate_random_string(30)
@@ -1641,7 +1712,7 @@ class Captchaify:
         captcha_data = {
             'id': captcha_id, 'type': captcha_type,
             'ip': ('None' if client_ip is None else Hashing().hash(client_ip)),
-            'user_agent': Hashing().hash(request.user_agent.string),
+            'user_agent': Hashing().hash(self.user_agent),
             'path': Hashing().hash(url_path), 'time': str(int(time()))
         }
 
@@ -1682,7 +1753,7 @@ class Captchaify:
 
         try:
             url_path = urlparse(request.url).path
-            client_ip = self.req_info.get_ip()
+            client_ip = self.ip
 
             request_data = request.form if request.method.lower() == 'post' else request.args
             request_captcha_token = request_data.get('ct', None)
@@ -1794,8 +1865,7 @@ class Captchaify:
                     client_ip, decrypted_token_data['ip']
                 )
                 comparison_user_agent = Hashing().compare(
-                    request.user_agent.string,
-                    decrypted_token_data['user_agent']
+                    self.user_agent, decrypted_token_data['user_agent']
                 )
 
                 if not comparison_path or \
@@ -1817,7 +1887,7 @@ class Captchaify:
         """
 
         try:
-            client_ip = self.req_info.get_ip()
+            client_ip = self.ip
 
             captcha_string = None
             if request.args.get('captcha') is not None:
@@ -1845,7 +1915,7 @@ class Captchaify:
                     user_agent = crypto.decrypt(ip_data['user_agent'])
 
                     if not int(time()) - int(ip_data['time']) > self.kwargs['verification_age'] and\
-                            ip == client_ip and user_agent == request.user_agent.string:
+                            ip == client_ip and user_agent == self.user_agent:
                         return True
                     break
         except Exception as exc:
@@ -1935,8 +2005,6 @@ class Captchaify:
         :return: None or redirect to a url + args
         """
 
-        client_ip = self.req_info.get_ip()
-
         captcha_id = generate_random_string(8, with_punctuation=False)
         captcha_token = generate_random_string(22, with_punctuation=False)
 
@@ -1948,10 +2016,11 @@ class Captchaify:
 
         symcrypto = SymmetricCrypto(self.captcha_secret)
 
+        client_ip = self.ip
         data = {
             'time': int(time()),
             'ip': ('None' if client_ip is None else symcrypto.encrypt(client_ip)),
-            'user_agent': symcrypto.encrypt(request.user_agent.string),
+            'user_agent': symcrypto.encrypt(self.user_agent),
         }
 
         solved_captchas = PICKLE.load(SOLVED_CAPTCHAS_PATH)
@@ -1967,26 +2036,22 @@ class Captchaify:
         else:
             url = remove_all_args_from_url(self.req_info.get_url())
 
-        without_cookies, is_default_choice = self.req_info.\
-            get_without_cookies(self.kwargs['without_cookies'])
+        without_cookies, is_default_choice = self.without_cookies
 
         char = get_char(url)
         if without_cookies:
             url += char + 'captcha=' + quote(str(captcha_id + captcha_token))
 
         if not self.kwargs['without_arg_transfer']:
-            theme, is_default_theme = self.req_info.get_theme(self.kwargs['without_customisation'])
-            language, is_default_language = self.req_info.\
-                get_language(self.kwargs['without_customisation'])
+            theme, is_default_theme = self.theme
+            language, is_default_language = self.language
 
             if not is_default_theme:
                 url += '&theme=' + theme
-
             if not is_default_language:
                 url += '&language=' + language
-
-            if not is_default_choice:
-                url += '&wc=' + str(int(without_cookies))
+            if not is_default_choice and without_cookies:
+                url += '&wc=1'
 
         g.captchaify_page = True
         g.captchaify_no_new_cookies = True
@@ -2021,18 +2086,14 @@ class Captchaify:
         redirect_url = f'/{template}' + self.route_id +\
             ('?return_path=' + return_path if not without_return_path else '')
 
-        theme, is_default_theme = self.req_info.get_theme(self.kwargs['without_customisation'])
-        language, is_default_language = self.req_info.\
-            get_language(self.kwargs['without_customisation'])
-        without_cookies, is_default_choice = self.req_info.\
-            get_without_cookies(self.kwargs['without_cookies'])
+        theme, is_default_theme = self.theme
+        language, is_default_language = self.language
+        without_cookies, is_default_choice = self.without_cookies
 
         if not is_default_theme:
             redirect_url += '&theme=' + theme
-
         if not is_default_language:
             redirect_url += '&language=' + language
-
         if not is_default_choice and without_cookies:
             redirect_url += '&wc=' + str(int(without_cookies))
 

@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 from typing import Optional, Tuple, Union, Final
 import dns.resolver
 import geoip2.database
+import crawleruseragents
 from werkzeug import Request
 from .utils import PICKLE, DATA_DIR, ASSETS_DIR, handle_exception, get_domain_from_url
 
@@ -182,6 +183,8 @@ def reverse_ip(ip_address: str) -> str:
     if is_ipv6(ip_address):
         ip_address = explode_ipv6(ip_address)
 
+        return ':'.join(reversed(ip_address))
+
     return '.'.join(reversed(ip_address.split('.')))
 
 
@@ -329,6 +332,25 @@ class RequestInfo:
             return
 
         self.store_token = ''
+
+
+    def get_user_agent(self) -> Optional[str]:
+        """
+        Retrieve the client's user agent.
+
+        :return: The client's user agent.
+        """
+
+        user_agents = [
+            self.request.user_agent.string,
+            self.request.headers.get('User-Agent', None)
+        ]
+
+        for user_agent in user_agents:
+            if isinstance(user_agent, str):
+                return user_agent
+
+        return None
 
 
     def get_ip(self, return_all: bool = False) -> Optional[Union[str, list]]:
@@ -481,6 +503,29 @@ class RequestInfo:
             return information[fields[0]]
 
         return information
+
+
+    def is_crawler(self, user_agent: Optional[str] = None) -> bool:
+        """
+        Check if the user agent is a crawler.
+
+        :param user_agent: The user agent to be checked.
+        :return: True if the user agent is a crawler, False otherwise.
+        """
+
+        if isinstance(getattr(self.global_data, self.store_token + 'is_crawler', None), bool):
+            return getattr(self.global_data, self.store_token + 'is_crawler')
+
+        if user_agent is None:
+            user_agent = self.get_user_agent()
+
+        if user_agent is None:
+            return False
+
+        is_crawler = crawleruseragents.is_crawler(user_agent)
+
+        setattr(self.global_data, self.store_token + 'is_crawler', is_crawler)
+        return is_crawler
 
 
     def is_tor(self, client_ip: Optional[str] = None) -> bool:
@@ -709,15 +754,15 @@ class RequestInfo:
         return language, True
 
 
-    def get_without_cookies(self, cookies_disabled: bool = False) -> Tuple[bool, bool]:
+    def get_without_cookies(self, without_cookies: bool = False) -> Tuple[bool, bool]:
         """
         Determine if the request should proceed without cookies.
 
-        :param cookies_disabled: Flag indicating if cookies are disabled.
+        :param without_cookies: Flag indicating if cookies are disabled.
         :return: A tuple containing two boolean values.
         """
 
-        if cookies_disabled:
+        if without_cookies:
             return True, True
 
         for arg in [self.request.args.get('wc'),
@@ -731,7 +776,7 @@ class RequestInfo:
         if self.request.args.get('captcha') is not None:
             return True, False
 
-        return False, True
+        return True, True
 
 
     def get_url(self) -> str:
