@@ -1315,7 +1315,7 @@ class Captchaify:
         except Exception as exc:
             handle_exception(exc)
 
-        return self.render_block()
+            return self.render_block()
 
 
     def add_rate_limit(self, response: Response) -> Response:
