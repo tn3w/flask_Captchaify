@@ -12,7 +12,7 @@ import os
 import re
 from typing import Optional
 from urllib.parse import urlparse, parse_qs, quote
-from googletrans import Translator
+from googletrans import Translator as GoogleTranslator
 from bs4 import BeautifulSoup, Tag
 from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
 from .utils import PICKLE, JSON, ASSETS_DIR, DATA_DIR, handle_exception,\
@@ -23,8 +23,7 @@ from .req_info import RequestInfo
 LANGUAGES = JSON.load(os.path.join(ASSETS_DIR, 'languages.json'), [])
 LANGUAGE_CODES = [language['code'] for language in LANGUAGES]
 TRANSLATIONS_FILE_PATH = os.path.join(DATA_DIR, 'translations.pkl')
-translator = Translator()
-
+google_translator = GoogleTranslator()
 
 def render_template(template_dir: str, file_name: str,
                     template_language: str = 'en', client_language: str = 'en', **kwargs) -> str:
@@ -44,10 +43,145 @@ def render_template(template_dir: str, file_name: str,
         template_language = "en"
 
     html = WebToolbox.render_template(template_dir, file_name, html = None, **kwargs)
-    html = WebToolbox.translate(html, template_language, client_language)
+    html = Translator.translate_html(html, template_language, client_language)
     html = WebToolbox.minimize(html)
 
     return html
+
+
+class Translator:
+    """
+    Class containing static methods for translating text.
+    """
+
+
+    @staticmethod
+    def translate(text_to_translate: str, from_lang: str, to_lang: str) -> str:
+        """
+        Function to translate a text based on a translation file
+
+        :param text_to_translate: The text to translate
+        :param from_lang: The language of the text to be translated
+        :param to_lang: Into which language the text should be translated
+        """
+
+        text_to_translate = text_to_translate.strip('\n ')
+
+        if from_lang == to_lang or not text_to_translate:
+            return text_to_translate
+
+        translations = PICKLE.load(TRANSLATIONS_FILE_PATH, [])
+
+        for translation in translations:
+            if translation["text_to_translate"] == text_to_translate\
+                and translation["from_lang"] == from_lang\
+                    and translation["to_lang"] == to_lang:
+                return translation["translated_output"]
+
+        try:
+            translated_output = google_translator.translate(
+                text_to_translate, src=from_lang, dest=to_lang
+            ).text
+
+            if translated_output is None:
+                return text_to_translate
+        except Exception as exc:
+            handle_exception(exc, is_app_error = False)
+            return text_to_translate
+
+        translation = {
+            "text_to_translate": text_to_translate, 
+            "from_lang": from_lang,
+            "to_lang": to_lang, 
+            "translated_output": translated_output
+        }
+        translations.append(translation)
+
+        PICKLE.dump(translations, TRANSLATIONS_FILE_PATH)
+
+        return translated_output
+
+
+    @staticmethod
+    def translate_html(html: str, from_lang: str, to_lang: str) -> Tag:
+        """
+        Function to translate a page into the correct language
+
+        :param html: The content of the page as html
+        :param from_lang: The language of the text to be translated
+        :param to_lang: Into which language the text should be translated
+        """
+
+        def translate_tag(html_tag: Tag, from_lang: str, to_lang: str):
+            """
+            Function to translate the text within a given HTML tag.
+
+            :param html_tag: The HTML tag to be translated.
+            :param from_lang: The language of the text to be translated.
+            :param to_lang: Into which language the text should be translated.
+
+            :return: The translated HTML tag.
+            """
+
+            translated_texts = []
+            for tag in html_tag.find_all(text = True, recursive = True):
+                if hasattr(tag, 'attrs') and 'ntr' in tag.attrs:
+                    continue
+
+                if tag.parent.name not in ['script', 'style']:
+                    translated_texts.append(
+                        (tag, Translator.translate(tag, from_lang, to_lang))
+                    )
+
+            for tag, translated_text in translated_texts:
+                tag.replace_with(translated_text)
+
+            translated_html = str(html_tag)
+            return translated_html
+
+        soup = BeautifulSoup(html, 'html.parser')
+
+        tags = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5',
+                              'h6', 'a', 'p', 'button', 'li', 'span'])
+        for tag in tags:
+            if str(tag) and 'ntr' not in tag.attrs:
+                translate_tag(tag, from_lang, to_lang)
+
+        inputs = soup.find_all('input')
+        for input_tag in inputs:
+            if input_tag.has_attr('placeholder') and 'ntr' not in input_tag.attrs:
+                input_tag['placeholder'] = Translator.translate(
+                    input_tag['placeholder'].strip(), from_lang, to_lang
+                    )
+
+        head_tag = soup.find('head')
+        if head_tag:
+            title_element = head_tag.find('title')
+            if title_element:
+                title_element.string = Translator.translate(
+                    title_element.text.strip(), from_lang, to_lang
+                    )
+
+            meta_title = head_tag.find('meta', attrs={'name': 'title'})
+            if meta_title and 'content' in meta_title.attrs:
+                meta_title['content'] = Translator.translate(
+                    meta_title['content'].strip(), from_lang, to_lang
+                )
+
+            meta_description = head_tag.find('meta', attrs={'name': 'description'})
+            if meta_description and 'content' in meta_description.attrs:
+                meta_description['content'] = Translator.translate(
+                    meta_description['content'].strip(), from_lang, to_lang
+                )
+
+            meta_keywords = head_tag.find('meta', attrs={'name': 'keywords'})
+            if meta_keywords and 'content' in meta_keywords.attrs:
+                meta_keywords['content'] = Translator.translate(
+                    meta_keywords['content'].strip(), from_lang, to_lang
+                )
+
+        translated_html = soup.prettify()
+        return translated_html
 
 
 class WebToolbox:
@@ -96,135 +230,6 @@ class WebToolbox:
         html = WebToolbox._minimize_tag_content(html, 'script')
         html = WebToolbox._minimize_tag_content(html, 'style')
         return html
-
-
-    @staticmethod
-    def _translate_text(text_to_translate: str, from_lang: str, to_lang: str) -> str:
-        """
-        Function to translate a text based on a translation file
-
-        :param text_to_translate: The text to translate
-        :param from_lang: The language of the text to be translated
-        :param to_lang: Into which language the text should be translated
-        """
-
-        text_to_translate = text_to_translate.strip('\n ')
-
-        if from_lang == to_lang or not text_to_translate:
-            return text_to_translate
-
-        translations = PICKLE.load(TRANSLATIONS_FILE_PATH, [])
-
-        for translation in translations:
-            if translation["text_to_translate"] == text_to_translate\
-                and translation["from_lang"] == from_lang\
-                    and translation["to_lang"] == to_lang:
-                return translation["translated_output"]
-
-        try:
-            translated_output = translator.translate(
-                text_to_translate, src=from_lang, dest=to_lang
-                ).text
-
-            if translated_output is None:
-                return text_to_translate
-        except Exception as exc:
-            handle_exception(exc, is_app_error = False)
-            return text_to_translate
-
-        translation = {
-            "text_to_translate": text_to_translate, 
-            "from_lang": from_lang,
-            "to_lang": to_lang, 
-            "translated_output": translated_output
-        }
-        translations.append(translation)
-
-        PICKLE.dump(translations, TRANSLATIONS_FILE_PATH)
-
-        return translated_output
-
-
-    @staticmethod
-    def translate(html: str, from_lang: str, to_lang: str) -> str:
-        """
-        Function to translate a page into the correct language
-
-        :param html: The content of the page as html
-        :param from_lang: The language of the text to be translated
-        :param to_lang: Into which language the text should be translated
-        """
-
-        def translate_tag(html_tag: Tag, from_lang: str, to_lang: str):
-            """
-            Function to translate the text within a given HTML tag.
-
-            :param html_tag: The HTML tag to be translated.
-            :param from_lang: The language of the text to be translated.
-            :param to_lang: Into which language the text should be translated.
-
-            :return: The translated HTML tag.
-            """
-
-            translated_texts = []
-            for tag in html_tag.find_all(text = True, recursive = True):
-                if hasattr(tag, 'attrs') and 'ntr' in tag.attrs:
-                    continue
-
-                if tag.parent.name not in ['script', 'style']:
-                    translated_texts.append(
-                        (tag, WebToolbox._translate_text(tag, from_lang, to_lang))
-                    )
-
-            for tag, translated_text in translated_texts:
-                tag.replace_with(translated_text)
-
-            translated_html = str(html_tag)
-            return translated_html
-
-        soup = BeautifulSoup(html, 'html.parser')
-
-        tags = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5',
-                              'h6', 'a', 'p', 'button', 'li', 'span'])
-        for tag in tags:
-            if str(tag) and 'ntr' not in tag.attrs:
-                translate_tag(tag, from_lang, to_lang)
-
-        inputs = soup.find_all('input')
-        for input_tag in inputs:
-            if input_tag.has_attr('placeholder') and 'ntr' not in input_tag.attrs:
-                input_tag['placeholder'] = WebToolbox._translate_text(
-                    input_tag['placeholder'].strip(), from_lang, to_lang
-                    )
-
-        head_tag = soup.find('head')
-        if head_tag:
-            title_element = head_tag.find('title')
-            if title_element:
-                title_element.string = WebToolbox._translate_text(
-                    title_element.text.strip(), from_lang, to_lang
-                    )
-
-            meta_title = head_tag.find('meta', attrs={'name': 'title'})
-            if meta_title and 'content' in meta_title.attrs:
-                meta_title['content'] = WebToolbox._translate_text(
-                    meta_title['content'].strip(), from_lang, to_lang
-                )
-
-            meta_description = head_tag.find('meta', attrs={'name': 'description'})
-            if meta_description and 'content' in meta_description.attrs:
-                meta_description['content'] = WebToolbox._translate_text(
-                    meta_description['content'].strip(), from_lang, to_lang
-                )
-
-            meta_keywords = head_tag.find('meta', attrs={'name': 'keywords'})
-            if meta_keywords and 'content' in meta_keywords.attrs:
-                meta_keywords['content'] = WebToolbox._translate_text(
-                    meta_keywords['content'].strip(), from_lang, to_lang
-                )
-
-        translated_html = soup.prettify()
-        return translated_html
 
 
     @staticmethod

@@ -297,16 +297,18 @@ args = {
 
    **Captcha types (`captcha_type`)**
 
-   | Name of captcha type | Displayed Captchas                                                       |
-   | --------------       | ------------------------------------------------------------------------ |
-   | oneclick (Default)   | The user only needs one click to confirm that he is not a bot            |
-   | multiclick           | The user must select several images that match a motif (harder)          |
-   | text                 | The user enters a text combination from an image into an input           |
-   | audio                | The user enters a text combination from an audio into an input           |
-   | text&audio           | The user enters a text and an audio combination into an input            |
-   | recaptcha            | Uses Google Recaptcha for verification. Set `site_key` and `secret`.     |
-   | hcaptcha             | Uses HCaptcha for verification. Set `site_key` and `secret`.             |
-   | turnstile            | Uses Cloudflare Turnstile for verification. Set `site_key` and `secret`. |
+   | Name of captcha type | Displayed Captchas                                                                                                  |
+   | --------------       | ------------------------------------------------------------------------------------------------------------------- |
+   | oneclick (Default)   | The user only needs one click to confirm that he is not a bot                                                       |
+   | multiclick           | The user must select several images that match a motif (harder)                                                     |
+   | text                 | The user enters a text combination from an image into an input                                                      |
+   | audio                | The user enters a text combination from an audio into an input                                                      |
+   | text&audio           | The user enters a text and an audio combination into an input                                                       |
+   | altcha               | Use a Prove-of-Work from Altcha to make spam more difficult. (Recommended if you do not want to use our own tools.) |
+   | recaptcha            | Uses Google Recaptcha for verification. Set `recaptcha_site_key` and `recaptcha_secret`.                            |
+   | hcaptcha             | Uses HCaptcha for verification. Set `hcaptcha_site_key` and `hcaptcha_secret`.                                      |
+   | turnstile            | Uses Cloudflare Turnstile for verification. Set `turnstile_site_key` and `turnstile_secret`.                        |
+   | friendly             | Uses Friendly Captcha for verification. Set `friendly_site_key` and `friendly_secret`.                              |
 
    Example of a website that has set its captcha type to "multiclick" for specific ips:
    ```python
@@ -458,16 +460,18 @@ args = {
 
    All captcha types:
 
-   | Name of captcha type | Displayed Captchas                                                                           |
-   | --------------       | -------------------------------------------------------------------------------------------- |
-   | oneclick (Default)   | The user only needs one click to confirm that he is not a bot                                |
-   | multiclick           | The user must select several images that match a motif (harder)                              |
-   | text                 | The user enters a text combination from an image into an input                               |
-   | audio                | The user enters a text combination from an audio into an input                               |
-   | text&audio           | The user enters a text and an audio combination into an input                                |
-   | recaptcha            | Uses Google Recaptcha for verification. Set `recaptcha_site_key` and `recaptcha_secret`.     |
-   | hcaptcha             | Uses HCaptcha for verification. Set `hcaptcha_site_key` and `hcaptcha_secret`.               |
-   | turnstile            | Uses Cloudflare Turnstile for verification. Set `turnstile_site_key` and `turnstile_secret`. |
+   | Name of captcha type | Displayed Captchas                                                                                                  |
+   | --------------       | ------------------------------------------------------------------------------------------------------------------- |
+   | oneclick (Default)   | The user only needs one click to confirm that he is not a bot                                                       |
+   | multiclick           | The user must select several images that match a motif (harder)                                                     |
+   | text                 | The user enters a text combination from an image into an input                                                      |
+   | audio                | The user enters a text combination from an audio into an input                                                      |
+   | text&audio           | The user enters a text and an audio combination into an input                                                       |
+   | altcha               | Use a Prove-of-Work from Altcha to make spam more difficult. (Recommended if you do not want to use our own tools.) |
+   | recaptcha            | Uses Google Recaptcha for verification. Set `recaptcha_site_key` and `recaptcha_secret`.                            |
+   | hcaptcha             | Uses HCaptcha for verification. Set `hcaptcha_site_key` and `hcaptcha_secret`.                                      |
+   | turnstile            | Uses Cloudflare Turnstile for verification. Set `turnstile_site_key` and `turnstile_secret`.                        |
+   | friendly             | Uses Friendly Captcha for verification. Set `friendly_site_key` and `friendly_secret`.                              |
 
 <br>
 

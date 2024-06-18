@@ -11,7 +11,7 @@
                 --text: #181818;
                 --main-ancher-color: #0000ad;
                 --ancher-color: #222;
-                {% if is_default_choice and without_cookies %}
+                {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
                 --background-color: #f2f2f2;
                 --text-color: #181818;
                 --button-background: #007BFF;
@@ -30,7 +30,7 @@
                 --text: #f2f2f2;
                 --main-ancher-color: #00BFFF;
                 --ancher-color: #999;
-                {% if is_default_choice and without_cookies %}
+                {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
                 --background-color: #121212;
                 --text-color: #f2f2f2;
                 --button-background: #1E90FF;
@@ -49,7 +49,7 @@
                 --text: #181818;
                 --main-ancher-color: #0000ad;
                 --ancher-color: #222;
-                {% if is_default_choice and without_cookies %}
+                {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
                 --background-color: #f2f2f2;
                 --text-color: #181818;
                 --button-background: #007BFF;
@@ -69,7 +69,7 @@
                     --text: #f2f2f2;
                     --main-ancher-color: #00BFFF;
                     --ancher-color: #999;
-                    {% if is_default_choice and without_cookies %}
+                    {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
                     --background-color: #121212;
                     --text-color: #f2f2f2;
                     --button-background: #1E90FF;
@@ -167,7 +167,7 @@
                 text-decoration: underline;
             }
             {% endif %}
-            {% if is_default_choice and without_cookies %}
+            {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
             
             .cookie-banner {
                 position: fixed;
@@ -228,7 +228,7 @@
         </style>
     </head>
     <body>
-        {% if is_default_choice and without_cookies %}
+        {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
         <div id="cookie-banner" class="cookie-banner">
             <h2 ntr="1">🍪 Cookies?</h2>
             <p>We use cookies to save and to determine that you are not a robot. If you select "Decline", this information will not be saved. As a result, you will have to solve a new captcha every time you close and reopen the tab.</p>
@@ -262,7 +262,7 @@
             </nav>
         </footer>
         {% endif %}
-        {% if is_default_choice and without_cookies %}
+        {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
         <noscript>
             <style>
                 .cookie-banner { bottom: 20px; }

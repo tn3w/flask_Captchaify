@@ -12,6 +12,7 @@ Under the open source license GPL-3.0 license, supported by Open Source Software
 """
 
 import os
+import json
 import random
 import secrets
 from time import time
@@ -30,6 +31,7 @@ from .utils import JSON, PICKLE, Hashing, SymmetricCrypto, SSES, get_work_dir,\
     remove_args_from_url, extract_args, get_char
 from .webtoolbox import WebToolbox, render_template
 from .req_info import RequestInfo, update_geolite_databases, matches_rule, is_valid_ip
+from .altcha import Altcha
 
 
 WORK_DIR: Final[str] = get_work_dir()
@@ -72,7 +74,7 @@ LANGUAGE_CODES: Final[list] = [language['code'] for language in LANGUAGES]
 ALL_CAPTCHA_TYPES: Final[list] = [
     'text', 'audio', 'text&audio', 'audio&text', 'oneclick',
     'multiclick', 'recaptcha', 'hcaptcha', 'turnstile',
-    'friendlycaptcha'
+    'friendlycaptcha', 'altcha'
 ]
 ALL_DATASET_TYPES: Final[list] = ['keys', 'animals', 'ki-dogs']
 ALL_ACTIONS: Final[list] = ['allow', 'block', 'fight', 'captcha']
@@ -345,6 +347,7 @@ class Captchaify:
 
         self.captcha_secret = captcha_secret
         self.sses = SSES(captcha_secret, with_keys = True)
+        self.altcha = Altcha(secrets.token_bytes(32))
 
         if third_parties is None:
             third_parties = ALL_THIRD_PARTIES
@@ -1082,12 +1085,19 @@ class Captchaify:
         config = self.current_configuration
         captcha_type = config['captcha_type']
 
-        site_key = {
-            "recaptcha": config['recaptcha_site_key'],
-            "hcaptcha": config['hcaptcha_site_key'],
-            "turnstile": config['turnstile_site_key'],
-            "friendlycaptcha": config['friendly_site_key']
-        }.get(captcha_type, None)
+        site_key = None
+        altcha_challenge = None
+        strings = None
+        if captcha_type == 'altcha':
+            altcha_challenge = json.dumps(self.altcha.create_challenge())
+            strings = json.dumps(self.altcha.localized_text(self.language[0]))
+        else:
+            site_key = {
+                "recaptcha": config['recaptcha_site_key'],
+                "hcaptcha": config['hcaptcha_site_key'],
+                "turnstile": config['turnstile_site_key'],
+                "friendlycaptcha": config['friendly_site_key']
+            }.get(captcha_type, None)
 
         captcha_data = self.get_captcha_data()
         captcha_token = self.sses.encrypt(captcha_data)
@@ -1096,7 +1106,8 @@ class Captchaify:
         return self.render_template(
             'captcha_third_party', error_message = error_message,
             captcha_token = captcha_token, return_path = return_path,
-            third_party = captcha_type, site_key = site_key
+            third_party = captcha_type, site_key = site_key,
+            altcha_challenge = altcha_challenge, strings = strings
         )
 
 
@@ -1127,7 +1138,8 @@ class Captchaify:
             "recaptcha": self.render_captcha_third_parties,
             "hcaptcha": self.render_captcha_third_parties,
             "turnstile": self.render_captcha_third_parties,
-            "friendlycaptcha": self.render_captcha_third_parties
+            "friendlycaptcha": self.render_captcha_third_parties,
+            "altcha": self.render_captcha_third_parties
         }
         captcha_display_function = captcha_display_functions.get(
             captcha_type, self.render_captcha_oneclick
@@ -1177,7 +1189,8 @@ class Captchaify:
                 "route_id": self.route_id,
                 "dataset": self.current_configuration['dataset'],
                 "without_watermark": self.kwargs['without_watermark'],
-                "without_customisation": self.kwargs['without_customisation']
+                "without_customisation": self.kwargs['without_customisation'],
+                "kwargs_without_cookies": self.kwargs['without_cookies'],
             }
 
             args.update(template_args)
@@ -1288,11 +1301,7 @@ class Captchaify:
 
     def check_for_bots(self):
         """
-        This method checks whether the client is a bot and combats it.
-        
-        It checks various criteria, including client information, 
-            IP reputation, and captcha verification, to determine whether to block,
-            show a captcha, or take other actions.
+        Check if the request is from a bot.
         """
 
         try:
@@ -1315,7 +1324,7 @@ class Captchaify:
         except Exception as exc:
             handle_exception(exc)
 
-            return self.render_block()
+            return self.captchaify()
 
 
     def add_rate_limit(self, response: Response) -> Response:
@@ -1799,41 +1808,53 @@ class Captchaify:
                     if sorted(request_indices) != sorted(decrypted_token_data['correct']):
                         is_failed_captcha = True
             elif token_captcha_type in [
-                'recaptcha', 'hcaptcha', 'turnstile', 'friendlycaptcha']:
+                'recaptcha', 'hcaptcha', 'turnstile',
+                'friendlycaptcha', 'altcha'
+                ]:
 
                 third_party_name = {
                     'recaptcha': 'g-recaptcha', 'turnstile': 'cf-turnstile',
                     'hcaptcha': 'h-captcha', 'friendlycaptcha': 'frc-captcha'
                 }.get(token_captcha_type)
 
-                response_or_solution = 'solution'\
-                    if token_captcha_type == 'friendlycaptcha' else 'response'
+                if token_captcha_type != 'altcha':
+                    response_or_solution = 'solution'\
+                        if token_captcha_type == 'friendlycaptcha' else 'response'
 
-                if request.method.lower() == 'post':
-                    response_data = request.form.get(third_party_name + '-' + response_or_solution)
+                    key = third_party_name + '-' + response_or_solution
+                    if request.method.lower() == 'post':
+                        response_data = request.form.get(key)
+                    else:
+                        response_data = request.args.get(key)
+
+                    config = self.current_configuration
+                    secret = {
+                        "recaptcha": config['recaptcha_secret'],
+                        "hcaptcha": config['hcaptcha_secret'],
+                        "turnstile": config['turnstile_secret'],
+                        "friendlycaptcha": config['friendly_secret']
+                    }.get(token_captcha_type, None)
+
+                    post_data = {
+                        'secret': secret,
+                        response_or_solution: response_data
+                    }
+
+                    api_url = CAPTCHA_THIRD_PARTIES_API_URLS.get(token_captcha_type)
+
+                    response = requests.post(api_url, data = post_data, timeout = 3)
+                    if not validate_captcha_response(
+                        response.json(), get_domain_from_url(self.req_info.get_url())):
+
+                        is_failed_captcha = True
                 else:
-                    response_data = request.args.get(third_party_name + '-' + response_or_solution)
+                    if request.method.lower() == 'post':
+                        response_data = request.form.get('altcha_response')
+                    else:
+                        response_data = request.args.get('altcha_response')
 
-                config = self.current_configuration
-                secret = {
-                    "recaptcha": config['recaptcha_secret'],
-                    "hcaptcha": config['hcaptcha_secret'],
-                    "turnstile": config['turnstile_secret'],
-                    "friendlycaptcha": config['friendly_secret']
-                }.get(token_captcha_type, None)
-
-                post_data = {
-                    'secret': secret,
-                    response_or_solution: response_data
-                }
-
-                api_url = CAPTCHA_THIRD_PARTIES_API_URLS.get(token_captcha_type)
-
-                response = requests.post(api_url, data = post_data, timeout = 3)
-                if not validate_captcha_response(
-                    response.json(), get_domain_from_url(self.req_info.get_url())):
-
-                    is_failed_captcha = True
+                    if not self.altcha.verify_challenge(response_data):
+                        is_failed_captcha = True
             else:
                 if request.method.lower() == 'post':
                     text_captcha = request.form.get('tc')
@@ -1875,6 +1896,8 @@ class Captchaify:
                     return True, False
         except Exception as exc:
             handle_exception(exc)
+
+            return False, True
 
         return False, is_failed_captcha
 
