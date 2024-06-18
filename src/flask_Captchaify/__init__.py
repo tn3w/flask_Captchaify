@@ -2065,16 +2065,16 @@ class Captchaify:
         if without_cookies:
             url += char + 'captcha=' + quote(str(captcha_id + captcha_token))
 
-        if not self.kwargs['without_arg_transfer']:
+        if not self.kwargs['without_arg_transfer'] and without_cookies:
             theme, is_default_theme = self.theme
             language, is_default_language = self.language
 
             if not is_default_theme:
-                url += '&theme=' + theme
+                url += get_char(url) + 'theme=' + theme
             if not is_default_language:
-                url += '&language=' + language
-            if not is_default_choice and without_cookies:
-                url += '&wc=1'
+                url += get_char(url) + 'language=' + language
+            if not is_default_choice:
+                url += get_char(url) + 'wc=1'
 
         g.captchaify_page = True
         g.captchaify_no_new_cookies = True

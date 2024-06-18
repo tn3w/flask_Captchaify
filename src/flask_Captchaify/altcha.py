@@ -8,11 +8,10 @@ https://github.com/tn3w/flask_Captchaify.
 The original GPL-3.0 licence applies.
 """
 
-import secrets
 import hmac
-import hashlib
 import json
-from time import time
+import secrets
+import hashlib
 from base64 import b64decode
 from .webtoolbox import Translator
 
@@ -136,7 +135,7 @@ class Altcha:
             for key, value in text.items():
                 localized_text[key] = Translator().translate(value, 'en', client_language)
 
-        localized_text['footer'] = localized_text['footer'].replace(
+        localized_text['footer'] = localized_text['footer'].replace('ALTTCHA', 'ALTCHA').replace(
             'ALTCHA', ('<a href="https://altcha.org/" target="_blank" '
             f'area-label="{localized_text["ariaLinkLabel"]}" ntr="1">ALTCHA</a>')
         )
