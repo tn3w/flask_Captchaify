@@ -14,3 +14,4 @@ werkzeug>=3.0.1 # not directly required, pinned by Snyk to avoid a vulnerability
 setuptools
 aiohttp>=3.9.4 # not directly required, pinned by Snyk to avoid a vulnerability
 crawler-user-agents
+idna>=3.7 # not directly required, pinned by Snyk to avoid a vulnerability
