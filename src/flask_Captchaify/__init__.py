@@ -19,7 +19,8 @@ from time import time
 from base64 import b64encode
 from urllib.parse import urlparse, quote
 from typing import Optional, Final, Union, Tuple, Callable
-import requests
+import urllib.parse
+import urllib.request
 from bs4 import BeautifulSoup
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
@@ -1842,11 +1843,21 @@ class Captchaify:
 
                     api_url = CAPTCHA_THIRD_PARTIES_API_URLS.get(token_captcha_type)
 
-                    response = requests.post(api_url, data = post_data, timeout = 3)
-                    if not validate_captcha_response(
-                        response.json(), get_domain_from_url(self.req_info.get_url())):
+                    post_data_encoded = urllib.parse.urlencode(post_data).encode('utf-8')
+                    req = urllib.request.Request(api_url, data=post_data_encoded)
 
+                    timeout = 3
+                    try:
+                        with urllib.request.urlopen(req, timeout=timeout) as response:
+                            response_data = response.read()
+                            response_json = json.loads(response_data)
+
+                        if not validate_captcha_response(
+                            response_json, get_domain_from_url(self.req_info.get_url())):
+                            is_failed_captcha = True
+                    except Exception:
                         is_failed_captcha = True
+
                 else:
                     if request.method.lower() == 'post':
                         response_data = request.form.get('altcha_response')

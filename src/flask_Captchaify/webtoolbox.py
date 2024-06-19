@@ -12,11 +12,10 @@ import os
 import re
 from typing import Optional
 from urllib.parse import urlparse, parse_qs, quote
-from googletrans import Translator as GoogleTranslator
 from bs4 import BeautifulSoup, Tag
+from googletrans import Translator as GoogleTranslator
 from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
-from .utils import PICKLE, JSON, ASSETS_DIR, DATA_DIR, handle_exception,\
-    get_domain_from_url
+from .utils import PICKLE, JSON, ASSETS_DIR, DATA_DIR, handle_exception, get_domain_from_url
 from .req_info import RequestInfo
 
 
@@ -24,6 +23,7 @@ LANGUAGES = JSON.load(os.path.join(ASSETS_DIR, 'languages.json'), [])
 LANGUAGE_CODES = [language['code'] for language in LANGUAGES]
 TRANSLATIONS_FILE_PATH = os.path.join(DATA_DIR, 'translations.pkl')
 google_translator = GoogleTranslator()
+
 
 def render_template(template_dir: str, file_name: str,
                     template_language: str = 'en', client_language: str = 'en', **kwargs) -> str:

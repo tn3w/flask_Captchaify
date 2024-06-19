@@ -12,17 +12,14 @@ import hmac
 import json
 import secrets
 import hashlib
+from typing import Optional
 from base64 import b64decode
 from .webtoolbox import Translator
 
 
-def secure_randrange(start, stop=None, step=1):
+def secure_randrange(start: int, stop: Optional[int] = None, step: int = 1):
     """
     Generate a random number within a given range.
-
-    This function is similar to the built-in `random.randrange()` function,
-    but it uses the `secrets` module to provide cryptographically secure
-    random numbers.
 
     :param start: The starting value of the range.
     :param stop: The ending value of the range. If not provided, `start` is treated
@@ -66,15 +63,16 @@ class Altcha:
         self.secret = secret
 
 
-    def create_challenge(self) -> dict:
+    def create_challenge(self, hardness: int = 1) -> dict:
         """
         Creates a challenge response for the altcha protocol.
 
+        :param hardness: The level of difficulty of the challenge.
         :return: A dictionary containing the challenge details.
         """
 
         salt = secrets.token_hex(12)
-        secret_number = secure_randrange(5000, 20000)
+        secret_number = secure_randrange(5000 * hardness, 20000 * hardness)
 
         challenge = hashlib.sha256((salt + str(secret_number)).encode('utf-8')).hexdigest()
         signature = hmac.new(self.secret, challenge.encode('utf-8'), hashlib.sha256).hexdigest()

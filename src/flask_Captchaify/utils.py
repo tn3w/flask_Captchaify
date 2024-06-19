@@ -11,25 +11,25 @@ distinguish automated bots from real human users.
 Under the open source license GPL-3.0 license, supported by Open Source Software
 """
 
-import secrets
 import io
-import random
-from datetime import datetime, timezone, timedelta
-from base64 import urlsafe_b64encode, urlsafe_b64decode, b64decode, b64encode
-from urllib.parse import urlparse, urlunparse, parse_qs, urlencode, urljoin
-import gzip
-import hashlib
 import os
-import traceback
-import unicodedata
-import threading
-import json
-import pickle
 import time
+import json
+import gzip
+import pickle
+import random
+import secrets
+import hashlib
+import traceback
+import threading
+import unicodedata
 from typing import Union, Optional, Final
 from concurrent.futures import ThreadPoolExecutor
-from PIL import Image, ImageFilter
+from datetime import datetime, timezone, timedelta
+from urllib.parse import urlparse, urlunparse, parse_qs, urlencode, urljoin
+from base64 import urlsafe_b64encode, urlsafe_b64decode, b64decode, b64encode
 from werkzeug import Request
+from PIL import Image, ImageFilter
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, padding
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
