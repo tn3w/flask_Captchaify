@@ -140,6 +140,7 @@ Site when user has javascript disabled and a captcha third party like Google reC
 - [x] https://github.com/tn3w/flask_Captchaify/issues/9 fixed with https://github.com/tn3w/flask_Captchaify/commit/3426b8fdafdc938c4951012a0dadf80b96b01776
 - [x] Google reCaptcha, hCaptcha or Cloudflare Turnstile response timestamp check
 - [ ] Re-implementation of hardness as a way to regulate sophistication
+- [ ] Add AWS WAF, GeeTest and Lemin as captcha types
 - [ ] Integrate Captchaify Trueclick as captcha type
 - [ ] Add option that can integrate Captchaify Trueclick, Google reCaptcha, hCaptcha or Cloudflare Turnstile into forms like https://github.com/KnugiHK/flask-hcaptcha
 - [ ] Captcha data set with emojis

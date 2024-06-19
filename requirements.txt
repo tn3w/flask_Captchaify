@@ -1,16 +1,27 @@
 cryptography
+
+# Web packages
 Flask
-googletrans==3.1.0a0
-beautifulsoup4
 Jinja2
-Pillow>=10.3.0 # not directly required, pinned by Snyk to avoid a vulnerability
-dnspython
-geoip2
+werkzeug>=3.0.1  # not directly required, pinned by Snyk to avoid a vulnerability
+aiohttp>=3.9.4  # not directly required, pinned by Snyk to avoid a vulnerability
+
+# Translation package
+googletrans==3.1.0a0
+
+# Web Scraping packages
+beautifulsoup4
 bs4
-captcha
-bcrypt
-pycryptodome
-werkzeug>=3.0.1 # not directly required, pinned by Snyk to avoid a vulnerability
-setuptools
-aiohttp>=3.9.4 # not directly required, pinned by Snyk to avoid a vulnerability
 crawler-user-agents
+
+# Image Processing package
+Pillow>=10.3.0  # not directly required, pinned by Snyk to avoid a vulnerability
+
+# DNS package
+dnspython>=2.6.1  # not directly required, pinned by Snyk to avoid a vulnerability
+
+# Geolocation package
+geoip2
+
+# Captcha package
+captcha
