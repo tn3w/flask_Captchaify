@@ -136,13 +136,12 @@ Site when user has javascript disabled and a captcha third party like Google reC
 
 
 ### To-Do's
-- [x] add `*` to rules Arg
-- [x] https://github.com/tn3w/flask_Captchaify/issues/9 fixed with https://github.com/tn3w/flask_Captchaify/commit/3426b8fdafdc938c4951012a0dadf80b96b01776
 - [x] Google reCaptcha, hCaptcha or Cloudflare Turnstile response timestamp check
-- [ ] Re-implementation of hardness as a way to regulate sophistication
-- [ ] Integrate Captchaify Trueclick as captcha type
+- [x] Re-implementation of hardness as a way to regulate sophistication
 - [ ] Add option that can integrate Captchaify Trueclick, Google reCaptcha, hCaptcha or Cloudflare Turnstile into forms like https://github.com/KnugiHK/flask-hcaptcha
+- [ ] Add clickable Captcha
 - [ ] Captcha data set with emojis
+- [ ] Integrate Captchaify Trueclick as captcha type
 
 
 ### Note for Contributors
@@ -154,21 +153,21 @@ If you want to contribute, please read [CONTRIBUTING.md](https://github.com/tn3w
 All args and default value:
 ```python
 args = {
-    "dataset_size": (20, 100), "dataset_dir": DATASETS_DIR,
-    "captcha_type": 'oneclick', "dataset": "keys",
-    "action": 'captcha', "theme": 'light',
-    "language": 'en', "enable_rate_limit": False,
-    "rate_limit": (15, 300), "template_dir": TEMPLATE_DIR,
-    "verification_age": 3600, "without_cookies": False,
-    "block_crawler": True, "crawler_hints": True,
-    "third_parties": ALL_THIRD_PARTIES, "as_route": False,
-    "fixed_route_name": '_captchaify', "without_watermark": False,
-    "without_other_args": True, "without_customisation": False,
-    "enable_trueclick": False, "error_codes": [],
-    "recaptcha_site_key": None, "recaptcha_secret": None,
-    "hcaptcha_site_key": None, "hcaptcha_secret": None,
-    "turnstile_site_key": None, "turnstile_secret": None,
-    "friendly_site_key": None, "friendly_secret": None
+   "action": 'captcha', "captcha_type": 'oneclick',
+   "dataset": 'keys', "dataset_size": (20, 100),
+   "dataset_dir": DATASETS_DIR, "hardness": 1,
+   "verification_age": 3600, "template_dir": TEMPLATE_DIR,
+   "without_customisation": False, "without_cookies": False,
+   "without_arg_transfer": False, "without_watermark": False,
+   "third_parties": ['geoip', 'tor', 'ipapi', 'stopforumspam'],
+   "enable_rate_limit": True, "rate_limit": (15, 300),
+   "block_crawler": True, "crawler_hints": True,"as_route": False,
+   "fixed_route_name": '_captchaify', "theme": 'light', "language": 'en',
+   "enable_trueclick": False, "error_codes": [],
+   "recaptcha_site_key": None, "recaptcha_secret": None,
+   "hcaptcha_site_key": None, "hcaptcha_secret": None,
+   "turnstile_site_key": None, "turnstile_secret": None,
+   "friendly_site_key": None, "friendly_secret": None
 }
 ```
 
@@ -266,24 +265,25 @@ args = {
    <br>
 
    All changes that can be made by these rules:
-   | Name of the change | Type            | Example               |
-   | ------------------ | --------------- | --------------------- |
-   | captcha_type       | str             | multiclick            |
-   | dataset            | str             | ai-dogs               |
-   | dataset_dir        | str             | /path/to/dataset/dir  |
-   | action             | str             | allow                 |
-   | enable_rate_limit  | bool            | True                  |
-   | rate_limit         | Tuple[int, int] | (20, 100)             |
-   | template_dir       | str             | /path/to/template/dir |
-   | enable_trueclick   | bool            | True                  |
-   | recaptcha_site_key | str             | <site-key>            |
-   | recaptcha_secret   | str             | <secret>              |
-   | hcaptcha_site_key  | str             | <site-key>            |
-   | hcaptcha_secret    | str             | <secret>              |
-   | turnstile_site_key | str             | <site-key>            |
-   | turnstile_secret   | str             | <secret>              |
-   | friendly_site_key  | str             | <site-key>            |
-   | friendly_secret    | str             | <secret>              |
+   | Name of the change | Type            | Example                                                     |
+   | ------------------ | --------------- | ----------------------------------------------------------- |
+   | captcha_type       | str             | multiclick                                                  |
+   | dataset            | str             | ai-dogs                                                     |
+   | dataset_dir        | str             | /path/to/dataset/dir                                        |
+   | action             | str             | allow                                                       |
+   | hardness           | int (1-5)       | 3                                                           |
+   | enable_rate_limit  | bool            | True                                                        |
+   | rate_limit         | Tuple[int, int] | (20, 100)                                                   |
+   | template_dir       | str             | /path/to/template/dir                                       |
+   | enable_trueclick   | bool            | True                                                        |
+   | recaptcha_site_key | str             | 6Lfp1PEpAAAAANS3PIXmQ4c7k2p7gqxMopD5Npy3                    |
+   | recaptcha_secret   | str             | 6Lfp1OEyBBBBBDjuZ-xK8H2LMnPVFQR-5nKkTBY9                    |
+   | hcaptcha_site_key  | str             | d4f8bc19-c517-4387-9cb1-826935d73f47                        |
+   | hcaptcha_secret    | str             | ES_e7d43d0818455496a48d22ddc3367d68                         |
+   | turnstile_site_key | str             | 0x5CCCCCCAp-qCgUJkS4MJa                                     |
+   | turnstile_secret   | str             | 0x5BBBBBBBc-vRpT3xZNR1bKfDJKUPGLQPF                         |
+   | friendly_site_key  | str             | WZMSUDMH2PXWVJN9                                            |
+   | friendly_secret    | str             | B2YL26SFRPF3C9VOMOOF9HW8R0MX5WESVXO3OZ5TJ2AP62L91B4PCUP5C1J |
 
    <br>
 
@@ -366,6 +366,17 @@ args = {
    Example of a website that has set its action to "block" for specific ips:
    ```python
    rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"action": "block"}]
+   ```
+
+   <br>
+
+   **Hardness (`hardness`)**
+
+   The variable hardness must be a number between 1 and 5. The higher the value, the harder the captcha is. (Default: 1)
+
+   Example of a website that has set its hardness to 3 for specific ips:
+   ```python
+   rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"hardness": 3}]
    ```
 
    <br>
@@ -547,7 +558,19 @@ args = {
 
 <br>
 
-8. ***`verification_age` Arg***
+8. ***`hardness` Arg***
+
+   Specifies the default hardness of the captcha.
+   The variable hardness must be a number between 1 and 5. The higher the value, the harder the captcha is. (Default: 1)
+
+   Example of a website that has set its default hardness to 3:
+   ```python
+   captchaify = Captchaify(app, hardness=3)
+   ```
+
+<br>
+
+9. ***`verification_age` Arg***
 
    Indicates the time in seconds how long a solved captcha is valid (Default: 3600 = 1 hour)
 
@@ -792,6 +815,8 @@ args = {
    For Google reCaptcha you can get this here: [https://www.google.com/recaptcha/admin/create](https://www.google.com/recaptcha/admin/create)
    Usually site_key and secret are displayed after creating an account or when linking a domain or ip.
 
+   Example: `6Lfp1PEpAAAAANS3PIXmQ4c7k2p7gqxMopD5Npy3`
+
    Web page where this is set:
    ```python
    captchaify = Captchaify(app, recaptcha_site_key = '<site-key>')
@@ -804,6 +829,8 @@ args = {
    Is required if Google reCaptcha is used as captcha_type or in an form.
    For Google reCaptcha you can get this here: [https://www.google.com/recaptcha/admin/create](https://www.google.com/recaptcha/admin/create)
    Usually site_key and secret are displayed after creating an account or when linking a domain or ip.
+
+   Example: `6Lfp1OEyBBBBBDjuZ-xK8H2LMnPVFQR-5nKkTBY9`
 
    Web page where this is set:
    ```python
@@ -818,6 +845,8 @@ args = {
    For hCaptcha you can get this here: [https://dashboard.hcaptcha.com/login](https://dashboard.hcaptcha.com/login)
    Usually site_key and secret are displayed after creating an account or when linking a domain or ip.
 
+   Example: `d4f8bc19-c517-4387-9cb1-826935d73f47`
+
    Web page where this is set:
    ```python
    captchaify = Captchaify(app, hcaptcha_site_key = '<site-key>')
@@ -830,6 +859,8 @@ args = {
    Is required if hCaptcha is used as captcha_type or in an form.
    For hCaptcha you can get this here: [https://dashboard.hcaptcha.com/login](https://dashboard.hcaptcha.com/login)
    Usually site_key and secret are displayed after creating an account or when linking a domain or ip.
+
+   Example: `ES_e7d43d0818455496a48d22ddc3367d68`
 
    Web page where this is set:
    ```python
@@ -845,6 +876,8 @@ args = {
    Important: Here you need a domain.
    Usually site_key and secret are displayed after creating an account or when linking a domain or ip.
 
+   Example: `0x5CCCCCCAp-qCgUJkS4MJa`
+
    Web page where this is set:
    ```python
    captchaify = Captchaify(app, turnstile_site_key = '<site-key>')
@@ -859,6 +892,8 @@ args = {
    Important: Here you need a domain.
    Usually site_key and secret are displayed after creating an account or when linking a domain or ip.
 
+   Example: `0x5BBBBBBBc-vRpT3xZNR1bKfDJKUPGLQPF`
+
    Web page where this is set:
    ```python
    captchaify = Captchaify(app, turnstile_secret = '<secret>')
@@ -871,6 +906,8 @@ args = {
    Is required if Friendly Captcha is used as captcha_type or in an form.
    For Friendly Captcha you can get this here: [https://friendlycaptcha.com/signup/](https://friendlycaptcha.com/signup/), after signing up you can create an organization and get your site_key under `Applications`.
 
+   Example: `WZMSUDMH2PXWVJN9`
+
    Web page where this is set:
    ```python
    captchaify = Captchaify(app, friendly_site_key = '<site-key>')
@@ -882,6 +919,8 @@ args = {
 
    Is required if Friendly Captcha is used as captcha_type or in an form.
    For Friendly Captcha you can get this here: [https://friendlycaptcha.com/signup/](https://friendlycaptcha.com/signup/), after signing up you can create an organization and get your secret under `Api Keys`.
+
+   Example: `B2YL26SFRPF3C9VOMOOF9HW8R0MX5WESVXO3OZ5TJ2AP62L91B4PCUP5C1J`
 
    Web page where this is set:
    ```python

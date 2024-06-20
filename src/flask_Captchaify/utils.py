@@ -29,7 +29,7 @@ from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse, urlunparse, parse_qs, urlencode, urljoin
 from base64 import urlsafe_b64encode, urlsafe_b64decode, b64decode, b64encode
 from werkzeug import Request
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageDraw
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, padding
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -436,11 +436,14 @@ def convert_image_to_base64(image_data: bytes) -> str:
     return data_url
 
 
-def manipulate_image_bytes(image_data: bytes, is_small: bool = False) -> bytes:
+def manipulate_image_bytes(image_data: bytes, is_small: bool = False,
+                           hardness: Optional[int] = 1) -> bytes:
     """
     Manipulates an image represented by bytes to create a distorted version.
 
     :param image_data: The bytes representing the original image.
+    :param is_small: Whether the image should be resized to 100x100 or not.
+    :param hardness: A number between 1 and 5 that determines the distortion factor.
     :return: The bytes of the distorted image.
     """
 
@@ -448,8 +451,29 @@ def manipulate_image_bytes(image_data: bytes, is_small: bool = False) -> bytes:
 
     width, height = img.size
 
-    x_shifts = [random.randint(-2, 3) for _ in range(width * height)]
-    y_shifts = [random.randint(-2, 3) for _ in range(width * height)]
+    if hardness > 3:
+        num_dots = random.randint(1, 20) * hardness - 3
+        for _ in range(num_dots):
+            x, y = random.randint(0, width - 1), random.randint(0, height - 1)
+            color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+            img.putpixel((x, y), color)
+
+        num_lines = random.randint(1, 20) * hardness - 3
+        for _ in range(num_lines):
+            start_x, start_y = random.randint(0, width - 1), random.randint(0, height - 1)
+            end_x, end_y = random.randint(0, width - 1), random.randint(0, height - 1)
+            color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+            draw = ImageDraw.Draw(img)
+            draw.line((start_x, start_y, end_x, end_y), fill=color, width=1)
+
+    x_shifts = [
+        random.randint(-max(2, hardness - 1), max(3, hardness))
+        for _ in range(width * height)
+    ]
+    y_shifts = [
+        random.randint(-max(2, hardness - 1), max(3, hardness))
+        for _ in range(width * height)
+    ]
 
     shifted_img = Image.new('RGB', (width, height))
     for y in range(height):
@@ -460,8 +484,8 @@ def manipulate_image_bytes(image_data: bytes, is_small: bool = False) -> bytes:
 
     shifted_img = shifted_img.convert('HSV')
 
-    saturation_factor = 1.02
-    value_factor = 0.99
+    saturation_factor = 1 + hardness * 0.02
+    value_factor = 1 - hardness * 0.01
     h, s, v = shifted_img.split()
 
     s = s.point(lambda i: min(255, i * saturation_factor), 'L')
@@ -470,7 +494,7 @@ def manipulate_image_bytes(image_data: bytes, is_small: bool = False) -> bytes:
     shifted_img = Image.merge('HSV', (h, s, v))
 
     shifted_img = shifted_img.convert('RGB')
-    shifted_img = shifted_img.filter(ImageFilter.GaussianBlur(radius=0.2))
+    shifted_img = shifted_img.filter(ImageFilter.GaussianBlur(radius=hardness * 0.1))
 
     size = 100 if is_small else 200
     shifted_img = shifted_img.resize((size, size), Image.LANCZOS)

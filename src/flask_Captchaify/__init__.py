@@ -260,14 +260,14 @@ ERROR_CODES: Final[dict] = {
 DEFAULT_KWARGS: Final[dict] = {
     "action": 'captcha', "captcha_type": 'oneclick',
     "dataset": 'keys', "dataset_size": (20, 100),
-    "dataset_dir": DATASETS_DIR, "verification_age": 3600,
-    "template_dir": TEMPLATE_DIR, "without_customisation": False,
-    "without_cookies": False, "without_arg_transfer": False,
-    "without_watermark": False, "third_parties": ALL_THIRD_PARTIES,
-    "enable_rate_limit": True, "rate_limit": (15, 300),
-    "block_crawler": True, "crawler_hints": True,
-    "as_route": False, "fixed_route_name": '_captchaify',
-    "theme": 'light', "language": 'en',
+    "dataset_dir": DATASETS_DIR, "hardness": 1,
+    "verification_age": 3600, "template_dir": TEMPLATE_DIR,
+    "without_customisation": False, "without_cookies": False,
+    "without_arg_transfer": False, "without_watermark": False,
+    "third_parties": ALL_THIRD_PARTIES, "enable_rate_limit": True,
+    "rate_limit": (15, 300), "block_crawler": True,
+    "crawler_hints": True, "as_route": False,
+    "fixed_route_name": '_captchaify', "theme": 'light', "language": 'en',
     "enable_trueclick": False, "error_codes": [],
     "recaptcha_site_key": None, "recaptcha_secret": None,
     "hcaptcha_site_key": None, "hcaptcha_secret": None,
@@ -285,7 +285,7 @@ class Captchaify:
                  rules: Optional[dict[tuple, str]] = None,
                  action: str = 'captcha', captcha_type: str = 'oneclick',
                  dataset: str = 'keys', dataset_size: Union[tuple[int, int], str] = (20, 100),
-                 dataset_dir: str = DATASETS_DIR, verification_age: int = 3600,
+                 dataset_dir: str = DATASETS_DIR, hardness: int = 1, verification_age: int = 3600,
                  template_dir: str = TEMPLATE_DIR, without_customisation: bool = False,
                  without_cookies: bool = False, without_arg_transfer: bool = False,
                  without_watermark: bool = False, third_parties: Optional[list[str]] = None,
@@ -309,6 +309,7 @@ class Captchaify:
         :param dataset: The default dataset
         :param dataset_size: The default dataset size
         :param dataset_dir: The default dataset directory
+        :param hardness: The default hardness
         :param verification_age: The default verification age
         :param template_dir: The default template directory
         :param without_customisation: Whether to disable customisation
@@ -359,13 +360,14 @@ class Captchaify:
         kwargs = {
             "action": action, "captcha_type": captcha_type, "dataset": dataset,
             "dataset_size": dataset_size, "dataset_dir": dataset_dir,
-            "verification_age": verification_age, "template_dir": template_dir,
-            "without_customisation": without_customisation, "without_cookies": without_cookies,
-            "without_arg_transfer": without_arg_transfer, "without_watermark": without_watermark,
-            "third_parties": third_parties, "as_route": as_route,
-            "fixed_route_name": fixed_route_name, "enable_rate_limit": enable_rate_limit,
-            "rate_limit": rate_limit, "block_crawler": block_crawler,
-            "crawler_hints": crawler_hints, "theme": theme, "language": language,
+            "hardness": hardness, "verification_age": verification_age,
+            "template_dir": template_dir, "without_customisation": without_customisation,
+            "without_cookies": without_cookies, "without_arg_transfer": without_arg_transfer,
+            "without_watermark": without_watermark, "third_parties": third_parties,
+            "as_route": as_route, "fixed_route_name": fixed_route_name,
+            "enable_rate_limit": enable_rate_limit, "rate_limit": rate_limit,
+            "block_crawler": block_crawler, "crawler_hints": crawler_hints,
+            "theme": theme, "language": language,
             "enable_trueclick": enable_trueclick, "error_codes": error_codes,
             "recaptcha_site_key": recaptcha_site_key, "recaptcha_secret": recaptcha_secret,
             "hcaptcha_site_key": hcaptcha_site_key, "hcaptcha_secret": hcaptcha_secret,
@@ -519,11 +521,12 @@ class Captchaify:
         """
 
         current_configuration = {
+            "action": self.kwargs.get('action', 'captcha'),
             "captcha_type": self.kwargs.get('captcha_type', 'oneclick'),
             "dataset": self.kwargs.get('dataset', 'keys'),
-            "action": self.kwargs.get('action', 'captcha'),
-            "template_dir": self.kwargs.get('template_dir', TEMPLATE_DIR),
             "dataset_dir": self.kwargs.get('dataset_dir', DATASETS_DIR),
+            "hardness": self.kwargs.get('hardness', 1),
+            "template_dir": self.kwargs.get('template_dir', TEMPLATE_DIR),
             "enable_rate_limit": self.kwargs.get('enable_rate_limit', True),
             "enable_trueclick": self.kwargs.get('enable_trueclick', False),
             "recaptcha_site_key": self.kwargs.get('recaptcha_site_key', None),
@@ -878,13 +881,16 @@ class Captchaify:
         """
 
         captcha_data = self.get_captcha_data()
-        captcha_type = self.current_configuration['captcha_type']
+
+        config = self.current_configuration
+        captcha_type = config['captcha_type']
+        hardness = max(1, config['hardness'] / 3 + 0.5)
 
         text_captcha = None
         audio_captcha = None
 
         if 'text' in captcha_type:
-            string_length = random.randint(5, 8)
+            string_length = round(random.randint(5, 8) * hardness)
             image_captcha_code = generate_random_string(string_length, with_punctuation=False)
 
             image_captcha = ImageCaptcha(width=320, height=120, fonts=[
@@ -901,7 +907,7 @@ class Captchaify:
             captcha_data['text'] = image_captcha_code
 
         if 'audio' in captcha_type:
-            int_length = random.randint(5, 8)
+            int_length = round(random.randint(5, 8) * hardness)
 
             audio_captcha_code = generate_random_string(
                 int_length, with_punctuation=False, with_letters=False
@@ -936,7 +942,10 @@ class Captchaify:
 
         captcha_data = self.get_captcha_data()
 
-        dataset_file = self.current_configuration['dataset_file']
+        config = self.current_configuration
+        dataset_file = config['dataset_file']
+        hardness = config['hardness']
+
         dataset = self.load_dataset(dataset_file)
 
         keywords = list(dataset.keys())
@@ -976,12 +985,18 @@ class Captchaify:
                 random_image = get_random_image(images)
             captcha_images.append(random_image)
 
-        original_image = convert_image_to_base64(manipulate_image_bytes(original_image))
+        original_image = convert_image_to_base64(
+            manipulate_image_bytes(
+                original_image, hardness = hardness
+            )
+        )
 
         captcha_images = [
             convert_image_to_base64(
-                manipulate_image_bytes(image, is_small = True)
-                ) for image in captcha_images
+                manipulate_image_bytes(
+                    image, is_small = True, hardness = hardness
+                )
+            ) for image in captcha_images
         ]
         captcha_images = [{'id': str(i), 'src': image_data}
                             for i, image_data in enumerate(captcha_images)]
@@ -1009,7 +1024,10 @@ class Captchaify:
 
         captcha_data = self.get_captcha_data()
 
-        dataset_file = self.current_configuration['dataset_file']
+        config = self.current_configuration
+        dataset_file = config['dataset_file']
+        hardness = config['hardness']
+
         if dataset_file is not None:
             dataset = self.load_dataset(dataset_file)
 
@@ -1047,12 +1065,16 @@ class Captchaify:
                 random_image = get_random_image(images)
             captcha_images.append(random_image)
 
-        original_image = convert_image_to_base64(manipulate_image_bytes(original_image))
+        original_image = convert_image_to_base64(
+            manipulate_image_bytes(original_image, hardness = hardness)
+        )
 
         captcha_images = [
             convert_image_to_base64(
-                manipulate_image_bytes(image, is_small = True)
-                ) for image in captcha_images
+                manipulate_image_bytes(
+                    image, is_small = True, hardness = hardness
+                )
+            ) for image in captcha_images
         ]
         captcha_images = [
             {'id': str(i), 'src': image_data}
@@ -1085,12 +1107,13 @@ class Captchaify:
 
         config = self.current_configuration
         captcha_type = config['captcha_type']
+        hardness = config['hardness']
 
         site_key = None
         altcha_challenge = None
         strings = None
         if captcha_type == 'altcha':
-            altcha_challenge = json.dumps(self.altcha.create_challenge())
+            altcha_challenge = json.dumps(self.altcha.create_challenge(hardness = hardness))
             strings = json.dumps(self.altcha.localized_text(self.language[0]))
         else:
             site_key = {
@@ -1217,7 +1240,9 @@ class Captchaify:
                 "url_args_without_lang": extract_args(remove_args_from_url(
                     self.req_info.get_url(), ['ct', 'ci', 'captcha', 'rr', 'language']
                 )),
-                "current_url": remove_args_from_url(current_url, ['ct', 'ci', 'captcha']),
+                "current_url": remove_args_from_url(
+                    current_url, ['ct', 'ci', 'captcha', 'tc', 'ac']
+                ),
                 "current_url_without_cl": remove_args_from_url(current_url, ['cl']),
                 "current_url_without_wc": remove_args_from_url(self.req_info.get_url(), ['wc']),
                 "path": request.path,
@@ -1581,7 +1606,7 @@ class Captchaify:
             if action == 'block' or self.to_many_attempts(action):
                 return self.render_block()
 
-            is_valid_ct, is_failed_captcha = self.is_captcha_token_valid()
+            is_valid_ct, is_failed_captcha = self.verify_captcha_token()
             if is_valid_ct:
                 return self.valid_captcha(return_path)
 
@@ -1716,14 +1741,16 @@ class Captchaify:
         url_path = urlparse(self.req_info.get_url()).path
         client_ip = self.ip
 
-        captcha_type = self.current_configuration['captcha_type'].split('_')[0]
+        config = self.current_configuration
+        captcha_type = config['captcha_type'].split('_')[0]
         captcha_id = generate_random_string(30)
 
         captcha_data = {
-            'id': captcha_id, 'type': captcha_type,
-            'ip': ('None' if client_ip is None else Hashing().hash(client_ip)),
-            'user_agent': Hashing().hash(self.user_agent),
-            'path': Hashing().hash(url_path), 'time': str(int(time()))
+            "id": captcha_id, "type": captcha_type,
+            "ip": ('None' if client_ip is None else Hashing().hash(client_ip)),
+            "user_agent": Hashing().hash(self.user_agent),
+            "path": Hashing().hash(url_path), "time": str(int(time())),
+            "hardness": config['hardness']
         }
 
         return captcha_data
@@ -1750,13 +1777,13 @@ class Captchaify:
         return page_path, file_name
 
 
-    def is_captcha_token_valid(self, captcha_token:\
-                                  Optional[str] = None) -> Union[bool, bool]:
+    def verify_captcha_token(self, captcha_token:\
+                             Optional[str] = None) -> Union[bool, bool]:
         """
-        Check the validity of the captcha token.
+        Verify the captcha token.
 
-        :param captcha_token: The captcha token.
-        :return: A tuple of two boolean values.
+        :param captcha_token: The captcha token to be verified
+        :return: A tuple containing the verification result and the captcha type
         """
 
         is_failed_captcha = False
@@ -1783,6 +1810,9 @@ class Captchaify:
                 return False, False
 
             if int(time()) - int(decrypted_token_data['time']) > 120:
+                return False, False
+
+            if decrypted_token_data['hardness'] < self.current_configuration['hardness']:
                 return False, False
 
             token_captcha_type = decrypted_token_data['type']
@@ -1900,8 +1930,7 @@ class Captchaify:
                     self.user_agent, decrypted_token_data['user_agent']
                 )
 
-                if not comparison_path or \
-                        (not comparison_ip and not comparison_user_agent):
+                if not comparison_path or (not comparison_ip and not comparison_user_agent):
                     is_failed_captcha = True
                 else:
                     return True, False
