@@ -756,7 +756,7 @@ class Captchaify:
         """
         Renders the block page.
 
-        :param without_redirect: If True, the block page is not redirected.
+        :param without_redirect: Flag indicating if the redirect should be skipped.
         :return: The rendered block page.
         """
 
@@ -780,7 +780,7 @@ class Captchaify:
         """
         Renders the nojs page.
 
-        :param without_redirect: If True, the nojs page is not redirected.
+        :param without_redirect: Flag indicating if the redirect should be skipped.
         :return: The rendered nojs page.
         """
 
@@ -802,7 +802,7 @@ class Captchaify:
         """
         Renders the rate limit page.
 
-        :param without_redirect: If True, the rate limit page is not redirected.
+        :param without_redirect: Flag indicating if the redirect should be skipped.
         :return: The rendered rate limit page.
         """
 
@@ -825,8 +825,7 @@ class Captchaify:
         """
         Renders the change language page.
 
-        :param without_redirect: If True, the change language page is not
-        redirected.
+        :param without_redirect: Flag indicating if the redirect should be skipped.
         :return: The rendered change language page.
         """
 
@@ -871,7 +870,7 @@ class Captchaify:
 
     def render_captcha_text_audio(
             self, is_error: bool = False,
-            return_path: Optional[str] = None) -> str:
+            return_path: Optional[str] = None) -> Response:
         """
         Renders the captcha text and audio challenge.
 
@@ -931,7 +930,7 @@ class Captchaify:
 
     def render_captcha_oneclick(
             self, is_error: bool = False,
-            return_path: Optional[str] = None) -> str:
+            return_path: Optional[str] = None) -> Response:
         """
         Renders the captcha one-click challenge.
 
@@ -1013,7 +1012,7 @@ class Captchaify:
 
     def render_captcha_multiclick(
             self, is_error: bool = False,
-            return_path: Optional[str] = None) -> str:
+            return_path: Optional[str] = None) -> Response:
         """
         Renders the captcha multiclick challenge.
 
@@ -1093,7 +1092,7 @@ class Captchaify:
 
     def render_captcha_third_parties(
             self, is_error: bool = False,
-            return_path: Optional[str] = None) -> str:
+            return_path: Optional[str] = None) -> Response:
         """
         Renders the captcha third parties challenge.
 
@@ -1172,12 +1171,13 @@ class Captchaify:
         return captcha_display_function(is_error, return_path)
 
 
-    def render_template(self, template: str, **args) -> any:
+    def render_template(self, template: str, **args) -> Response:
         """
         Retrieves and renders templates based on the specified template type.
 
         :param template: The template to retrieve and render
         :param **args: Additional keyword arguments to be passed to the template renderer
+        :return: A Flask response object
         """
 
         g.captchaify_page = True
@@ -1358,6 +1358,7 @@ class Captchaify:
         This method handles rate limiting for incoming requests.
 
         :param response: The response object to be returned
+        :return: The response object with rate limit added
         """
 
         try:
@@ -1397,6 +1398,7 @@ class Captchaify:
         Modifies HTML content of a response by adding arguments to links and forms.
 
         :param response: The response object to be returned
+        :return: The response object with arguments added
         """
 
         try:
@@ -1453,6 +1455,7 @@ class Captchaify:
         Set cookies in the response object based on various conditions.
 
         :param response: The response object to be returned
+        :return: The response object with cookies set
         """
 
         try:
@@ -2065,6 +2068,7 @@ class Captchaify:
         """
         Generates a token to verify that the captcha has been completed.
 
+        :param return_path: The path to redirect to if the captcha is valid
         :return: None or redirect to a url + args
         """
 
@@ -2154,11 +2158,11 @@ class Captchaify:
         without_cookies, is_default_choice = self.without_cookies
 
         if not is_default_theme:
-            redirect_url += '&theme=' + theme
+            redirect_url += get_char(redirect_url) + 'theme=' + theme
         if not is_default_language:
-            redirect_url += '&language=' + language
+            redirect_url += get_char(redirect_url) + 'language=' + language
         if not is_default_choice and without_cookies:
-            redirect_url += '&wc=' + str(int(without_cookies))
+            redirect_url += get_char(redirect_url) + 'wc=' + str(int(without_cookies))
 
         captcha_string = None
         if request.args.get('captcha') is not None:
