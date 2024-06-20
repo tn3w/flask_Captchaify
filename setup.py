@@ -23,7 +23,7 @@ long_description = long_description.replace('   - [Some Screenshots](#some-scree
 
 setup(
     name='flask_Captchaify',
-    version='1.7.3.2',
+    version='1.7.3.3',
     description='Protect against bots and DDoS attacks',
     long_description=long_description,
     long_description_content_type='text/markdown',
