@@ -890,7 +890,7 @@ class Captchaify:
         audio_captcha = None
 
         if 'text' in captcha_type:
-            string_length = round(random.randint(5, 8) * hardness)
+            string_length = round(random.randint(4, 6) * hardness)
             image_captcha_code = generate_random_string(string_length, with_punctuation=False)
 
             image_captcha = ImageCaptcha(width=320, height=120, fonts=[
@@ -907,7 +907,7 @@ class Captchaify:
             captcha_data['text'] = image_captcha_code
 
         if 'audio' in captcha_type:
-            int_length = round(random.randint(5, 8) * hardness)
+            int_length = round(random.randint(4, 6) * hardness)
 
             audio_captcha_code = generate_random_string(
                 int_length, with_punctuation=False, with_letters=False
