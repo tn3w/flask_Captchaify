@@ -16,14 +16,10 @@ with open('README.md', 'r', encoding='utf-8') as readable_file:
 
 long_description = long_description.split('<h1 align="center">𝐟𝐥𝐚𝐬𝐤_𝐂𝐚𝐩𝐭𝐜𝐡𝐚𝐢𝐟𝐲</h1>')[1]
 long_description = '<h1 align="center">𝐟𝐥𝐚𝐬𝐤_𝐂𝐚𝐩𝐭𝐜𝐡𝐚𝐢𝐟𝐲</h1>' + long_description
-long_description = long_description.split('### Some Screenshots')[0] +\
-    '''### To-Do's''' + long_description.split('''### To-Do's''')[1]
-
-long_description = long_description.replace('   - [Some Screenshots](#some-screenshots)\n', '')
 
 setup(
     name='flask_Captchaify',
-    version='1.7.3.4',
+    version='1.7.3.5',
     description='Protect against bots and DDoS attacks',
     long_description=long_description,
     long_description_content_type='text/markdown',
