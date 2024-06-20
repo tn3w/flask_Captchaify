@@ -38,6 +38,7 @@ if __name__ == '__main__':
       - [Features](#features)
    - [About](#about)
       - [Installation](#installation)
+      - [Some Screenshots](#some-screenshots)
       - [To-do's](#to-dos)
       - [Contributing](#note-for-contributors)
    - [Documentation](#documentation)
@@ -85,59 +86,13 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```
 
 ### Some Screenshots
-Captcha oneclick:
-
-<picture>
-   <img width="800px" alt="Picture from Captcha oneclick" src="https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/oneclick_captcha.png">
-</picture>
-
-<br>
-
-Captcha multiclick:
-
-<picture>
-   <img width="800px" alt="Picture from Captcha multiclick" src="https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/multiclick_captcha.png">
-</picture>
-
-<br>
-
-Captcha using Google reCaptcha:
-
-<picture>
-   <img width="800px" alt="Picture from Captcha using Google reCaptcha" src="https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/third_party_captcha.png">
-</picture>
-
-<br>
-
-Site to change language:
-
-<picture>
-   <img width="800px" alt="Picture from Site to Change Language" src="https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/change_language.png">
-</picture>
-
-<br>
-
-Site when user is blocked:
-
-<picture>
-   <img width="800px" alt="Picture from Site when user is blocked" src="https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/blocked.png">
-</picture>
-
-<br>
-
-Site when user is rate limited:
-
-<picture>
-   <img width="800px" alt="Picture from Site when user is rate limited" src="https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/rate_limited.png">
-</picture>
-
-<br>
-
-Site when user has javascript disabled and a captcha third party like Google reCaptcha is used:
-
-<picture>
-   <img width="800px" alt="Picture from Site when user has javascript disabled" src="https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/nojs.png">
-</picture>
+- Captcha oneclick: [Display](https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/oneclick_captcha.png)
+- Captcha multiclick: [Display](https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/multiclick_captcha.png)
+- Captcha using Google reCaptcha: [Display](https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/google_captcha.png)
+- Site to change language: [Display](https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/change_language.png)
+- Site when user is blocked: [Display](https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/blocked.png)
+- Site when user is rate limited: [Display](https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/rate_limited.png)
+- Site when user has javascript disabled and a captcha third party like Google reCaptcha is used: [Display](https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/nojs.png)
 
 
 ### To-Do's
