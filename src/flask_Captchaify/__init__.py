@@ -15,12 +15,13 @@ import os
 import json
 import random
 import secrets
+import urllib.parse
+import urllib.request
 from time import time
 from base64 import b64encode
 from urllib.parse import urlparse, quote
 from typing import Optional, Final, Union, Tuple, Callable
-import urllib.parse
-import urllib.request
+from markupsafe import Markup
 from bs4 import BeautifulSoup
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
@@ -33,6 +34,7 @@ from .utils import JSON, PICKLE, Hashing, SymmetricCrypto, SSES, get_work_dir,\
 from .webtoolbox import WebToolbox, render_template
 from .req_info import RequestInfo, update_geolite_databases, matches_rule, is_valid_ip
 from .altcha import Altcha
+from .embed import CaptchaEmbed
 
 
 WORK_DIR: Final[str] = get_work_dir()
@@ -401,54 +403,54 @@ class Captchaify:
 
         self.app = app
 
-        default_kwargs = {}
+        keyword_args = {}
         for key, value in DEFAULT_KWARGS.items():
             if key not in kwargs:
-                default_kwargs[key] = value
+                keyword_args[key] = value
             else:
-                default_kwargs[key] = kwargs[key]
-        self.kwargs = default_kwargs
+                keyword_args[key] = kwargs[key]
+        self.kwargs = keyword_args
 
-        if default_kwargs['as_route']:
-            if default_kwargs.get('fixed_route_name') is None:
+        if keyword_args['as_route']:
+            if keyword_args.get('fixed_route_name') is None:
                 route_id = '-' + generate_random_string(6, False)
                 self.route_id = route_id
             else:
-                self.route_id = default_kwargs["fixed_route_name"]
+                self.route_id = keyword_args["fixed_route_name"]
 
-        app.config['CAPTCHAIFY_CONFIG'] = default_kwargs
-        if default_kwargs['as_route']:
+        app.config['CAPTCHAIFY_CONFIG'] = keyword_args
+        if keyword_args['as_route']:
             app.route(
                 '/blocked' + self.route_id,
                 endpoint = 'blocked_captchaify'
-            )(lambda: self.render_block(True))
+            )(lambda: self._render_block(True))
 
             app.route(
                 '/nojs' + self.route_id,
                 endpoint = 'nojs_captchaify'
-            )(lambda: self.render_nojs(True))
+            )(lambda: self._render_nojs(True))
 
             app.route(
                 '/rate_limited' + self.route_id,
                 endpoint = 'rate_limited_captchaify'
-            )(lambda: self.render_rate_limit(True))
+            )(lambda: self._render_rate_limit(True))
 
             app.route(
                 '/captcha' + self.route_id,
                 methods = ['GET', 'POST'],
                 endpoint = 'captcha_captchaify'
-            )(lambda: self.captchaify(True))
+            )(lambda: self._captchaify(True))
 
-            if not default_kwargs['without_customisation']:
+            if not keyword_args['without_customisation']:
                 app.route(
                     '/change_language' + self.route_id,
                     endpoint = 'change_language_captchaify'
-                )(lambda: self.render_change_language(True))
+                )(lambda: self._render_change_language(True))
 
-        elif not default_kwargs['without_customisation']:
-            app.before_request(self.change_language)
+        elif not keyword_args['without_customisation']:
+            app.before_request(self._change_language)
 
-        if default_kwargs['enable_trueclick']:
+        if keyword_args['enable_trueclick']:
 
             @app.route('/trueclick')
             def trueclick_captchaify():
@@ -459,11 +461,11 @@ class Captchaify:
                 """
 
                 if request.args.get('js', '1') == '0':
-                    return self.render_nojs()
+                    return self._render_nojs()
 
-                return self.render_template('captcha_trueclick')
+                return self._render_template('captcha_trueclick')
 
-        error_codes_to_handle = default_kwargs['error_codes']
+        error_codes_to_handle = keyword_args['error_codes']
         if len(error_codes_to_handle) != 0:
             codes = []
             for error_code in error_codes_to_handle:
@@ -475,17 +477,66 @@ class Captchaify:
                     codes.append(error_code['code'])
 
             for error_code in codes:
-                app.register_error_handler(error_code, self.render_exception)
+                app.register_error_handler(error_code, self._render_exception)
 
-        app.before_request(self.rate_limit)
-        app.before_request(self.check_for_bots)
+        app.before_request(self._rate_limit)
+        app.before_request(self._check_for_bots)
 
-        app.after_request(self.add_rate_limit)
-        app.after_request(self.add_args)
-        app.after_request(self.set_cookies)
+        app.after_request(self._add_rate_limit)
+        app.after_request(self._add_args)
+        app.after_request(self._set_cookies)
 
-        if default_kwargs['crawler_hints']:
-            app.after_request(self.crawler_hints)
+        if keyword_args['crawler_hints']:
+            app.after_request(self._crawler_hints)
+
+        if not None in [keyword_args['recaptcha_site_key'], keyword_args['recaptcha_secret']]:
+            @app.context_processor
+            def add_recaptcha():
+                embed = CaptchaEmbed(self.language[0], self.theme, self.altcha)
+
+                return {'recaptcha': Markup(
+                    embed.get_embed('recaptcha', keyword_args['recaptcha_site_key'])
+                    )
+                }
+
+        if not None in [keyword_args['hcaptcha_site_key'], keyword_args['hcaptcha_secret']]:
+            @app.context_processor
+            def add_hcaptcha():
+                embed = CaptchaEmbed(self.language[0], self.theme, self.altcha)
+
+                return {'hcaptcha': Markup(
+                    embed.get_embed('hcaptcha', keyword_args['hcaptcha_site_key'])
+                    )
+                }
+
+        if not None in [keyword_args['turnstile_site_key'], keyword_args['turnstile_secret']]:
+            @app.context_processor
+            def add_turnstile():
+                embed = CaptchaEmbed(self.language[0], self.theme, self.altcha)
+
+                return {'turnstile': Markup(
+                    embed.get_embed('turnstile', keyword_args['turnstile_site_key'])
+                    )
+                }
+
+        if not None in [keyword_args['friendly_site_key'], keyword_args['friendly_secret']]:
+            @app.context_processor
+            def add_friendly():
+                embed = CaptchaEmbed(self.language[0], self.theme, self.altcha)
+
+                return {'friendly': Markup(
+                    embed.get_embed('friendly', keyword_args['friendly_site_key'])
+                    )
+                }
+
+        @app.context_processor
+        def add_altcha():
+            embed = CaptchaEmbed(self.language[0], self.theme, self.altcha)
+
+            return {'altcha': Markup(
+                embed.get_embed('altcha', None)
+                )
+            }
 
 
     ####################
@@ -494,7 +545,7 @@ class Captchaify:
 
 
     @property
-    def req_info(self) -> RequestInfo:
+    def _req_info(self) -> RequestInfo:
         """
         Property that returns the request information for the current request.
 
@@ -514,7 +565,7 @@ class Captchaify:
 
 
     @property
-    def current_configuration(self) -> dict:
+    def _current_configuration(self) -> dict:
         """
         This property returns a dictionary of the current configuration
         based on the current route or endpoint.
@@ -547,7 +598,7 @@ class Captchaify:
         current_configuration['max_rate_limit'] = rate_limit[1]
 
         for config in self.rules:
-            if not matches_rule(config['rule'], self.req_info):
+            if not matches_rule(config['rule'], self._req_info):
                 continue
 
             for config_name, config in config['change'].items():
@@ -565,7 +616,7 @@ class Captchaify:
 
 
     @property
-    def own_routes(self) -> list:
+    def _own_routes(self) -> list:
         """
         Generates and returns a list of custom routes
         specific to the instance based on its properties.
@@ -593,7 +644,7 @@ class Captchaify:
         Returns the IP address of the current request.
         """
 
-        return self.req_info.get_ip()
+        return self._req_info.get_ip()
 
 
     @property
@@ -602,7 +653,7 @@ class Captchaify:
         Returns the user agent of the current request.
         """
 
-        return self.req_info.get_user_agent()
+        return self._req_info.get_user_agent()
 
 
     @property
@@ -611,7 +662,7 @@ class Captchaify:
         Returns the theme of the current request.
         """
 
-        return self.req_info.get_theme(
+        return self._req_info.get_theme(
             self.kwargs['without_customisation'], self.kwargs['theme']
         )
 
@@ -622,7 +673,7 @@ class Captchaify:
         Returns the language of the current request.
         """
 
-        return self.req_info.get_language(
+        return self._req_info.get_language(
             self.kwargs['without_customisation'], self.kwargs['language']
         )
 
@@ -633,7 +684,7 @@ class Captchaify:
         Returns the cookies of the current request.
         """
 
-        return self.req_info.get_without_cookies(self.kwargs['without_cookies'])
+        return self._req_info.get_without_cookies(self.kwargs['without_cookies'])
 
 
     @property
@@ -651,7 +702,7 @@ class Captchaify:
         Check if the client is a crawler.
         """
 
-        return self.req_info.is_crawler()
+        return self._req_info.is_crawler()
 
 
     @property
@@ -663,7 +714,7 @@ class Captchaify:
         if not self.is_valid_ip:
             return False
 
-        return self.req_info.is_tor()
+        return self._req_info.is_tor()
 
 
     @property
@@ -675,7 +726,7 @@ class Captchaify:
         if not self.is_valid_ip:
             return False
 
-        return self.req_info.is_spammer()
+        return self._req_info.is_spammer()
 
 
     @property
@@ -687,18 +738,132 @@ class Captchaify:
         if not self.is_valid_ip:
             return False
 
-        info = self.req_info.get_ip_info(['proxy', 'hosting'])
+        info = self._req_info.get_ip_info(['proxy', 'hosting'])
 
         return info.get('proxy', False) is True\
             or info.get('hosting', False) is True
 
+
+    #######################
+    #### Captcha Check ####
+    #######################
+
+
+    def _is_captcha_valid(self, captcha_type: str) -> bool:
+        """	
+        Check if the captcha is valid
+
+        :param captcha_type: The type of captcha
+        :return: True if the captcha is valid, False otherwise
+        """
+
+        third_party_name = {
+            'recaptcha': 'g-recaptcha', 'turnstile': 'cf-turnstile',
+            'hcaptcha': 'h-captcha', 'friendlycaptcha': 'frc-captcha'
+        }.get(captcha_type)
+
+        response_or_solution = 'solution'\
+            if captcha_type == 'friendlycaptcha' else 'response'
+
+        key = third_party_name + '-' + response_or_solution
+        if request.method.lower() == 'post':
+            response_data = request.form.get(key)
+        else:
+            response_data = request.args.get(key)
+
+        config = self._current_configuration
+        secret = {
+            "recaptcha": config['recaptcha_secret'],
+            "hcaptcha": config['hcaptcha_secret'],
+            "turnstile": config['turnstile_secret'],
+            "friendlycaptcha": config['friendly_secret']
+        }.get(captcha_type, None)
+
+        post_data = {
+            'secret': secret,
+            response_or_solution: response_data
+        }
+
+        api_url = CAPTCHA_THIRD_PARTIES_API_URLS.get(captcha_type)
+
+        post_data_encoded = urllib.parse.urlencode(post_data).encode('utf-8')
+        req = urllib.request.Request(api_url, data=post_data_encoded)
+
+        timeout = 3
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                response_data = response.read()
+                response_json = json.loads(response_data)
+
+            if not validate_captcha_response(
+                response_json, get_domain_from_url(self._req_info.get_url())):
+                return False
+        except Exception:
+            return False
+
+        return True
+
+
+    def is_recaptcha_valid(self) -> bool:
+        """
+        Check if the recaptcha is valid
+
+        :return: True if the recaptcha is valid, False otherwise
+        """
+
+        return self._is_captcha_valid('recaptcha')
+
+
+    def is_hcaptcha_valid(self) -> bool:
+        """
+        Check if the hcaptcha is valid
+
+        :return: True if the hcaptcha is valid, False otherwise
+        """
+
+        return self._is_captcha_valid('hcaptcha')
+
+
+    def is_turnstile_valid(self) -> bool:
+        """
+        Check if the turnstile is valid
+
+        :return: True if the turnstile is valid, False otherwise
+        """
+
+        return self._is_captcha_valid('turnstile')
+
+
+    def is_friendlycaptcha_valid(self) -> bool:
+        """
+        Check if the friendlycaptcha is valid
+
+        :return: True if the friendlycaptcha is valid, False otherwise
+        """
+
+        return self._is_captcha_valid('friendlycaptcha')
+
+
+    def is_altcha_valid(self) -> bool:
+        """
+        Check if the altcha is valid
+
+        :return: True if the altcha is valid, False otherwise
+        """
+
+        if request.method.lower() == 'post':
+            response_data = request.form.get('altcha')
+        else:
+            response_data = request.args.get('altcha')
+
+        return self.altcha.verify_challenge(response_data)
 
     ########################
     #### Render Methods ####
     ########################
 
 
-    def render_exception(self, error: Exception) -> Response:
+    def _render_exception(self, error: Exception) -> Response:
         """
         Renders the exception page.
 
@@ -749,10 +914,10 @@ class Captchaify:
             exception['code'] = int(exception['code'])
 
         exc_code = 200 if exception['code'] not in ERROR_CODES else exception['code']
-        return self.render_template('exception', exception = exception), exc_code
+        return self._render_template('exception', exception = exception), exc_code
 
 
-    def render_block(self, without_redirect: bool = False) -> Response:
+    def _render_block(self, without_redirect: bool = False) -> Response:
         """
         Renders the block page.
 
@@ -763,20 +928,20 @@ class Captchaify:
         g.captchaify_page = True
 
         if not without_redirect and self.kwargs['as_route']:
-            return redirect(self.create_route_url('blocked'))
+            return redirect(self._create_route_url('blocked'))
 
         return_path = get_return_path(request, '/')
         return_url = get_return_url(return_path, request)
 
         emoji = random.choice(EMOJIS)
 
-        return self.render_template(
+        return self._render_template(
             'blocked', emoji = emoji, return_path = return_path,
             return_url = return_url
         ), 403
 
 
-    def render_nojs(self, without_redirect: bool = False) -> Response:
+    def _render_nojs(self, without_redirect: bool = False) -> Response:
         """
         Renders the nojs page.
 
@@ -787,18 +952,18 @@ class Captchaify:
         g.captchaify_page = True
 
         if not without_redirect and self.kwargs['as_route']:
-            return redirect(self.create_route_url('nojs'))
+            return redirect(self._create_route_url('nojs'))
 
         return_path = get_return_path(request, '/')
         return_url = get_return_url(return_path, request)
 
-        return self.render_template(
+        return self._render_template(
             'nojs', return_path = return_path,
             return_url = return_url
         ), 403
 
 
-    def render_rate_limit(self, without_redirect: bool = False) -> Response:
+    def _render_rate_limit(self, without_redirect: bool = False) -> Response:
         """
         Renders the rate limit page.
 
@@ -809,19 +974,19 @@ class Captchaify:
         g.captchaify_page = True
 
         if not without_redirect and self.kwargs['as_route']:
-            return redirect(self.create_route_url('rate_limited'))
+            return redirect(self._create_route_url('rate_limited'))
 
         return_path = get_return_path(request, '/')
         return_url = get_return_url(return_path, request)
 
         emoji = random.choice(TEA_EMOJIS)
-        return self.render_template(
+        return self._render_template(
             'rate_limited', emoji = emoji, return_path = return_path,
             return_url = return_url
         ), 429
 
 
-    def render_change_language(self, without_redirect: bool = False) -> Response:
+    def _render_change_language(self, without_redirect: bool = False) -> Response:
         """
         Renders the change language page.
 
@@ -832,7 +997,7 @@ class Captchaify:
         return_path = get_return_path(request, '/')
         if self.kwargs['as_route']:
             if not without_redirect:
-                return redirect(self.create_route_url('change_language'))
+                return redirect(self._create_route_url('change_language'))
 
         languages = LANGUAGES
 
@@ -864,11 +1029,11 @@ class Captchaify:
 
         g.captchaify_page = True
 
-        return self.render_template(
+        return self._render_template(
             'change_language', **args
         )
 
-    def render_captcha_text_audio(
+    def _render_captcha_text_audio(
             self, is_error: bool = False,
             return_path: Optional[str] = None) -> Response:
         """
@@ -879,9 +1044,9 @@ class Captchaify:
         :return: A Flask response object.
         """
 
-        captcha_data = self.get_captcha_data()
+        captcha_data = self._get_captcha_data()
 
-        config = self.current_configuration
+        config = self._current_configuration
         captcha_type = config['captcha_type']
         hardness = max(1, config['hardness'] / 3 + 0.5)
 
@@ -922,13 +1087,13 @@ class Captchaify:
         captcha_token = self.sses.encrypt(captcha_data)
         error_message = 'That was not right, try again!' if is_error else None
 
-        return self.render_template(
+        return self._render_template(
             'captcha_text_audio', error_message = error_message, text_captcha = text_captcha, 
             audio_captcha = audio_captcha, captcha_token = captcha_token, return_path = return_path
         )
 
 
-    def render_captcha_oneclick(
+    def _render_captcha_oneclick(
             self, is_error: bool = False,
             return_path: Optional[str] = None) -> Response:
         """
@@ -939,13 +1104,13 @@ class Captchaify:
         :return: A Flask response object.
         """
 
-        captcha_data = self.get_captcha_data()
+        captcha_data = self._get_captcha_data()
 
-        config = self.current_configuration
+        config = self._current_configuration
         dataset_file = config['dataset_file']
         hardness = config['hardness']
 
-        dataset = self.load_dataset(dataset_file)
+        dataset = self._load_dataset(dataset_file)
 
         keywords = list(dataset.keys())
         if 'smiling dog' in keywords and len(keywords) == 2:
@@ -1003,14 +1168,14 @@ class Captchaify:
         captcha_token = self.sses.encrypt(captcha_data)
         error_message = 'That was not the right one, try again!' if is_error else None
 
-        return self.render_template(
+        return self._render_template(
             'captcha_oneclick', error_message = error_message,
             original_image = original_image, captcha_images = captcha_images,
             captcha_token = captcha_token, return_path = return_path
         )
 
 
-    def render_captcha_multiclick(
+    def _render_captcha_multiclick(
             self, is_error: bool = False,
             return_path: Optional[str] = None) -> Response:
         """
@@ -1021,14 +1186,14 @@ class Captchaify:
         :return: A Flask response object.
         """
 
-        captcha_data = self.get_captcha_data()
+        captcha_data = self._get_captcha_data()
 
-        config = self.current_configuration
+        config = self._current_configuration
         dataset_file = config['dataset_file']
         hardness = config['hardness']
 
         if dataset_file is not None:
-            dataset = self.load_dataset(dataset_file)
+            dataset = self._load_dataset(dataset_file)
 
             keywords = list(dataset.keys())
             if 'smiling dog' in keywords and len(keywords) == 2:
@@ -1083,14 +1248,14 @@ class Captchaify:
         captcha_token = self.sses.encrypt(captcha_data)
         error_message = 'That was not the right one, try again!' if is_error else None
 
-        return self.render_template(
+        return self._render_template(
             'captcha_multiclick', error_message = error_message,
             original_image = original_image, captcha_images = captcha_images,
             captcha_token = captcha_token, return_path = return_path
         )
 
 
-    def render_captcha_third_parties(
+    def _render_captcha_third_parties(
             self, is_error: bool = False,
             return_path: Optional[str] = None) -> Response:
         """
@@ -1102,9 +1267,9 @@ class Captchaify:
         """
 
         if request.args.get('js', '1') == '0':
-            return self.render_nojs()
+            return self._render_nojs()
 
-        config = self.current_configuration
+        config = self._current_configuration
         captcha_type = config['captcha_type']
         hardness = config['hardness']
 
@@ -1122,11 +1287,11 @@ class Captchaify:
                 "friendlycaptcha": config['friendly_site_key']
             }.get(captcha_type, None)
 
-        captcha_data = self.get_captcha_data()
+        captcha_data = self._get_captcha_data()
         captcha_token = self.sses.encrypt(captcha_data)
         error_message = 'Something has gone wrong. Try again.' if is_error else None
 
-        return self.render_template(
+        return self._render_template(
             'captcha_third_party', error_message = error_message,
             captcha_token = captcha_token, return_path = return_path,
             third_party = captcha_type, site_key = site_key,
@@ -1134,7 +1299,7 @@ class Captchaify:
         )
 
 
-    def render_captcha(self, is_error: bool = False,
+    def _render_captcha(self, is_error: bool = False,
                        return_path: Optional[str] = None,
                        without_redirect: bool = False) -> Response:
         """
@@ -1147,31 +1312,31 @@ class Captchaify:
         """
 
         if not without_redirect and self.kwargs['as_route']:
-            return redirect(self.create_route_url('captcha'))
+            return redirect(self._create_route_url('captcha'))
 
-        captcha_type = self.current_configuration['captcha_type']
+        captcha_type = self._current_configuration['captcha_type']
 
         captcha_display_functions = {
-            "text": self.render_captcha_text_audio,
-            "audio": self.render_captcha_text_audio,
-            "text&audio": self.render_captcha_text_audio,
-            "audio&text": self.render_captcha_text_audio,
-            "oneclick": self.render_captcha_oneclick,
-            "multiclick": self.render_captcha_multiclick,
-            "recaptcha": self.render_captcha_third_parties,
-            "hcaptcha": self.render_captcha_third_parties,
-            "turnstile": self.render_captcha_third_parties,
-            "friendlycaptcha": self.render_captcha_third_parties,
-            "altcha": self.render_captcha_third_parties
+            "text": self._render_captcha_text_audio,
+            "audio": self._render_captcha_text_audio,
+            "text&audio": self._render_captcha_text_audio,
+            "audio&text": self._render_captcha_text_audio,
+            "oneclick": self._render_captcha_oneclick,
+            "multiclick": self._render_captcha_multiclick,
+            "recaptcha": self._render_captcha_third_parties,
+            "hcaptcha": self._render_captcha_third_parties,
+            "turnstile": self._render_captcha_third_parties,
+            "friendlycaptcha": self._render_captcha_third_parties,
+            "altcha": self._render_captcha_third_parties
         }
         captcha_display_function = captcha_display_functions.get(
-            captcha_type, self.render_captcha_oneclick
+            captcha_type, self._render_captcha_oneclick
         )
 
         return captcha_display_function(is_error, return_path)
 
 
-    def render_template(self, template: str, **args) -> Response:
+    def _render_template(self, template: str, **args) -> Response:
         """
         Retrieves and renders templates based on the specified template type.
 
@@ -1185,9 +1350,9 @@ class Captchaify:
         if not template in ALL_TEMPLATE_TYPES:
             template = 'blocked'
 
-        template_dir = self.current_configuration['template_dir']
+        template_dir = self._current_configuration['template_dir']
 
-        page_path, file_name = self.find_template(template)
+        page_path, file_name = self._find_template(template)
         if page_path is None:
             return abort(404)
 
@@ -1211,7 +1376,7 @@ class Captchaify:
                 "is_default_choice": is_default_choice,
                 "as_route": self.kwargs['as_route'],
                 "route_id": self.route_id,
-                "dataset": self.current_configuration['dataset'],
+                "dataset": self._current_configuration['dataset'],
                 "without_watermark": self.kwargs['without_watermark'],
                 "without_customisation": self.kwargs['without_customisation'],
                 "kwargs_without_cookies": self.kwargs['without_cookies'],
@@ -1220,35 +1385,35 @@ class Captchaify:
             args.update(template_args)
 
             if self.kwargs['as_route']:
-                args['captcha_url'] = self.create_route_url('captcha')
+                args['captcha_url'] = self._create_route_url('captcha')
 
             current_url = remove_args_from_url(
-                self.req_info.get_url(),
+                self._req_info.get_url(),
                 ['theme', 'language'] +
                 (['wc'] if not without_cookies else [])
             )
             args.update({
                 "current_url_with_config": remove_args_from_url(
-                    self.req_info.get_url(), ['ct', 'ci', 'captcha', 'js']
+                    self._req_info.get_url(), ['ct', 'ci', 'captcha', 'js']
                 ),
                 "url_args": extract_args(remove_args_from_url(
-                    self.req_info.get_url(), ['ct', 'ci', 'captcha']
+                    self._req_info.get_url(), ['ct', 'ci', 'captcha']
                 )),
                 "url_args_without_rr": extract_args(remove_args_from_url(
-                    self.req_info.get_url(), ['ct', 'ci', 'captcha', 'rr']
+                    self._req_info.get_url(), ['ct', 'ci', 'captcha', 'rr']
                 )),
                 "url_args_without_lang": extract_args(remove_args_from_url(
-                    self.req_info.get_url(), ['ct', 'ci', 'captcha', 'rr', 'language']
+                    self._req_info.get_url(), ['ct', 'ci', 'captcha', 'rr', 'language']
                 )),
                 "current_url": remove_args_from_url(
                     current_url, ['ct', 'ci', 'captcha', 'tc', 'ac']
                 ),
                 "current_url_without_cl": remove_args_from_url(current_url, ['cl']),
-                "current_url_without_wc": remove_args_from_url(self.req_info.get_url(), ['wc']),
+                "current_url_without_wc": remove_args_from_url(self._req_info.get_url(), ['wc']),
                 "path": request.path,
                 "current_path": quote(
                     extract_path_and_args(
-                        remove_args_from_url(self.req_info.get_url(), ['theme', 'language'])
+                        remove_args_from_url(self._req_info.get_url(), ['theme', 'language'])
                     )
                 )
             })
@@ -1277,13 +1442,13 @@ class Captchaify:
     ########################################
 
 
-    def rate_limit(self) -> Optional[str]:
+    def _rate_limit(self) -> Optional[str]:
         """
         Checks for rate limits based on IP addresses and overall request counts.
         """
 
         try:
-            config = self.current_configuration
+            config = self._current_configuration
 
             if not config['enable_rate_limit'] or (self.kwargs['as_route']
                 and request.path == '/rate_limited' + self.route_id):
@@ -1309,51 +1474,51 @@ class Captchaify:
 
             if (ip_request_count >= rate_limit and not rate_limit == 0) or \
                 (request_count >= max_rate_limit and not max_rate_limit == 0):
-                return self.render_rate_limit()
+                return self._render_rate_limit()
 
         except Exception as exc:
             handle_exception(exc)
 
-            return self.render_block()
+            return self._render_block()
 
-    def change_language(self) -> Optional[str]:
+    def _change_language(self) -> Optional[str]:
         """
         Change the language of the web application based on the provided query parameters.
         """
 
         if request.args.get('cl') == '1':
-            return self.render_change_language()
+            return self._render_change_language()
 
 
-    def check_for_bots(self):
+    def _check_for_bots(self):
         """
         Check if the request is from a bot.
         """
 
         try:
-            if request.path in self.own_routes:
+            if request.path in self._own_routes:
                 return
 
-            action = self.current_configuration['action']
+            action = self._current_configuration['action']
 
             if action == 'allow' or\
-                self.is_captcha_verifier_valid():
+                self._is_captcha_verifier_valid():
                 return
 
             if action == 'fight' or not self.is_valid_ip:
-                return self.captchaify()
+                return self._captchaify()
 
             if self.is_crawler or self.is_proxy\
                 or self.is_spammer or self.is_tor:
-                return self.captchaify()
+                return self._captchaify()
 
         except Exception as exc:
             handle_exception(exc)
 
-            return self.captchaify()
+            return self._captchaify()
 
 
-    def add_rate_limit(self, response: Response) -> Response:
+    def _add_rate_limit(self, response: Response) -> Response:
         """
         This method handles rate limiting for incoming requests.
 
@@ -1363,10 +1528,10 @@ class Captchaify:
 
         try:
             client_ip = self.ip
-            if not self.current_configuration['enable_rate_limit'] or client_ip is None:
+            if not self._current_configuration['enable_rate_limit'] or client_ip is None:
                 return response
 
-            rate_limit = self.current_configuration['rate_limit']
+            rate_limit = self._current_configuration['rate_limit']
             rate_limited_ips = PICKLE.load(RATE_LIMIT_PATH)
 
             found = False
@@ -1393,7 +1558,7 @@ class Captchaify:
             handle_exception(exc)
 
 
-    def add_args(self, response: Response) -> Response:
+    def _add_args(self, response: Response) -> Response:
         """
         Modifies HTML content of a response by adding arguments to links and forms.
 
@@ -1443,14 +1608,14 @@ class Captchaify:
                 if not is_default_language:
                     args['language'] = language
 
-            response.data = WebToolbox.add_arguments(response.data, self.req_info, **args)
+            response.data = WebToolbox.add_arguments(response.data, self._req_info, **args)
         except Exception as exc:
             handle_exception(exc)
 
         return response
 
 
-    def set_cookies(self, response: Response) -> Response:
+    def _set_cookies(self, response: Response) -> Response:
         """
         Set cookies in the response object based on various conditions.
 
@@ -1505,7 +1670,7 @@ class Captchaify:
         return response
 
 
-    def crawler_hints(self, response: Response) -> Response:
+    def _crawler_hints(self, response: Response) -> Response:
         """
         Adds crawler hints to the response if the response is an HTML page.
 
@@ -1587,7 +1752,7 @@ class Captchaify:
     #########################
 
 
-    def captchaify(self, without_redirect: bool = False) -> Response:
+    def _captchaify(self, without_redirect: bool = False) -> Response:
         """
         Captchaify the current request.
 
@@ -1596,7 +1761,7 @@ class Captchaify:
         """
 
         try:
-            if request.path in self.own_routes and not without_redirect:
+            if request.path in self._own_routes and not without_redirect:
                 return
 
             return_path = get_return_path(request)
@@ -1604,16 +1769,16 @@ class Captchaify:
                 return_path = '/'
 
             client_ip = self.ip
-            action = self.current_configuration['action']
+            action = self._current_configuration['action']
 
-            if action == 'block' or self.to_many_attempts(action):
-                return self.render_block()
+            if action == 'block' or self._to_many_attempts(action):
+                return self._render_block()
 
-            is_valid_ct, is_failed_captcha = self.verify_captcha_token()
+            is_valid_ct, is_failed_captcha = self._verify_captcha_token()
             if is_valid_ct:
-                return self.valid_captcha(return_path)
+                return self._valid_captcha(return_path)
 
-            if self.is_captcha_verifier_valid():
+            if self._is_captcha_verifier_valid():
                 if not without_redirect:
                     return
 
@@ -1648,12 +1813,12 @@ class Captchaify:
                 return redirect(return_url)
 
             if not without_redirect and self.kwargs['as_route']:
-                return redirect(self.create_route_url('captcha'))
+                return redirect(self._create_route_url('captcha'))
 
             if is_failed_captcha and not client_ip is None:
-                self.add_failed_captcha_attempt(client_ip)
+                self._add_failed_captcha_attempt(client_ip)
 
-            return self.render_captcha(
+            return self._render_captcha(
                 is_error = is_failed_captcha,
                 return_path = quote(return_path),
                 without_redirect = True
@@ -1661,9 +1826,9 @@ class Captchaify:
         except Exception as exc:
             handle_exception(exc)
 
-        return self.render_block()
+        return self._render_block()
 
-    def clean_used_captcha_ids(self) -> None:
+    def _clean_used_captcha_ids(self) -> None:
         """
         Clean up the expired entries from the used_captcha_ids dictionary.
         """
@@ -1675,14 +1840,14 @@ class Captchaify:
         self.used_captcha_ids = cleaned_used_captcha_ids
 
 
-    def add_used_captcha_id(self, captcha_id: str) -> None:
+    def _add_used_captcha_id(self, captcha_id: str) -> None:
         """
         Add a new captcha id to the used_captcha_ids dictionary.
 
         :param captcha_id: The captcha id to be added.
         """
 
-        self.clean_used_captcha_ids()
+        self._clean_used_captcha_ids()
         hashed_captcha_id = Hashing().hash(captcha_id)
 
         used_captcha_ids = self.used_captcha_ids.copy()
@@ -1690,7 +1855,7 @@ class Captchaify:
         self.used_captcha_ids = used_captcha_ids
 
 
-    def was_already_used(self, captcha_id: str) -> bool:
+    def _was_already_used(self, captcha_id: str) -> bool:
         """
         Check if a captcha id has been previously used.
 
@@ -1705,7 +1870,7 @@ class Captchaify:
         return False
 
 
-    def load_dataset(self, dataset_path: str) -> dict:
+    def _load_dataset(self, dataset_path: str) -> dict:
         """
         Loads a dataset from the specified path.
 
@@ -1734,17 +1899,17 @@ class Captchaify:
         return dataset
 
 
-    def get_captcha_data(self) -> dict:
+    def _get_captcha_data(self) -> dict:
         """
         Get the captcha data from the request.
 
         :return: The captcha data.
         """
 
-        url_path = urlparse(self.req_info.get_url()).path
+        url_path = urlparse(self._req_info.get_url()).path
         client_ip = self.ip
 
-        config = self.current_configuration
+        config = self._current_configuration
         captcha_type = config['captcha_type'].split('_')[0]
         captcha_id = generate_random_string(30)
 
@@ -1759,7 +1924,7 @@ class Captchaify:
         return captcha_data
 
 
-    def find_template(self, template: str) -> Tuple[Optional[str], Optional[str]]:
+    def _find_template(self, template: str) -> Tuple[Optional[str], Optional[str]]:
         """
         Finds the path to the template file.
 
@@ -1767,7 +1932,7 @@ class Captchaify:
         :return: A tuple containing the path to the template file and the name of the template file
         """
 
-        template_dir = self.current_configuration['template_dir']
+        template_dir = self._current_configuration['template_dir']
 
         page_path = None
         file_name = None
@@ -1780,7 +1945,7 @@ class Captchaify:
         return page_path, file_name
 
 
-    def verify_captcha_token(self, captcha_token:\
+    def _verify_captcha_token(self, captcha_token:\
                              Optional[str] = None) -> Union[bool, bool]:
         """
         Verify the captcha token.
@@ -1809,13 +1974,13 @@ class Captchaify:
                 return False, False
 
             captcha_id = decrypted_token_data['id']
-            if self.was_already_used(captcha_id):
+            if self._was_already_used(captcha_id):
                 return False, False
 
             if int(time()) - int(decrypted_token_data['time']) > 120:
                 return False, False
 
-            if decrypted_token_data['hardness'] < self.current_configuration['hardness']:
+            if decrypted_token_data['hardness'] < self._current_configuration['hardness']:
                 return False, False
 
             token_captcha_type = decrypted_token_data['type']
@@ -1861,7 +2026,7 @@ class Captchaify:
                     else:
                         response_data = request.args.get(key)
 
-                    config = self.current_configuration
+                    config = self._current_configuration
                     secret = {
                         "recaptcha": config['recaptcha_secret'],
                         "hcaptcha": config['hcaptcha_secret'],
@@ -1886,7 +2051,7 @@ class Captchaify:
                             response_json = json.loads(response_data)
 
                         if not validate_captcha_response(
-                            response_json, get_domain_from_url(self.req_info.get_url())):
+                            response_json, get_domain_from_url(self._req_info.get_url())):
                             is_failed_captcha = True
                     except Exception:
                         is_failed_captcha = True
@@ -1920,7 +2085,7 @@ class Captchaify:
                     if str(audio_captcha) != str(captcha_token_audio):
                         is_failed_captcha = True
 
-            self.add_used_captcha_id(captcha_id)
+            self._add_used_captcha_id(captcha_id)
             if not is_failed_captcha:
                 comparison_path = Hashing().compare(
                     url_path, decrypted_token_data['path']
@@ -1945,7 +2110,7 @@ class Captchaify:
         return False, is_failed_captcha
 
 
-    def is_captcha_verifier_valid(self) -> bool:
+    def _is_captcha_verifier_valid(self) -> bool:
         """
         Check the validity of the captcha verifier.
 
@@ -1990,7 +2155,7 @@ class Captchaify:
         return False
 
 
-    def to_many_attempts(self, action: str) -> bool:
+    def _to_many_attempts(self, action: str) -> bool:
         """
         Check if there are too many failed attempts for the specified action.
 
@@ -1999,7 +2164,7 @@ class Captchaify:
         """
 
         try:
-            client_ip = self.req_info.get_ip()
+            client_ip = self._req_info.get_ip()
             if client_ip is None:
                 client_ip = 'None'
 
@@ -2023,7 +2188,7 @@ class Captchaify:
         return False
 
 
-    def add_failed_captcha_attempt(self, client_ip: Optional[str] = None) -> None:
+    def _add_failed_captcha_attempt(self, client_ip: Optional[str] = None) -> None:
         """
         Add a failed captcha attempt for the specified client IP.
 
@@ -2064,7 +2229,7 @@ class Captchaify:
             handle_exception(exc)
 
 
-    def valid_captcha(self, return_path: Optional[str] = None):
+    def _valid_captcha(self, return_path: Optional[str] = None):
         """
         Generates a token to verify that the captcha has been completed.
 
@@ -2101,7 +2266,7 @@ class Captchaify:
         if self.kwargs['as_route']:
             url = get_return_url(return_path, request)
         else:
-            url = remove_all_args_from_url(self.req_info.get_url())
+            url = remove_all_args_from_url(self._req_info.get_url())
 
         without_cookies, is_default_choice = self.without_cookies
 
@@ -2125,7 +2290,7 @@ class Captchaify:
         return redirect(url)
 
 
-    def create_route_url(self, template: str, without_return_path: Optional[bool] = None) -> str:
+    def _create_route_url(self, template: str, without_return_path: Optional[bool] = None) -> str:
         """
         Creates a route URL with the specified template, including return path,
         theme, and language parameters.
@@ -2136,14 +2301,14 @@ class Captchaify:
         """
 
         if not isinstance(without_return_path, bool):
-            if request.path in self.own_routes:
+            if request.path in self._own_routes:
                 without_return_path = True
 
         return_path = get_return_path(request)
         if return_path is None:
             return_path = quote(
                 extract_path_and_args(
-                    remove_args_from_url(self.req_info.get_url(),
+                    remove_args_from_url(self._req_info.get_url(),
                         ['theme', 'language', 'captcha',
                          'return_path', 'wc', 'js']
                     )

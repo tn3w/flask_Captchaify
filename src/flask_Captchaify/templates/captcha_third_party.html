@@ -294,6 +294,10 @@
                 </p>
                 {% endif %}
                 <form id="captchaForm" action="{{ current_url }}" method="{% if not as_route %}GET{% else %}POST{% endif %}">
+                    <input type="hidden" name="ct" value="{{ captcha_token }}">
+                    {% if return_path|default %}
+                    <input type="hidden" name="return_path" value="{{ return_path }}">
+                    {% endif %}
                     <div id="captchaContainer">
                         {% if not third_party == 'altcha' %}
                         <div id="captchaBox" class="
@@ -320,10 +324,6 @@
                         <altcha-widget hidelogo challengejson="{{ altcha_challenge }}" strings="{{ strings }}"></altcha-widget>
                         {% endif %}
                     </div>
-                    {% if return_path|default %}
-                    <input type="hidden" name="return_path" value="{{ return_path }}">
-                    {% endif %}
-                    <input type="hidden" name="ct" value="{{ captcha_token }}">
                 </form>
             </div>
         </main>

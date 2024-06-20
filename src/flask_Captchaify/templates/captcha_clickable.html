@@ -9,8 +9,6 @@
             :root {
                 --background: #f2f2f2;
                 --text: #181818;
-                --box-shadow: #e2e2e2;
-                --captcha-background: #c0c0c0;
                 --ancher-color: #222;
                 {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
                 --background-color: #f2f2f2;
@@ -29,8 +27,6 @@
             :root {
                 --background: #121212;
                 --text: #f2f2f2;
-                --box-shadow: #2e2e2e;
-                --captcha-background: #1f1f1f;
                 --ancher-color: #999;
                 {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
                 --background-color: #121212;
@@ -49,8 +45,6 @@
             :root {
                 --background: #f2f2f2;
                 --text: #181818;
-                --box-shadow: #e2e2e2;
-                --captcha-background: #c0c0c0;
                 --ancher-color: #222;
                 {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
                 --background-color: #f2f2f2;
@@ -70,8 +64,7 @@
                 :root {
                     --background: #121212;
                     --text: #f2f2f2;
-                    --box-shadow: #2e2e2e;
-                    --captcha-background: #1f1f1f;
+                    --main-ancher-color: #00BFFF;
                     --ancher-color: #999;
                     {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
                     --background-color: #121212;
@@ -102,31 +95,40 @@
                 font-family: Consolas, Arial, sans-serif;
                 background-color: var(--background);
                 color: var(--text);
+                margin: 0;
+                height: 100%;
+                overflow: hidden;
             }
 
             main {
+                display: flex;
+                justify-content: center;
+                align-items: center;
                 {% if not without_customisation or not without_watermark %}
                 height: 90vh;
                 {% else %}
                 height: 100vh;
                 {% endif %}
-                display: flex;
-                justify-content: center;
-                align-items: center;
                 text-align: center;
             }
 
-            .captcha-container {
-                background-color: var(--captcha-background);
+            .square-image {
+                width: 200px;
+                height: 200px;
+                display: block;
+                margin: 0 auto;
                 border-radius: 5px;
-                box-shadow: 5px 5px 5px var(--box-shadow);
-                padding: 20px;
-                max-width: 400px;
+                box-shadow: 2px 2px 10px var(--border);
             }
 
-            h2 {
-                text-align: center;
-                margin-bottom: 20px;
+            p {
+                max-width: 300px;
+            }
+
+            .caption {
+                font-size: 18px;
+                margin: 0 auto;
+                padding-top: 20px;
             }
 
             form {
@@ -135,35 +137,43 @@
                 align-items: center;
             }
 
-            .captcha-image,
-            .captcha-audio {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                margin-bottom: 20px;
+            .pixel-checkbox {
+                width: 20px;
+                height: 20px;
+                margin: 0;
+                padding: 0;
+                border: none;
+                appearance: none;
+                -webkit-appearance: none;
+                position: absolute;
+                display: none;
             }
 
-            img {
-                max-width: 100%;
-                margin-bottom: 10px;
+            .pixel-label {
+                display: block;
+                width: 15px;
+                height: 15px;
+                position: absolute;
+                cursor: pointer;
             }
 
-            audio {
-                width: 100%;
-                margin-bottom: 10px;
+            .pixel-checkbox:checked + .pixel-label {
+                background-color: rgba(255, 255, 255, 0.8);
             }
 
-            input {
-                padding: 8px 12px;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                margin-bottom: 10px;
+            .image-container {
+                position: relative;
                 width: 300px;
-                background-color: var(--background);
-                color: var(--text);
+                height: 300px;
+            }
+
+            .pixel-image {
+                width: 100%;
+                height: 100%;
             }
 
             button {
+                margin-top: 20px;
                 padding: 10px 20px;
                 background-color: #0078FF;
                 color: #f2f2f2;
@@ -180,9 +190,9 @@
                 text-decoration: underline;
             }
             {% if not without_customisation or not without_watermark %}
-
             footer {
                 text-align: center;
+                height: 10vh;
             }
 
             footer nav ul {
@@ -213,6 +223,14 @@
             @media screen and (max-width: 600px) {
                 .captcha-container {
                     max-width: 80%;
+                }
+            }
+
+            @media (max-width: 450px) {
+                .grid-item input[type="checkbox"] {
+                    transform: scale(1.2);
+                    margin-right: 1px;
+                    margin-bottom: 1px;
                 }
             }
             {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
@@ -287,11 +305,11 @@
         </div>
         {% endif %}
         <main>
-            <div class="captcha-container">
-                <h2 ntr="1">Beep beop Boop?</h2>
-                <p>Before you can see the page you have to prove that you are not a robot!</p>
+            <div>
+                <img class="square-image" src="{{ original_image }}">
+                <p class="caption">{% if dataset == 'ai-dogs' %}Choose the smiling dogs:{% else %}Select all images that contain the same motif:{% endif %}</p>
                 {% if error_message|default %}
-                <p style="color: #ff0000;margin:10px;">
+                <p class="caption" style="color: #ff0000;font-size: 16px;">
                     {{ error_message }}
                 </p>
                 {% endif %}
@@ -300,21 +318,13 @@
                     {% if return_path|default %}
                     <input type="hidden" name="return_path" value="{{ return_path }}">
                     {% endif %}
-                    {% if text_captcha|default %}
-                    <div class="captcha-image">
-                        <img src="{{ text_captcha }}" alt="Captcha Image">
-                        <input type="text" name="tc" placeholder="Enter what you see in the picture." required>
-                    </div>
-                    {% endif %}
-                    {% if audio_captcha|default %}
-                    <div class="captcha-audio">
-                        <audio controls>
-                            <source src="{{ audio_captcha }}" type="audio/wav">
-                            Your browser does not support the audio element.
-                        </audio>
-                        <input type="text" name="ac" placeholder="Enter what you hear." required>
-                    </div>
-                    {% endif %}
+                    <img src="{{ image }}" alt="Random Pixel Image" class="pixel-image">
+                    {% for y in range(0, 20) %}
+                        {% for x in range(0, 20) %}
+                            <input type="checkbox" id="block-{{ x }}-{{ y }}" class="pixel-checkbox" name="block-{{ x }}-{{ y }}" value="1">
+                            <label for="block-{{ x }}-{{ y }}" class="pixel-label" style="left: {{ x * 20 }}px; top: {{ y * 20 }}px;"></label>
+                        {% endfor %}
+                    {% endfor %}
                     <button type="submit">Check</button>
                 </form>
             </div>

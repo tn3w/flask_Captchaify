@@ -306,6 +306,9 @@
                 {% endif %}
                 <form action="{{ current_url }}" method="{% if not as_route %}GET{% else %}POST{% endif %}">
                     <input type="hidden" name="ct" value="{{ captcha_token }}">
+                    {% if return_path|default %}
+                    <input type="hidden" name="return_path" value="{{ return_path }}">
+                    {% endif %}
                     <div class="grid-container">
                         {% for image in captcha_images %}
                         <div class="grid-item">
@@ -314,9 +317,6 @@
                         </div>
                         {% endfor %}
                     </div>
-                    {% if return_path|default %}
-                    <input type="hidden" name="return_path" value="{{ return_path }}">
-                    {% endif %}
                     <button type="submit">Check</button>
                 </form>
             </div>
