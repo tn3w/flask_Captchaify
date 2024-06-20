@@ -35,18 +35,21 @@ if __name__ == '__main__':
 ### Table of Contents
    - [Table of Contents](#table-of-contents)
    - [How does it work](#how-does-it-work)
-   - [Features](#features)
-   - [Installation guide](#installation-guide)
-   - [Some Screenshots](#some-screenshots)
-   - [To-do's](#to-dos)
-   - [Personalization](#personalization)
+      - [Features](#features)
+   - [About](#about)
+      - [Installation](#installation)
+      - [To-do's](#to-dos)
+      - [Contributing](#note-for-contributors)
+   - [Documentation](#documentation)
+      - [Captcha Integration](#captcha-integration)
+      - [Arguments](#arguments)
 
 
 ### How does it work?
 In situations where it is deemed necessary, a captivating challenge may be presented to either the user or any automated agents, depending on the predetermined level of security required. Upon successful completion of this captivating challenge, a unique token is generated. This token serves as a secure vessel, encapsulating the client's information in an encrypted format. Subsequently, this token is deployed as both a cookie within the client's browser or as a parameter in the URL, denoted as 'captcha'. This mechanism ensures the continual validation of legitimacy with each subsequent request.
 
 
-### Features
+#### Features
 - **Captcha Verification:** flask_Captchaify can verify captchas from third-party services like Google reCaptcha, hCaptcha, Cloudflare Turnstile, and Friendly Captcha, as well as custom verification options such as images, text or audio captchas.
 - **Bot Identification:** flask_Captchaify can automatically identify and block known bots using block lists, API`s and similar mechanisms.
 - **Rate Limiting:** flask_Captchaify allows you to set rate limits for requests to prevent bots from overwhelming your server.
@@ -60,8 +63,11 @@ In situations where it is deemed necessary, a captivating challenge may be prese
 - **Personalization:** You can customize the behavior of flask_Captchaify by providing your own arguments and values.
 - **Fully Open Source:** flask_Captchaify is fully open source and free to use. ʕっ•ᴥ•ʔっ
 
+<br>
 
-### Installation guide
+## About
+
+### Installation
 1. Make sure you have the latest version of Python and Pip installed, you also need git installed.
 2. Install the script with pip `pip install flask_Captchaify` or manually via `git clone https://github.com/tn3w/flask_Captchaify` or download the zip.
 3. If you installed it manually, make sure your python script is in the folder where there is a subfolder flask_Captchaify, and make sure you run `pip install -r requirements.txt` in the flask_Captchaify folder.
@@ -77,7 +83,6 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    ```python
    from flask_Captchaify import Captchaify
    ```
-
 
 ### Some Screenshots
 Captcha oneclick:
