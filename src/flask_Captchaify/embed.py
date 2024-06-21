@@ -36,8 +36,9 @@ SCRIPT = ('''function a(){return window.matchMedia("(prefers-color-scheme: dark)
           '''dd(t));const c=document.createElement("script");c.src="URL",c.async=!0,c.defer=!0,d'''
           '''ocument.head.appendChild(c)};''')
 
-ALTCHA_EMBED = ('''<altcha-widget hidelogo challengejson="CHALLENGE" strings="STRINGS"></altcha-'''
-                '''widget><script>SCRIPT</script>''')
+ALTCHA_EMBED = ('''<altcha-widget style="font-family: Segoe UI, Arial, sans-serif;" hidelogo cha'''
+                '''llengejson="CHALLENGE" strings="STRINGS"></altcha-widget><script>SCRIPT</scri'''
+                '''pt>''')
 ALTCHA_SCRIPT = ('''function a(e){var t=document.createElement("style");t.styleSheet?t.styleShee'''
                  '''t.cssText=e:t.appendChild(document.createTextNode(e)),document.head.appendCh'''
                  '''ild(t)}const cssStringLight=":root{--altcha-color-base:#f2f2f2;--altcha-colo'''
