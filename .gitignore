@@ -160,7 +160,9 @@ cython_debug/
 #.idea/
 
 src/flask_Captchaify/data
+src/flask_Captchaify/datasets
 test*
 log.txt
 .vscode
 templates
+trueclick.js

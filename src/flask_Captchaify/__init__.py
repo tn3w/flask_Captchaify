@@ -378,6 +378,7 @@ class Captchaify:
         }
         self.kwargs = kwargs
 
+        self.download_datasets()
         update_geolite_databases('geoip' in kwargs['third_parties'])
         if kwargs['crawler_hints']:
             self.crawler_hints_cache = {}
@@ -538,6 +539,23 @@ class Captchaify:
                 )
             }
 
+    def download_datasets(self) -> None:
+        """
+        This method downloads the datasets if they haven't already been
+        downloaded.
+        """
+
+        if not os.path.exists(DATASETS_DIR):
+            os.mkdir(DATASETS_DIR)
+
+        for url in [
+            'https://github.com/tn3w/Captcha_Datasets/raw/master/keys.json',
+            'https://github.com/tn3w/Captcha_Datasets/raw/master/animals.json',
+            'https://github.com/tn3w/Captcha_Datasets/raw/master/ai-dogs.json'
+            ]:
+            file_name = url.rsplit('/', maxsplit=1)
+            if not os.path.exists(os.path.join(DATASETS_DIR, file_name)):
+                urllib.request.urlretrieve(url, os.path.join(DATASETS_DIR, file_name))
 
     ####################
     #### Properties ####
@@ -857,6 +875,7 @@ class Captchaify:
             response_data = request.args.get('altcha')
 
         return self.altcha.verify_challenge(response_data)
+
 
     ########################
     #### Render Methods ####
