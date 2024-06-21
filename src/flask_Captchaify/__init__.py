@@ -553,7 +553,8 @@ class Captchaify:
             'https://github.com/tn3w/Captcha_Datasets/raw/master/animals.json',
             'https://github.com/tn3w/Captcha_Datasets/raw/master/ai-dogs.json'
             ]:
-            file_name = url.rsplit('/', maxsplit=1)
+            file_name = url.rsplit('/', maxsplit=1)[-1]
+            print('Downloading', file_name)
             if not os.path.exists(os.path.join(DATASETS_DIR, file_name)):
                 urllib.request.urlretrieve(url, os.path.join(DATASETS_DIR, file_name))
 
