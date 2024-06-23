@@ -63,6 +63,10 @@ if not os.path.isdir(DATA_DIR):
     os.makedirs(DATA_DIR, exist_ok = True)
 
 ASSETS_DIR: Final[str] = os.path.join(WORK_DIR, 'assets')
+TEMPLATE_DIR: Final[str] = os.path.join(WORK_DIR, 'templates')
+DATASETS_DIR: Final[str] = os.path.join(WORK_DIR, 'datasets')
+
+ASSETS_DIR: Final[str] = os.path.join(WORK_DIR, 'assets')
 LOG_FILE: Final[str] = os.path.join(CURRENT_DIR, 'log.txt')
 
 USER_AGENTS: Final[list] =\

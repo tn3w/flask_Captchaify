@@ -8,19 +8,22 @@
         <noscript>
             <meta http-equiv="refresh" content="0;url={% if not as_route %}{{ current_url_with_config }}{% if '?' in current_url_with_config %}&{% else %}?{% endif %}js=0{% else %}/nojs{{ route_id }}{{ url_args }}{% endif %}">
         </noscript>
-        {% if not is_default_theme %}
-            {% if third_party == 'recaptcha' %}
-            <script src="https://www.google.com/recaptcha/api.js?explicit&hl={{ language }}" async defer></script>
-            {% elif third_party == 'hcaptcha' %}
-            <script src="https://hcaptcha.com/1/api.js?explicit&hl={{ language }}" async defer></script>
-            {% elif third_party == 'turnstile' %}
-            <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?explicit&hl={{ language }}" async defer></script>
-            {% elif third_party == 'friendlycaptcha' %}
-            <script src="https://cdn.jsdelivr.net/npm/friendly-challenge/widget.module.min.js" async defer></script>
+        {% if third_party == 'trueclick' %}
+        <script src="/trueclick_captchaify.js"></script>
+        {% else %}
+            {% if not is_default_theme %}
+                {% if third_party == 'recaptcha' %}
+                <script src="https://www.google.com/recaptcha/api.js?explicit&hl={{ language }}" async defer></script>
+                {% elif third_party == 'hcaptcha' %}
+                <script src="https://hcaptcha.com/1/api.js?explicit&hl={{ language }}" async defer></script>
+                {% elif third_party == 'turnstile' %}
+                <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?explicit&hl={{ language }}" async defer></script>
+                {% elif third_party == 'friendlycaptcha' %}
+                <script src="https://cdn.jsdelivr.net/npm/friendly-challenge/widget.module.min.js" async defer></script>
+                {% endif %}
+            {% elif third_party == 'altcha' %}
+                <script src="https://cdn.jsdelivr.net/npm/altcha/dist/altcha.min.js" async defer type="module"></script>
             {% endif %}
-        {% endif %}
-        {% if third_party == 'altcha' %}
-            <script src="https://cdn.jsdelivr.net/npm/altcha/dist/altcha.min.js" async defer type="module"></script>
         {% endif %}
         <style>{% if theme == "light" and not is_default_theme %}
             :root {
@@ -299,7 +302,7 @@
                     <input type="hidden" name="return_path" value="{{ return_path }}">
                     {% endif %}
                     <div id="captchaContainer">
-                        {% if not third_party == 'altcha' %}
+                        {% if not third_party in ['altcha', 'trueclick'] %}
                         <div id="captchaBox" class="
                             {% if third_party == 'recaptcha' %}g-recaptcha
                             {% elif third_party == 'hcaptcha' %}h-captcha
@@ -320,7 +323,9 @@
                             data-lang="{{ language }}"
                             {% endif %}>
                         </div>
-                        {% else %}
+                        {% elif third_party == 'trueclick' %}
+                        <div class="trueclick" data-callback="onSuccess()" data-lang="{{ language }}"{% if not is_default_theme %} data-theme="{{ theme }}"{% endif %}></div>
+                        {% elif third_party == 'altcha' %}
                         <altcha-widget hidelogo challengejson="{{ altcha_challenge }}" strings="{{ strings }}"></altcha-widget>
                         {% endif %}
                     </div>
@@ -382,10 +387,10 @@
                 500 });
             };
             {% endif %}
-            {% if (is_default_choice and without_cookies) or (is_default_theme and not third_party == 'altcha')%}
+            {% if (is_default_choice and without_cookies) or (is_default_theme and not third_party in ['altcha', 'trueclick'])%}
 
             document.addEventListener('DOMContentLoaded', () => {
-                {% if is_default_theme and not third_party == 'altcha' %}
+                {% if is_default_theme and not third_party in ['altcha', 'trueclick'] %}
                 const theme = getTheme();
                 let captchaBox = document.getElementById('captchaBox');
                 captchaBox.setAttribute('data-theme', theme);

@@ -57,6 +57,10 @@ ALTCHA_SCRIPT = ('''function a(e){var t=document.createElement("style");t.styleS
                  '''ript");t.src="https://cdn.jsdelivr.net/npm/altcha/dist/altcha.min.js",t.asyn'''
                  '''c=!0,t.defer=!0,t.type="module";document.head.appendChild(t)};''')
 
+TRUECLICK_EMBED = ('''<div class="trueclick" data-lang="LANGUAGE" data-theme="THEME"></div><scri'''
+                   '''pt>var e=document.createElement("script");e.src="/trueclick_captchaify.js"'''
+                   ''',document.head.appendChild(e)</script>''')
+
 
 class CaptchaEmbed:
     """
@@ -109,6 +113,12 @@ class CaptchaEmbed:
         :param site_key: The site key of the captcha.
         :return: The embed that is supposed to be added to the HTML document.
         """
+
+        if captcha_type == 'trueclick':
+            embed = TRUECLICK_EMBED.replace('LANGUAGE', self.language)
+            embed = embed.replace('THEME', self.theme if not self.is_default_theme else '')
+
+            return embed
 
         if captcha_type == 'altcha':
             challenge = html.escape(json.dumps(self.altcha.create_challenge(2)))

@@ -25,27 +25,18 @@ from markupsafe import Markup
 from bs4 import BeautifulSoup
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
-from flask import Flask, Response, request, g, abort, send_file, make_response, redirect
-from .utils import JSON, PICKLE, Hashing, SymmetricCrypto, SSES, get_work_dir,\
-    generate_random_string, remove_all_args_from_url, search_languages, get_random_image,\
-    manipulate_image_bytes, convert_image_to_base64, get_return_path, get_return_url,\
-    extract_path_and_args, handle_exception, get_domain_from_url, validate_captcha_response,\
-    remove_args_from_url, extract_args, get_char
+from flask import Flask, Response, request, g, abort, send_file, make_response, redirect, jsonify
+from .utils import DATASETS_DIR, DATA_DIR, TEMPLATE_DIR, ASSETS_DIR, JSON, PICKLE, Hashing,\
+    SymmetricCrypto, SSES, generate_random_string, remove_all_args_from_url, search_languages,\
+    get_random_image, manipulate_image_bytes, convert_image_to_base64, get_return_path,\
+    get_return_url, extract_path_and_args, handle_exception, get_domain_from_url,\
+    validate_captcha_response, remove_args_from_url, extract_args, get_char
 from .webtoolbox import WebToolbox, render_template
 from .req_info import RequestInfo, update_geolite_databases, matches_rule, is_valid_ip
 from .altcha import Altcha
 from .embed import CaptchaEmbed
+from .trueclick import TrueClick
 
-
-WORK_DIR: Final[str] = get_work_dir()
-DATA_DIR: Final[str] = os.path.join(WORK_DIR, 'data')
-
-if not os.path.isdir(DATA_DIR):
-    os.makedirs(DATA_DIR, exist_ok = True)
-
-ASSETS_DIR: Final[str] = os.path.join(WORK_DIR, 'assets')
-TEMPLATE_DIR: Final[str] = os.path.join(WORK_DIR, 'templates')
-DATASETS_DIR: Final[str] = os.path.join(WORK_DIR, 'datasets')
 
 DATASET_PATHS: Final[dict] = {
     'default': os.path.join(DATASETS_DIR, 'keys.json'),
@@ -77,15 +68,15 @@ LANGUAGE_CODES: Final[list] = [language['code'] for language in LANGUAGES]
 ALL_CAPTCHA_TYPES: Final[list] = [
     'text', 'audio', 'text&audio', 'audio&text', 'oneclick',
     'multiclick', 'recaptcha', 'hcaptcha', 'turnstile',
-    'friendlycaptcha', 'altcha'
+    'friendlycaptcha', 'altcha', 'trueclick'
 ]
 ALL_DATASET_TYPES: Final[list] = ['keys', 'animals', 'ki-dogs']
 ALL_ACTIONS: Final[list] = ['allow', 'block', 'fight', 'captcha']
 ALL_THIRD_PARTIES: Final[list] = ['geoip', 'tor', 'ipapi', 'stopforumspam']
 ALL_TEMPLATE_TYPES: Final[list] = [
     'captcha_text_audio', 'captcha_multiclick', 'captcha_oneclick',
-    'captcha_trueclick', 'captcha_third_party', 'change_language',
-    'blocked', 'nojs', 'rate_limited', 'exception'
+    'captcha_third_party', 'change_language', 'blocked', 'nojs',
+    'rate_limited', 'exception'
 ]
 ALL_THEMES: Final[list] = ['dark', 'light']
 
@@ -270,18 +261,20 @@ DEFAULT_KWARGS: Final[dict] = {
     "rate_limit": (15, 300), "block_crawler": True,
     "crawler_hints": True, "as_route": False,
     "fixed_route_name": '_captchaify', "theme": 'light', "language": 'en',
-    "enable_trueclick": False, "error_codes": [],
+    "without_trueclick": False, "error_codes": [],
     "recaptcha_site_key": None, "recaptcha_secret": None,
     "hcaptcha_site_key": None, "hcaptcha_secret": None,
     "turnstile_site_key": None, "turnstile_secret": None,
     "friendly_site_key": None, "friendly_secret": None
 }
 
+
 class Captchaify:
     """
     Shows the user/bot a captcha before the request first if the request comes from a dangerous IP
     Further function are: Rate Limits, Crawler Hints, Custom Templates, Rules for Specific Routes
     """
+
 
     def __init__(self, app: Optional[Flask] = None,
                  rules: Optional[dict[tuple, str]] = None,
@@ -295,7 +288,7 @@ class Captchaify:
                  enable_rate_limit: bool = True, rate_limit: Tuple[int, int] = (15, 300),
                  block_crawler: bool = True, crawler_hints: bool = True,
                  theme: str = 'light', language: str = 'en',
-                 enable_trueclick: bool = False, error_codes: Optional[list] = None,
+                 without_trueclick: bool = False, error_codes: Optional[list] = None,
                  recaptcha_site_key: Optional[str] = None, recaptcha_secret: Optional[str] = None,
                  hcaptcha_site_key: Optional[str] = None, hcaptcha_secret: Optional[str] = None,
                  turnstile_site_key: Optional[str] = None, turnstile_secret: Optional[str] = None,
@@ -327,7 +320,7 @@ class Captchaify:
         :param crawler_hints: Whether to show crawler hints
         :param theme: The default theme
         :param language: The default language
-        :param enable_trueclick: Whether to enable trueclick
+        :param without_trueclick: Whether to disable TrueClick
         :param error_codes: The default error codes to handle
         :param recaptcha_site_key: The reCAPTCHA site key
         :param recaptcha_secret: The reCAPTCHA secret
@@ -370,7 +363,7 @@ class Captchaify:
             "enable_rate_limit": enable_rate_limit, "rate_limit": rate_limit,
             "block_crawler": block_crawler, "crawler_hints": crawler_hints,
             "theme": theme, "language": language,
-            "enable_trueclick": enable_trueclick, "error_codes": error_codes,
+            "without_trueclick": without_trueclick, "error_codes": error_codes,
             "recaptcha_site_key": recaptcha_site_key, "recaptcha_secret": recaptcha_secret,
             "hcaptcha_site_key": hcaptcha_site_key, "hcaptcha_secret": hcaptcha_secret,
             "turnstile_site_key": turnstile_site_key, "turnstile_secret": turnstile_secret,
@@ -378,7 +371,7 @@ class Captchaify:
         }
         self.kwargs = kwargs
 
-        self.download_datasets()
+        self._download_datasets()
         update_geolite_databases('geoip' in kwargs['third_parties'])
         if kwargs['crawler_hints']:
             self.crawler_hints_cache = {}
@@ -411,6 +404,10 @@ class Captchaify:
             else:
                 keyword_args[key] = kwargs[key]
         self.kwargs = keyword_args
+
+        ################
+        #### Routes ####
+        ################
 
         if keyword_args['as_route']:
             if keyword_args.get('fixed_route_name') is None:
@@ -451,20 +448,86 @@ class Captchaify:
         elif not keyword_args['without_customisation']:
             app.before_request(self._change_language)
 
-        if keyword_args['enable_trueclick']:
+        ###################
+        #### Trueclick ####
+        ###################
 
-            @app.route('/trueclick')
-            def trueclick_captchaify():
+        if not self.kwargs['without_trueclick']:
+
+            @app.route('/trueclick_captchaify.js', endpoint = 'trueclick_js_captchaify')
+            def trueclickjs_captchaify() -> Response:
                 """
-                Route for the trueclick captcha page.
-
-                :return: The rendered template.
+                Returns the trueclick.js file.
+                
+                :return: The trueclick.js file.
                 """
 
-                if request.args.get('js', '1') == '0':
-                    return self._render_nojs()
+                return send_file(
+                    os.path.join(ASSETS_DIR, 'trueclick-min.js'),
+                    mimetype = 'application/javascript', max_age=31536000
+                )
 
-                return self._render_template('captcha_trueclick')
+            @app.route('/trueclick_captchaify/<action>', methods = ['POST'],
+                        endpoint = 'trueclick_captchaify')
+            def trueclick_captchaify(action = None) -> Response:
+                """
+                Generates and verifies trueclick captchas.
+
+                :param action: The action to perform.
+                :return: The captcha challenge and dataset if
+                            the request is valid, otherwise the error.
+                """
+
+                if not action in ['generate', 'verify']:
+                    return jsonify({'status': 'error', 'error': 'Invalid request'})
+
+                config = self._current_configuration
+                dataset_dir, hardness, dataset =\
+                    config['dataset_dir'], config['hardness'], config['dataset']
+
+                trueclick = TrueClick(dataset_dir, hardness)
+                if action == 'generate':
+                    captcha_challenge = trueclick.generate_captcha(dataset)
+
+                    return jsonify(
+                        {
+                            'status': 'ok', 'error': None,
+                            'challenge': captcha_challenge,
+                            'dataset': dataset
+                        }
+                    )
+
+                if not request.is_json:
+                    return jsonify({'status': 'error', 'error': 'Invalid request'})
+                data = request.get_json()
+
+                captcha_id, captcha_token = data.get('id'), data.get('token')
+                selected_indices = [
+                    int(digit) for digit in data.get('selected', '')
+                    if digit.isdigit()
+                ]
+
+                if not captcha_id or not captcha_token or not selected_indices:
+                    return jsonify({'status': 'error', 'error': 'Invalid request'})
+
+                is_verified = trueclick.verify_captcha(
+                    captcha_id, captcha_token, selected_indices
+                )
+
+                return jsonify(
+                    {
+                        'status': 'ok' if is_verified else 'error',
+                        'error': 'Invalid captcha' if not is_verified else None,
+                        'challenge':
+                            trueclick.generate_captcha(dataset)\
+                                if not is_verified else None,
+                        'dataset': dataset
+                    }
+                )
+
+        ########################
+        #### Error handlers ####
+        ########################
 
         error_codes_to_handle = keyword_args['error_codes']
         if len(error_codes_to_handle) != 0:
@@ -480,6 +543,10 @@ class Captchaify:
             for error_code in codes:
                 app.register_error_handler(error_code, self._render_exception)
 
+        ################################
+        #### before & after_request ####
+        ################################
+
         app.before_request(self._rate_limit)
         app.before_request(self._check_for_bots)
 
@@ -489,6 +556,10 @@ class Captchaify:
 
         if keyword_args['crawler_hints']:
             app.after_request(self._crawler_hints)
+
+        ############################
+        #### Context Processors ####
+        ############################
 
         if not None in [keyword_args['recaptcha_site_key'], keyword_args['recaptcha_secret']]:
             @app.context_processor
@@ -531,15 +602,17 @@ class Captchaify:
                 }
 
         @app.context_processor
-        def add_altcha():
+        def add_altcha_trueclick():
             embed = CaptchaEmbed(self.language[0], self.theme, self.altcha)
 
-            return {'altcha': Markup(
-                embed.get_embed('altcha', None)
-                )
-            }
+            embeds = {'altcha': Markup(embed.get_embed('altcha', None))}
+            if not self.kwargs['without_trueclick']:
+                embeds['trueclick'] = Markup(embed.get_embed('trueclick', None))
 
-    def download_datasets(self) -> None:
+            return embeds
+
+
+    def _download_datasets(self) -> None:
         """
         This method downloads the datasets if they haven't already been
         downloaded.
@@ -557,6 +630,7 @@ class Captchaify:
             if not os.path.exists(os.path.join(DATASETS_DIR, file_name)):
                 print('Downloading', file_name)
                 urllib.request.urlretrieve(url, os.path.join(DATASETS_DIR, file_name))
+
 
     ####################
     #### Properties ####
@@ -598,7 +672,6 @@ class Captchaify:
             "hardness": self.kwargs.get('hardness', 1),
             "template_dir": self.kwargs.get('template_dir', TEMPLATE_DIR),
             "enable_rate_limit": self.kwargs.get('enable_rate_limit', True),
-            "enable_trueclick": self.kwargs.get('enable_trueclick', False),
             "recaptcha_site_key": self.kwargs.get('recaptcha_site_key', None),
             "recaptcha_secret": self.kwargs.get('recaptcha_secret', None),
             "hcaptcha_site_key": self.kwargs.get('hcaptcha_site_key', None),
@@ -651,8 +724,10 @@ class Captchaify:
             if not self.kwargs['without_customisation']:
                 routes.append('/change_language' + self.route_id)
 
-        if self.kwargs['enable_trueclick']:
-            routes.append('/trueclick')
+        if not self.kwargs['without_trueclick']:
+            routes.append('/trueclick_captchaify.js')
+            routes.append('/trueclick_captchaify/verify')
+            routes.append('/trueclick_captchaify/generate')
 
         return routes
 
@@ -878,6 +953,21 @@ class Captchaify:
         return self.altcha.verify_challenge(response_data)
 
 
+    def is_trueclick_valid(self) -> bool:
+        """
+        Check if the trueclick is valid
+
+        :return: True if the trueclick is valid, False otherwise
+        """
+
+        config = self._current_configuration
+        dataset_dir, hardness = config['dataset_dir'], config['hardness']
+
+        trueclick = TrueClick(dataset_dir, hardness)
+
+        return trueclick.is_trueclick_valid()
+
+
     ########################
     #### Render Methods ####
     ########################
@@ -1053,6 +1143,7 @@ class Captchaify:
             'change_language', **args
         )
 
+
     def _render_captcha_text_audio(
             self, is_error: bool = False,
             return_path: Optional[str] = None) -> Response:
@@ -1212,33 +1303,32 @@ class Captchaify:
         dataset_file = config['dataset_file']
         hardness = config['hardness']
 
-        if dataset_file is not None:
-            dataset = self._load_dataset(dataset_file)
+        dataset = self._load_dataset(dataset_file)
 
-            keywords = list(dataset.keys())
-            if 'smiling dog' in keywords and len(keywords) == 2:
-                keyword = 'smiling dog'
-            else:
-                keyword = secrets.choice(keywords)
+        keywords = list(dataset.keys())
+        if 'smiling dog' in keywords and len(keywords) == 2:
+            keyword = 'smiling dog'
+        else:
+            keyword = secrets.choice(keywords)
 
-            captcha_data['keyword'] = keyword
+        captcha_data['keyword'] = keyword
 
-            images = dataset[keyword]
-            original_image = get_random_image(images)
+        images = dataset[keyword]
+        original_image = get_random_image(images)
 
-            num_originals = secrets.choice([2, 3, 4])
-            other_keywords = [keyword] * num_originals
+        num_originals = secrets.choice([2, 3, 4])
+        other_keywords = [keyword] * num_originals
 
-            while len(other_keywords) < 9:
-                random_keyword = secrets.choice(keywords)
-                if random_keyword != keyword and\
-                    (random_keyword not in other_keywords or len(keywords) == 2):
+        while len(other_keywords) < 9:
+            random_keyword = secrets.choice(keywords)
+            if random_keyword != keyword and\
+                (random_keyword not in other_keywords or len(keywords) == 2):
 
-                    other_keywords.append(random_keyword)
+                other_keywords.append(random_keyword)
 
-            secrets.SystemRandom().shuffle(other_keywords)
+        secrets.SystemRandom().shuffle(other_keywords)
 
-            captcha_data['correct'] = [i for i, k in enumerate(other_keywords) if k == keyword]
+        captcha_data['correct'] = [i for i, k in enumerate(other_keywords) if k == keyword]
 
         captcha_images = []
         for keyword in other_keywords:
@@ -1299,7 +1389,7 @@ class Captchaify:
         if captcha_type == 'altcha':
             altcha_challenge = json.dumps(self.altcha.create_challenge(hardness = hardness))
             strings = json.dumps(self.altcha.localized_text(self.language[0]))
-        else:
+        elif not captcha_type == 'trueclick':
             site_key = {
                 "recaptcha": config['recaptcha_site_key'],
                 "hcaptcha": config['hcaptcha_site_key'],
@@ -1347,7 +1437,8 @@ class Captchaify:
             "hcaptcha": self._render_captcha_third_parties,
             "turnstile": self._render_captcha_third_parties,
             "friendlycaptcha": self._render_captcha_third_parties,
-            "altcha": self._render_captcha_third_parties
+            "altcha": self._render_captcha_third_parties,
+            "trueclick": self._render_captcha_third_parties
         }
         captcha_display_function = captcha_display_functions.get(
             captcha_type, self._render_captcha_oneclick
@@ -1457,9 +1548,9 @@ class Captchaify:
         return send_file(page_path)
 
 
-    ########################################
-    #### before_request & after_request ####
-    ########################################
+    ################################
+    #### before & after_request ####
+    ################################
 
 
     def _rate_limit(self) -> Optional[str]:
@@ -1500,6 +1591,7 @@ class Captchaify:
             handle_exception(exc)
 
             return self._render_block()
+
 
     def _change_language(self) -> Optional[str]:
         """
@@ -1766,7 +1858,6 @@ class Captchaify:
         return response
 
 
-
     #########################
     #### Other Functions ####
     #########################
@@ -1847,6 +1938,7 @@ class Captchaify:
             handle_exception(exc)
 
         return self._render_block()
+
 
     def _clean_used_captcha_ids(self) -> None:
         """
@@ -2028,62 +2120,70 @@ class Captchaify:
                         is_failed_captcha = True
             elif token_captcha_type in [
                 'recaptcha', 'hcaptcha', 'turnstile',
-                'friendlycaptcha', 'altcha'
+                'friendlycaptcha', 'altcha', 'trueclick'
                 ]:
 
-                third_party_name = {
-                    'recaptcha': 'g-recaptcha', 'turnstile': 'cf-turnstile',
-                    'hcaptcha': 'h-captcha', 'friendlycaptcha': 'frc-captcha'
-                }.get(token_captcha_type)
-
-                if token_captcha_type != 'altcha':
-                    response_or_solution = 'solution'\
-                        if token_captcha_type == 'friendlycaptcha' else 'response'
-
-                    key = third_party_name + '-' + response_or_solution
-                    if request.method.lower() == 'post':
-                        response_data = request.form.get(key)
-                    else:
-                        response_data = request.args.get(key)
-
+                if token_captcha_type == 'trueclick':
                     config = self._current_configuration
-                    secret = {
-                        "recaptcha": config['recaptcha_secret'],
-                        "hcaptcha": config['hcaptcha_secret'],
-                        "turnstile": config['turnstile_secret'],
-                        "friendlycaptcha": config['friendly_secret']
-                    }.get(token_captcha_type, None)
+                    dataset_dir, hardness = config['dataset_dir'], config['hardness']
 
-                    post_data = {
-                        'secret': secret,
-                        response_or_solution: response_data
-                    }
-
-                    api_url = CAPTCHA_THIRD_PARTIES_API_URLS.get(token_captcha_type)
-
-                    post_data_encoded = urllib.parse.urlencode(post_data).encode('utf-8')
-                    req = urllib.request.Request(api_url, data=post_data_encoded)
-
-                    timeout = 3
-                    try:
-                        with urllib.request.urlopen(req, timeout=timeout) as response:
-                            response_data = response.read()
-                            response_json = json.loads(response_data)
-
-                        if not validate_captcha_response(
-                            response_json, get_domain_from_url(self._req_info.get_url())):
-                            is_failed_captcha = True
-                    except Exception:
+                    trueclick = TrueClick(dataset_dir, hardness)
+                    if not trueclick.is_trueclick_valid():
                         is_failed_captcha = True
-
                 else:
-                    if request.method.lower() == 'post':
-                        response_data = request.form.get('altcha_response')
-                    else:
-                        response_data = request.args.get('altcha_response')
+                    third_party_name = {
+                        'recaptcha': 'g-recaptcha', 'turnstile': 'cf-turnstile',
+                        'hcaptcha': 'h-captcha', 'friendlycaptcha': 'frc-captcha'
+                    }.get(token_captcha_type)
 
-                    if not self.altcha.verify_challenge(response_data):
-                        is_failed_captcha = True
+                    if token_captcha_type != 'altcha':
+                        response_or_solution = 'solution'\
+                            if token_captcha_type == 'friendlycaptcha' else 'response'
+
+                        key = third_party_name + '-' + response_or_solution
+                        if request.method.lower() == 'post':
+                            response_data = request.form.get(key)
+                        else:
+                            response_data = request.args.get(key)
+
+                        config = self._current_configuration
+                        secret = {
+                            "recaptcha": config['recaptcha_secret'],
+                            "hcaptcha": config['hcaptcha_secret'],
+                            "turnstile": config['turnstile_secret'],
+                            "friendlycaptcha": config['friendly_secret']
+                        }.get(token_captcha_type, None)
+
+                        post_data = {
+                            'secret': secret,
+                            response_or_solution: response_data
+                        }
+
+                        api_url = CAPTCHA_THIRD_PARTIES_API_URLS.get(token_captcha_type)
+
+                        post_data_encoded = urllib.parse.urlencode(post_data).encode('utf-8')
+                        req = urllib.request.Request(api_url, data=post_data_encoded)
+
+                        timeout = 3
+                        try:
+                            with urllib.request.urlopen(req, timeout=timeout) as response:
+                                response_data = response.read()
+                                response_json = json.loads(response_data)
+
+                            if not validate_captcha_response(
+                                response_json, get_domain_from_url(self._req_info.get_url())):
+                                is_failed_captcha = True
+                        except Exception:
+                            is_failed_captcha = True
+
+                    else:
+                        if request.method.lower() == 'post':
+                            response_data = request.form.get('altcha_response')
+                        else:
+                            response_data = request.args.get('altcha_response')
+
+                        if not self.altcha.verify_challenge(response_data):
+                            is_failed_captcha = True
             else:
                 if request.method.lower() == 'post':
                     text_captcha = request.form.get('tc')
