@@ -189,7 +189,7 @@ args = {
    "enable_rate_limit": True, "rate_limit": (15, 300),
    "block_crawler": True, "crawler_hints": True,"as_route": False,
    "fixed_route_name": '_captchaify', "theme": 'light', "language": 'en',
-   "enable_trueclick": False, "error_codes": [],
+   "without_trueclick": False, "error_codes": [],
    "recaptcha_site_key": None, "recaptcha_secret": None,
    "hcaptcha_site_key": None, "hcaptcha_secret": None,
    "turnstile_site_key": None, "turnstile_secret": None,
