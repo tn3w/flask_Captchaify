@@ -15,7 +15,8 @@ bs4
 crawler-user-agents
 
 # Image Processing package
-Pillow>=10.3.0  # not directly required, pinned by Snyk to avoid a vulnerability
+opencv-python
+numpy
 
 # DNS package
 dnspython>=2.6.1  # not directly required, pinned by Snyk to avoid a vulnerability
