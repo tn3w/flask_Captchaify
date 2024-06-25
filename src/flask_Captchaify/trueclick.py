@@ -171,6 +171,9 @@ class TrueClick:
 
         data = request.form if request.method.lower() == 'post' else request.args
 
+        if not isinstance(data, dict):
+            return False
+
         captcha_id_token = data.get('trueclick_response', None)
         if not captcha_id_token:
             return False

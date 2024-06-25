@@ -865,6 +865,9 @@ class Captchaify:
         else:
             response_data = request.args.get(key)
 
+        if not isinstance(response_data, str):
+            return False
+
         config = self._current_configuration
         secret = {
             "recaptcha": config['recaptcha_secret'],
@@ -949,6 +952,9 @@ class Captchaify:
             response_data = request.form.get('altcha')
         else:
             response_data = request.args.get('altcha')
+
+        if not isinstance(response_data, str):
+            return False
 
         return self.altcha.verify_challenge(response_data)
 
