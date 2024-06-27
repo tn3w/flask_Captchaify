@@ -10,19 +10,17 @@
         </noscript>
         {% if third_party == 'trueclick' %}
         <script src="/trueclick_captchaify.js"></script>
-        {% else %}
-            {% if not is_default_theme %}
-                {% if third_party == 'recaptcha' %}
-                <script src="https://www.google.com/recaptcha/api.js?explicit&hl={{ language }}" async defer></script>
-                {% elif third_party == 'hcaptcha' %}
-                <script src="https://hcaptcha.com/1/api.js?explicit&hl={{ language }}" async defer></script>
-                {% elif third_party == 'turnstile' %}
-                <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?explicit&hl={{ language }}" async defer></script>
-                {% elif third_party == 'friendlycaptcha' %}
-                <script src="https://cdn.jsdelivr.net/npm/friendly-challenge/widget.module.min.js" async defer></script>
-                {% endif %}
-            {% elif third_party == 'altcha' %}
-                <script src="https://cdn.jsdelivr.net/npm/altcha/dist/altcha.min.js" async defer type="module"></script>
+        {% elif third_party == 'altcha' %}
+        <script src="https://cdn.jsdelivr.net/npm/altcha/dist/altcha.min.js" async defer type="module"></script>
+        {% elif not is_default_theme %}
+            {% if third_party == 'recaptcha' %}
+            <script src="https://www.google.com/recaptcha/api.js?explicit&hl={{ language }}" async defer></script>
+            {% elif third_party == 'hcaptcha' %}
+            <script src="https://hcaptcha.com/1/api.js?explicit&hl={{ language }}" async defer></script>
+            {% elif third_party == 'turnstile' %}
+            <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?explicit&hl={{ language }}" async defer></script>
+            {% elif third_party == 'friendlycaptcha' %}
+            <script src="https://cdn.jsdelivr.net/npm/friendly-challenge/widget.module.min.js" async defer></script>
             {% endif %}
         {% endif %}
         <style>{% if theme == "light" and not is_default_theme %}
@@ -289,7 +287,7 @@
         {% endif %}
         <main>
             <div>
-                <h1>🤖Beep beop Boop?</h1>
+                <h1><span ntr="1">🤖</span>Beep beop Boop?</h1>
                 <p class="caption">Please tick the box to confirm that you are not a robot:</p>
                 {% if error_message|default %}
                 <p class="caption" style="color: #ff0000;font-size: 16px;">
@@ -308,8 +306,8 @@
                             {% elif third_party == 'hcaptcha' %}h-captcha
                             {% elif third_party == 'turnstile' %}cf-turnstile
                             {% elif third_party == 'friendlycaptcha' %}frc-captcha 
-                            {% if not is_default_theme and theme == 'dark' %}dark{% endif %}
-                            {% endif %}" 
+                            {% if not is_default_theme and theme == 'dark' %} dark{% endif %}
+                            {% endif %}"
                             data-sitekey="{{ site_key }}" 
                             data-callback="onSuccess"
                             {% if not is_default_theme %} 

@@ -733,6 +733,15 @@ class Captchaify:
 
 
     @property
+    def url(self) -> str:
+        """
+        Returns the URL of the current request.
+        """
+
+        return self._req_info.get_url()
+
+
+    @property
     def ip(self) -> str:
         """
         Returns the IP address of the current request.
@@ -892,8 +901,7 @@ class Captchaify:
                 response_data = response.read()
                 response_json = json.loads(response_data)
 
-            if not validate_captcha_response(
-                response_json, get_domain_from_url(self._req_info.get_url())):
+            if not validate_captcha_response(response_json, get_domain_from_url(self.url)):
                 return False
         except Exception:
             return False
@@ -1505,32 +1513,32 @@ class Captchaify:
                 args['captcha_url'] = self._create_route_url('captcha')
 
             current_url = remove_args_from_url(
-                self._req_info.get_url(),
+                self.url,
                 ['theme', 'language'] +
                 (['wc'] if not without_cookies else [])
             )
             args.update({
                 "current_url_with_config": remove_args_from_url(
-                    self._req_info.get_url(), ['ct', 'ci', 'captcha', 'js']
+                    self.url, ['ct', 'ci', 'captcha', 'js']
                 ),
                 "url_args": extract_args(remove_args_from_url(
-                    self._req_info.get_url(), ['ct', 'ci', 'captcha']
+                    self.url, ['ct', 'ci', 'captcha']
                 )),
                 "url_args_without_rr": extract_args(remove_args_from_url(
-                    self._req_info.get_url(), ['ct', 'ci', 'captcha', 'rr']
+                    self.url, ['ct', 'ci', 'captcha', 'rr']
                 )),
                 "url_args_without_lang": extract_args(remove_args_from_url(
-                    self._req_info.get_url(), ['ct', 'ci', 'captcha', 'rr', 'language']
+                    self.url, ['ct', 'ci', 'captcha', 'rr', 'language']
                 )),
                 "current_url": remove_args_from_url(
                     current_url, ['ct', 'ci', 'captcha', 'tc', 'ac']
                 ),
                 "current_url_without_cl": remove_args_from_url(current_url, ['cl']),
-                "current_url_without_wc": remove_args_from_url(self._req_info.get_url(), ['wc']),
+                "current_url_without_wc": remove_args_from_url(self.url, ['wc']),
                 "path": request.path,
                 "current_path": quote(
                     extract_path_and_args(
-                        remove_args_from_url(self._req_info.get_url(), ['theme', 'language'])
+                        remove_args_from_url(self.url, ['theme', 'language'])
                     )
                 )
             })
