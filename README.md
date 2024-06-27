@@ -556,7 +556,7 @@ args = {
    | little            | (6, 8)              |
 
    The more images per keyword, the more inaccurate the user rate becomes, as images further behind in the image search and in the data set could no longer show the keyword.
-   It is recommended that you generate your own dataset as the default data could be trained, use the script written in `src/flask_Captchaify/datasets` and put the file in a folder and use the `dataset_dir` Arg to use it.
+   It is recommended that you generate your own dataset as the default data could be trained, use the script written in [https://github.com/tn3w/Captcha_Datasets](https://github.com/tn3w/Captcha_Datasets) and put the file in a folder and use the `dataset_dir` Arg to use it.
 
    Example of a website that uses 100 images per keyword and 140 keywords:
    ```python
@@ -637,7 +637,7 @@ args = {
 9. ***`without_customisation` Arg***
 
    Whether to allow customisation of the captcha site (theme and language) or not.
-   Customisation can lead to ddos attacks and less security. *If not correctly implemented.
+   If you want the best possible user experience, allow customization, if you just want protection, activate this option
 
    Web page where customisation is not allowed:
    ```python
@@ -648,7 +648,7 @@ args = {
 
 9. ***`without_cookies` Arg***
 
-   If True, no cookies are created, and verification is proven via URL args (Default: False)
+   If True, no cookies are created, and verification is proven via URL args. (Default: False)
 
    Website with without_cookies enabled:
    ```python
@@ -659,7 +659,7 @@ args = {
 
 9. ***`without_arg_transfer` Arg***
 
-   Whether to allow other args to be passed to sites after the captcha has been solved (Default: False)
+   Whether to allow other args to be passed to sites after the captcha has been solved. (Default: False)
 
    Web page where this is activated:
    ```python
@@ -671,6 +671,8 @@ args = {
 9. ***`without_watermark` Arg***
 
    Whether to show the Captchaify watermark or not. (Default: False)
+   You don't have to use the Captchaify watermark, if you like the project you can give it a star on GitHub.
+
    When you use custom templates you can remove the watermark in the template.
 
    Web page where this is activated and the watermark is not shown:
@@ -682,9 +684,9 @@ args = {
 
 9. ***`third_parties` Arg***
 
-   Specifies which third parties are used to check the IP addresses. By default, all 3 third parties are used. (See list)
+   Specifies which third parties are used to check the IP addresses. By default, all 4 third parties are used. (See list)
 
-   Web page that only asks a third party for Tor Ip addresses:
+   Web page that only asks a third party for Tor Ip addresse information:
    ```python
    captchaify = Captchaify(app, third_parties=["tor"])
    ```
@@ -712,7 +714,7 @@ args = {
 
 9. ***`fixed_route_name` Arg***
 
-   Specifies the name of the route that is used if Captchaify pages are displayed as separate routes. (Default: `_captchaify`, e.g.: `/captcha_captchaify`)
+   Specifies the name of the route that is used if Captchaify pages are displayed as separate routes. (Default: `_captchaify`)
 
    Web page where this is edited:
    ```python
