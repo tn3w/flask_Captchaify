@@ -1,9 +1,9 @@
 """
 -~- Embeds for Captchaify -~-
-This module generates the embeds that are supposed to be
-added to the HTML document. It supports Google reCaptcha,
-hCaptcha, Cloudflare Turnstile and Altcha. It is part of the
-flask_Captchaify module for Flask applications at
+This module generates the embeds that are supposed to be added
+to the HTML document. It supports Google reCaptcha, hCaptcha, 
+Cloudflare Turnstile, Friendly Captcha, Altcha and TrueClick.
+It is part of the flask_Captchaify module for Flask applications at
 https://github.com/tn3w/flask_Captchaify.
 
 The original GPL-3.0 licence applies.
