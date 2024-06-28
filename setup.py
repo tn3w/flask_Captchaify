@@ -19,7 +19,7 @@ long_description = '<h1 align="center">𝐟𝐥𝐚𝐬𝐤_𝐂𝐚𝐩𝐭𝐜
 
 setup(
     name='flask_Captchaify',
-    version='1.7.6',
+    version='1.7.6.1',
     description='Protect against bots and DDoS attacks',
     long_description=long_description,
     long_description_content_type='text/markdown',
@@ -29,7 +29,7 @@ setup(
     packages=find_packages(where='src'),
     package_dir={'': 'src'},
     package_data={
-        'flask_Captchaify': ['assets/*', 'templates/*', 'datasets/*']
+        'flask_Captchaify': ['assets/*', 'templates/*', 'datasets/*', 'templates/assets/*']
     },
     classifiers=[
         'Environment :: Web Environment',
