@@ -1,0 +1,167 @@
+{% if is_default_choice and without_cookies and not kwargs_without_cookies %}
+<noscript>
+    <style>
+        .cookie-banner { bottom: 20px; }
+    </style>
+</noscript>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const cookieBanner = document.getElementById('cookie-banner');
+        const acceptCookiesBtn = document.getElementById('accept-cookies');
+        const declineCookiesBtn = document.getElementById('decline-cookies');
+    
+        const cookieConsent = getCookie('cookieConsent');
+        if (cookieConsent !== null) {
+            cookieBanner.style.display = 'none';
+        } else {
+            setTimeout(() => {
+                cookieBanner.classList.add('show');
+            }, 100);
+    
+            acceptCookiesBtn.removeAttribute('href');
+            declineCookiesBtn.removeAttribute('href');
+    
+            acceptCookiesBtn.addEventListener('click', () => {
+                createCookie('cookieConsent', '1');
+                hideBanner();
+            });
+
+            declineCookiesBtn.addEventListener('click', () => {
+                var currentUrl = window.location.href;
+                var cookies = document.cookie.split(";");
+
+                let kwargs = {
+                    wc: '1'
+                };
+
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i];
+                    const eqPos = cookie.indexOf("=");
+
+                    let name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+
+                    let value = '';
+                    if (eqPos > -1) {
+                        value = cookie.substr(eqPos + 1).trim();
+                    }
+
+                    if (name.length > 0 && value.length > 0) {
+                        kwargs[name] = value;
+                        
+                        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+                    }
+                }
+
+                function appendQueryParams(url, params) {
+                    try {
+                        const urlObj = new URL(url, window.location.origin);
+                        if (urlObj.origin === window.location.origin) {
+                            for (const [key, value] of Object.entries(params)) {
+                                if (!urlObj.searchParams.has(key)) {
+                                    urlObj.searchParams.append(key, value);
+                                }
+                            }
+                        }
+                        return urlObj.toString();
+                    } catch (error) {
+                        if (url.startsWith('/')) {
+                            const urlObj = new URL(url, window.location.origin);
+                            for (const [key, value] of Object.entries(params)) {
+                                if (!urlObj.searchParams.has(key)) {
+                                    urlObj.searchParams.append(key, value);
+                                }
+                            }
+                            return urlObj.toString();
+                        }
+                        return url;
+                    }
+                }
+
+                function addHiddenInputs(form, params) {
+                    for (const [key, value] of Object.entries(params)) {
+                        const hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        hiddenInput.name = key;
+                        hiddenInput.value = value;
+                        form.appendChild(hiddenInput);
+                    }
+                }
+
+                var updatedUrl = appendQueryParams(currentUrl, kwargs);
+                window.history.replaceState({}, document.title, updatedUrl);
+
+                var anchors = document.querySelectorAll('a');
+                anchors.forEach(function(anchor) {
+                    var href = anchor.getAttribute('href');
+                    if (href) {
+                        anchor.setAttribute('href', appendQueryParams(href, kwargs));
+                    }
+                });
+
+                var forms = document.querySelectorAll('form');
+                forms.forEach(function(form) {
+                    addHiddenInputs(form, kwargs);
+                });
+                hideBanner();
+            });
+        }
+    
+        function hideBanner() {
+            cookieBanner.classList.remove('show');
+            setTimeout(() => {
+                cookieBanner.style.display = 'none';
+            }, 500);
+        }
+    
+        function createCookie(name, value) {
+            var options = {
+                max_age: 93312000,
+                secure: window.location.protocol === "https:",
+                samesite: 'Lax',
+                domain: window.location.hostname
+            };
+
+            var expires = options.expires;
+
+            if (typeof expires === "number" && expires) {
+                var d = new Date();
+                d.setTime(d.getTime() + expires * 1000);
+                expires = options.expires = d;
+            }
+            if (expires instanceof Date) {
+                options.expires = expires.toUTCString();
+            }
+
+            var cookie = encodeURIComponent(name) + "=" + encodeURIComponent(value);
+
+            for (var propName in options) {
+                if (options.hasOwnProperty(propName)) {
+                    cookie += "; " + propName;
+                    var propValue = options[propName];
+                    if (propValue !== true) {
+                        cookie += "=" + propValue;
+                    }
+                }
+            }
+
+            document.cookie = cookie;
+        }
+
+
+        function getCookie(name) {
+            const nameEQ = `${name}=`;
+            const ca = document.cookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) === ' ') {
+                    c = c.substring(1, c.length);
+                }
+                if (c.indexOf(nameEQ) === 0) {
+                    return c.substring(nameEQ.length, c.length);
+                }
+            }
+            return null;
+        }
+    });
+</script>
+{% endif %}

@@ -1,0 +1,10 @@
+{% if is_default_choice and without_cookies and not kwargs_without_cookies %}
+<div id="cookie-banner" class="cookie-banner">
+    <h2 ntr="1">🍪 Cookies?</h2>
+    <p>We use cookies to save and to determine that you are not a robot. If you select "Decline", this information will not be saved. As a result, you will have to solve a new captcha every time you close and reopen the tab.</p>
+    <div class="button-container">
+        <a id="accept-cookies" href="{{ current_url_without_wc }}{% if '?' in current_url_without_wc %}&{% else %}?{% endif %}wc=0{% if template == 'nojs' %}&js=0{% endif %}" class="cookie-button">Accept</a>
+        <a id="decline-cookies" href="{{ current_url_without_wc }}{% if '?' in current_url_without_wc %}&{% else %}?{% endif %}wc=1{% if template == 'nojs' and not as_route %}&js=0{% endif %}" class="cookie-button">Reject</a>
+    </div>
+</div>
+{% endif %}

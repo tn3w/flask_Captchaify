@@ -31,7 +31,7 @@ from .utils import DATASETS_DIR, DATA_DIR, TEMPLATE_DIR, ASSETS_DIR, JSON, PICKL
     get_random_image, manipulate_image_bytes, convert_image_to_base64, get_return_path,\
     get_return_url, extract_path_and_args, handle_exception, get_domain_from_url,\
     validate_captcha_response, remove_args_from_url, extract_args, get_char
-from .webtoolbox import WebToolbox, render_template
+from .webtoolbox import WebToolbox, asset, render_template
 from .req_info import RequestInfo, update_geolite_databases, matches_rule, is_valid_ip
 from .altcha import Altcha
 from .embed import CaptchaEmbed
@@ -1505,9 +1505,16 @@ class Captchaify:
                 "without_watermark": self.kwargs['without_watermark'],
                 "without_customisation": self.kwargs['without_customisation'],
                 "kwargs_without_cookies": self.kwargs['without_cookies'],
+                "template": template
             }
 
             args.update(template_args)
+
+            for asset_name in [
+                'colors', 'cookie_banner_css', 'cookie_banner_html',
+                'cookie_banner_js', 'footer_css', 'footer_html']:
+
+                args[asset_name] = asset(asset_name, **args)
 
             if self.kwargs['as_route']:
                 args['captcha_url'] = self._create_route_url('captcha')

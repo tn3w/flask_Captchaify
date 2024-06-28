@@ -6,58 +6,32 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>{{ exception.code }}{% if exception.title|default %} ─ {{ exception.title }}{% endif %}</title>
         <style>
+            {{ colors|safe }}
+
             {% if theme == "light" and not is_default_theme %}
             :root {
-                --background: #f2f2f2;
-                --text: #181818;
                 --secondary-text: #666;
                 --anchor: rgba(50, 50, 50, 0.5);
                 --anchor-hover: rgba(50, 50, 50, 0.7);
             }
-
-            #choose-light {
-                display: none;
-            }
             {% elif theme == "dark" and not is_default_theme %}
             :root {
-                --background: #121212;
-                --text: #f2f2f2;
                 --secondary-text: #999;
                 --anchor: rgba(200, 200, 200, 0.5);
                 --anchor-hover: rgba(200, 200, 200, 0.7);
             }
-
-            #choose-dark {
-                display: none;
-            }
             {% else %}
             :root {
-                --background: #f2f2f2;
-                --text: #181818;
                 --secondary-text: #666;
                 --anchor: rgba(50, 50, 50, 0.5);
                 --anchor-hover: rgba(50, 50, 50, 0.7);
             }
-            
-            #choose-light {
-                display: none;
-            }
 
             @media (prefers-color-scheme: dark) {
                 :root {
-                    --background: #121212;
-                    --text: #f2f2f2;
                     --secondary-text: #999;
                     --anchor: rgba(200, 200, 200, 0.5);
                     --anchor-hover: rgba(200, 200, 200, 0.7);
-                }
-
-                #choose-dark {
-                    display: none;
-                }
-
-                #choose-light {
-                    display: unset;
                 }
             }
             {% endif %}
@@ -117,37 +91,8 @@
                 0%, 100% { transform: translateY(0); }
                 50% { transform: translateY(-20px); }
             }
-            {% if (not without_customisation and as_route) or not without_watermark %}
-
-            footer {
-                text-align: center;
-                padding-top: 40px;
-            }
-
-            footer nav ul {
-                list-style-type: none;
-                padding: 0;
-            }
-
-            footer nav ul li {
-                color: var(--ancher-color);
-                display: inline;
-                margin-right: 20px;
-                font-size: 15px;
-                text-align: center;
-                font-weight: lighter;
-                word-break: keep-all;
-            }
-
-            footer nav ul li a {
-                color: var(--ancher-color);
-                text-decoration: none;
-            }
-
-            footer nav ul li a:hover {
-                text-decoration: underline;
-            }
-            {% endif %}
+            
+            {{ footer_css|safe }}
         </style>
     </head>
     <body>

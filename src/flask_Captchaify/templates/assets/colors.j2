@@ -1,0 +1,83 @@
+{% if theme == "light" and not is_default_theme %}
+:root {
+    --background: #f2f2f2;
+    --text: #181818;
+    --main-ancher-color: #0000ad;
+    --ancher-color: #222;
+    {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
+    --background-color: #f2f2f2;
+    --text-color: #181818;
+    --button-background: #007BFF;
+    --button-hover-background: #0056b3;
+    --button-color: #fff;
+    --box-shadow: rgba(0, 0, 0, 0.2);
+    {% endif %}
+}
+
+#choose-light {
+    display: none;
+}
+{% elif theme == "dark" and not is_default_theme %}
+:root {
+    --background: #121212;
+    --text: #f2f2f2;
+    --main-ancher-color: #00BFFF;
+    --ancher-color: #999;
+    {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
+    --background-color: #121212;
+    --text-color: #f2f2f2;
+    --button-background: #1E90FF;
+    --button-hover-background: #1C86EE;
+    --button-color: #fff;
+    --box-shadow: rgba(255, 255, 255, 0.2);
+    {% endif %}
+}
+
+#choose-dark {
+    display: none;
+}
+{% else %}
+:root {
+    --background: #f2f2f2;
+    --text: #181818;
+    --main-ancher-color: #0000ad;
+    --ancher-color: #222;
+    {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
+    --background-color: #f2f2f2;
+    --text-color: #181818;
+    --button-background: #007BFF;
+    --button-hover-background: #0056b3;
+    --button-color: #fff;
+    --box-shadow: rgba(0, 0, 0, 0.2);
+    {% endif %}
+}
+
+#choose-light {
+    display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --background: #121212;
+        --text: #f2f2f2;
+        --main-ancher-color: #00BFFF;
+        --ancher-color: #999;
+        {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
+        --background-color: #121212;
+        --text-color: #f2f2f2;
+        --button-background: #1E90FF;
+        --button-hover-background: #1C86EE;
+        --button-color: #fff;
+        --box-shadow: rgba(255, 255, 255, 0.2);
+        {% endif %}
+    }
+
+    #choose-dark {
+        display: none;
+    }
+
+    #choose-light {
+        display: unset;
+    }
+}
+{% endif %}

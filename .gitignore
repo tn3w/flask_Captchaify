@@ -164,5 +164,4 @@ src/flask_Captchaify/datasets
 test*
 log.txt
 .vscode
-templates
 trueclick.js

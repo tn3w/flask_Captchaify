@@ -5,98 +5,37 @@
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Change Language</title>
-        <style>{% if theme == "light" and not is_default_theme %}
+        <style>
+            {{ colors|safe }}
+
+            {% if theme == "light" and not is_default_theme %}
             :root {
-                --background: #f2f2f2;
-                --text: #181818;
                 --search-border: #333;
                 --search-background: #fff;
-                --ancher-color: #222;
                 --back-button: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAA/gAAAP4BT8Ki/gAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVFiFxZc7SgRBEIa/WryBCL69hUfwcQATM2+wZnsAwUgUQdgDeBIFA0XBxMeqa2posPhA9DdQYV2nu2ft7pmCSqan5vtqmC6mTRJ1RqNWOjAybIGZLQILQBdoS3qPMpBUOoEWoL5sD1Nf+MwIuIBOJQIOuIC97AIe+C0wnlUgAJ+OhXsFPPA7YCYF3CnggXdTwgsFAvDZlPA/Ah74PTCXGv5LwAO/yAWXhEnCzFrAZsGgPAU2gBf3LP1XfADHkh4BVh2d584HYBngrCYBAQcN4C3ubUbFKMAK9XTfA5Z+PsImsF1geAJsAa9J+4Zn4FDSU/82bDpMz4GpXNtwcBC5JG5ySRSNYpdEB5jMLhCQuE4t4V7wS0xkFwhIXKWSCN/glrgExrILBCR2KxHwSET/lpc+mknaAdYHLh+VrXeFfXdXvsBsHljja0LuS+pVKpA6aj8dfwKVbnEwnsoZwwAAAABJRU5ErkJggg==");
                 --search-button: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAADuwAAA7sBrvcmpQAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAJjSURBVFiFvdZPaM9hHAfw1/NjG7WD4mBbyb+kHSTWyi7awkGOji6kFA5ycHJZcqMdleQsJUeURg6UJklCakWZJaWN/Intcfht/Dz7/tvP5lPP5fN9Pu/P+/M87+/n+YQYoyILIbSiHwPoQgem8A6vcQsPYozThUB5FmPMXGjBICYQS9Z7HEPIw8vNk5N8Cx5XSJyu21jTNAEsxWl8byL57JrAwaoEQqMGQgjncTLntsbwCCNow3b0YGXO/iMxxos53/5YQ/V96uJKK7qP7gKt9OF5Rtwk1la6AizHywTgG05hSSkIy3Auo4BhJcKcBTifUcHheSuasxk4x0tifv/XjUE35pt8BqwNzxKsj2gpInA0CfiErmYIzAD2ZpzC7rz9NexLdHk/xvi2VL05FmN8iDeJe2/e/hrWJb6RZpMXYGwoItDxHwh0FRFoTXyTC0AgxWgpIjCe+LYtAIEU41URgbHE17MABFKMQgLDiW9HCCH3yMoshLAK3Yn7RVHMVnP/2zP/0AeumNtXVpS14rtJ0E/0NpF8f0YxQ1XegvX4nASOYvs8ku/GhwTjh5IBpREgbcmzAIOKe3k7LmTERkzjUBGB3wNJCCGoj1QDGToZnbmmrIGkH50FGpt9WS9nf/27mk7cy6nmX1buSWQdaQ0n8KWJRFPqE3JlEkWi2qQ+jlVNfEX9/18te0TLJFGm7Bp2YghP/FH5VzzFNfUpqDuJq0yimUbTilqFfZVI/DWWL7SFEFbjDjZnfI7Ys6gEKpC4WVvU7Igxjqv3iqwHaeOiEyghcWnRr6DRQgjtOIBduIrrvwDf9VLVUownngAAAABJRU5ErkJggg==");
-                {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
-                --background-color: #f2f2f2;
-                --text-color: #181818;
-                --button-background: #007BFF;
-                --button-hover-background: #0056b3;
-                --button-color: #fff;
-                --box-shadow: rgba(0, 0, 0, 0.2);
-                {% endif %}
-            }
-
-            #choose-light {
-                display: none;
             }
             {% elif theme == "dark" and not is_default_theme %}
             :root {
-                --background: #121212;
-                --text: #f2f2f2;
                 --search-border: #fff;
                 --search-background: #333;
-                --ancher-color: #999;
                 --back-button: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgEAQAAACJ4248AAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAACYktHRAAAqo0jMgAAAAlwSFlzAAAAYAAAAGAA8GtCzwAAAAd0SU1FB+cGDBEbImOxiLsAAAEkSURBVFjD7ZdBy0FBFIbfc9fKTsLCD7KztJblXShZ2FkgC3+DUvwOC4q6RcqC8BPo5rwW30eJq9S9M9J9lzNTzzOnM80MEOfDkMUi2e+T7TY1kTAMr9X4kMHAIpwkj0eLcJIcj+3Bdb0mM5mI4dXq651vNmQ+H8NjeMjwoKM2n1Nzuai4coMDnc7z9GQCNpvA6RQ+2fNE9ntQy2Vaie+TpZKQhwOQTkdV4vfZbh3gcrEDBwARB2g0ANI83PeBev2/CV0X6PUAkcdFiwXY7YbehHI+g9OpOLvdfYx0XVL1qVd0Nov80rlLaKXyUoKrFZnNfoGE9Uosl7GEeYmg00HPo6ZSliWGQyMCwRKGnuXBEqORUQEAoBYKf1+zVouaTBoX+LlcAfaG1UPNJ+wjAAAAAElFTkSuQmCC");
                 --search-button: url("data:image/png;base64,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");
-                {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
-                --background-color: #121212;
-                --text-color: #f2f2f2;
-                --button-background: #1E90FF;
-                --button-hover-background: #1C86EE;
-                --button-color: #fff;
-                --box-shadow: rgba(255, 255, 255, 0.2);
-                {% endif %}
-            }
-
-            #choose-dark {
-                display: none;
             }
             {% else %}
             :root {
-                --background: #f2f2f2;
-                --text: #181818;
                 --search-border: #333;
                 --search-background: #fff;
-                --ancher-color: #222;
                 --back-button: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAA/gAAAP4BT8Ki/gAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFYSURBVFiFxZc7SgRBEIa/WryBCL69hUfwcQATM2+wZnsAwUgUQdgDeBIFA0XBxMeqa2posPhA9DdQYV2nu2ft7pmCSqan5vtqmC6mTRJ1RqNWOjAybIGZLQILQBdoS3qPMpBUOoEWoL5sD1Nf+MwIuIBOJQIOuIC97AIe+C0wnlUgAJ+OhXsFPPA7YCYF3CnggXdTwgsFAvDZlPA/Ah74PTCXGv5LwAO/yAWXhEnCzFrAZsGgPAU2gBf3LP1XfADHkh4BVh2d584HYBngrCYBAQcN4C3ubUbFKMAK9XTfA5Z+PsImsF1geAJsAa9J+4Zn4FDSU/82bDpMz4GpXNtwcBC5JG5ySRSNYpdEB5jMLhCQuE4t4V7wS0xkFwhIXKWSCN/glrgExrILBCR2KxHwSET/lpc+mknaAdYHLh+VrXeFfXdXvsBsHljja0LuS+pVKpA6aj8dfwKVbnEwnsoZwwAAAABJRU5ErkJggg==");
                 --search-button: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAADuwAAA7sBrvcmpQAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAJjSURBVFiFvdZPaM9hHAfw1/NjG7WD4mBbyb+kHSTWyi7awkGOji6kFA5ycHJZcqMdleQsJUeURg6UJklCakWZJaWN/Intcfht/Dz7/tvP5lPP5fN9Pu/P+/M87+/n+YQYoyILIbSiHwPoQgem8A6vcQsPYozThUB5FmPMXGjBICYQS9Z7HEPIw8vNk5N8Cx5XSJyu21jTNAEsxWl8byL57JrAwaoEQqMGQgjncTLntsbwCCNow3b0YGXO/iMxxos53/5YQ/V96uJKK7qP7gKt9OF5Rtwk1la6AizHywTgG05hSSkIy3Auo4BhJcKcBTifUcHheSuasxk4x0tifv/XjUE35pt8BqwNzxKsj2gpInA0CfiErmYIzAD2ZpzC7rz9NexLdHk/xvi2VL05FmN8iDeJe2/e/hrWJb6RZpMXYGwoItDxHwh0FRFoTXyTC0AgxWgpIjCe+LYtAIEU41URgbHE17MABFKMQgLDiW9HCCH3yMoshLAK3Yn7RVHMVnP/2zP/0AeumNtXVpS14rtJ0E/0NpF8f0YxQ1XegvX4nASOYvs8ku/GhwTjh5IBpREgbcmzAIOKe3k7LmTERkzjUBGB3wNJCCGoj1QDGToZnbmmrIGkH50FGpt9WS9nf/27mk7cy6nmX1buSWQdaQ0n8KWJRFPqE3JlEkWi2qQ+jlVNfEX9/18te0TLJFGm7Bp2YghP/FH5VzzFNfUpqDuJq0yimUbTilqFfZVI/DWWL7SFEFbjDjZnfI7Ys6gEKpC4WVvU7Igxjqv3iqwHaeOiEyghcWnRr6DRQgjtOIBduIrrvwDf9VLVUownngAAAABJRU5ErkJggg==");
-                {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
-                --background-color: #f2f2f2;
-                --text-color: #181818;
-                --button-background: #007BFF;
-                --button-hover-background: #0056b3;
-                --button-color: #fff;
-                --box-shadow: rgba(0, 0, 0, 0.2);
-                {% endif %}
             }
 
-            #choose-light {
-                display: none;
-            }
-            
             @media (prefers-color-scheme: dark) {
                 :root {
-                    --background: #121212;
-                    --text: #f2f2f2;
                     --search-border: #fff;
                     --search-background: #333;
-                    --ancher-color: #999;
                     --back-button: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgEAQAAACJ4248AAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAACYktHRAAAqo0jMgAAAAlwSFlzAAAAYAAAAGAA8GtCzwAAAAd0SU1FB+cGDBEbImOxiLsAAAEkSURBVFjD7ZdBy0FBFIbfc9fKTsLCD7KztJblXShZ2FkgC3+DUvwOC4q6RcqC8BPo5rwW30eJq9S9M9J9lzNTzzOnM80MEOfDkMUi2e+T7TY1kTAMr9X4kMHAIpwkj0eLcJIcj+3Bdb0mM5mI4dXq651vNmQ+H8NjeMjwoKM2n1Nzuai4coMDnc7z9GQCNpvA6RQ+2fNE9ntQy2Vaie+TpZKQhwOQTkdV4vfZbh3gcrEDBwARB2g0ANI83PeBev2/CV0X6PUAkcdFiwXY7YbehHI+g9OpOLvdfYx0XVL1qVd0Nov80rlLaKXyUoKrFZnNfoGE9Uosl7GEeYmg00HPo6ZSliWGQyMCwRKGnuXBEqORUQEAoBYKf1+zVouaTBoX+LlcAfaG1UPNJ+wjAAAAAElFTkSuQmCC");
                     --search-button: url("data:image/png;base64,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");
-                    {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
-                    --background-color: #121212;
-                    --text-color: #f2f2f2;
-                    --button-background: #1E90FF;
-                    --button-hover-background: #1C86EE;
-                    --button-color: #fff;
-                    --box-shadow: rgba(255, 255, 255, 0.2);
-                    {% endif %}
-                }
-
-                #choose-dark {
-                    display: none;
-                }
-
-                #choose-light {
-                    display: unset;
                 }
             }
             {% endif %}
@@ -215,114 +154,12 @@
                 content: var(--search-button);
             }
 
-            footer {
-                text-align: center;
-            }
-
-            footer nav ul {
-                list-style-type: none;
-                padding: 0;
-            }
-
-            footer nav ul li {
-                color: var(--ancher-color);
-                display: inline;
-                margin-right: 20px;
-                font-size: 15px;
-                text-align: center;
-                font-weight: lighter;
-                word-break: keep-all;
-            }
-
-            footer nav ul li a {
-                color: var(--ancher-color);
-                text-decoration: none;
-            }
-
-            footer nav ul li a:hover {
-                text-decoration: underline;
-            }
-
-            @media (max-width: 400px) {
-                .container {
-                    grid-template-columns: repeat(auto-fit, minmax(33.3%, 1fr));
-                }
-
-                h1 {
-                    font-size: 1.5rem;
-                }
-            }
-            {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
-            
-            .cookie-banner {
-                position: fixed;
-                bottom: -200px;
-                left: 20px;
-                width: 300px;
-                padding: 20px;
-                color: var(--text-color);
-                background-color: var(--background-color);
-                box-shadow: 0 2px 5px var(--box-shadow);
-                transition: bottom 0.5s ease-in-out;
-                z-index: 1000;
-            }
-
-            .cookie-banner.show {
-                bottom: 20px;
-            }
-
-            .cookie-banner h2 {
-                margin-top: 0;
-            }
-
-            .cookie-banner p {
-                margin: 10px 0;
-            }
-
-            .button-container {
-                display: flex;
-                justify-content: space-between;
-            }
-
-            .cookie-button {
-                padding: 10px 20px;
-                background-color: var(--button-background);
-                color: var(--button-color);
-                text-decoration: none;
-                border-radius: 5px;
-                cursor: pointer;
-            }
-
-            .cookie-button:hover {
-                background-color: var(--button-hover-background);
-            }
-
-            @media (max-width: 650px) {
-                .cookie-banner {
-                    left: 50%;
-                    transform: translateX(-50%);
-                }
-            }
-
-            @media (max-width: 400px) {
-                .cookie-banner {
-                    width: 250px;
-                }
-            }
-            {% endif %}
+            {{ footer_css|safe }}
+            {{ cookie_banner_css|safe }}
         </style>
     </head>
     <body>
-        {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
-        <div id="cookie-banner" class="cookie-banner">
-            <h2 ntr="1">🍪 Cookies?</h2>
-            <p>We use cookies to save and to determine that you are not a robot. If you select "Decline", this information will not be saved. As a result, you will have to solve a new captcha every time you close and reopen the tab.</p>
-            <div class="button-container">
-                <a id="accept-cookies" href="{{ current_url_without_wc }}{% if '?' in current_url_without_wc %}&{% else %}?{% endif %}wc=0" class="cookie-button">Accept</a>
-                <a id="decline-cookies" href="{{ current_url_without_wc }}{% if '?' in current_url_without_wc %}&{% else %}?{% endif %}wc=1" class="cookie-button">Reject</a>
-            </div>
-        </div>
-        {% endif %}
+        {{ cookie_banner_html|safe }}
         <main>
             <a class="back-button" href="{% if as_route %}/{{ return_route }}{{ route_id }}{{ url_args_without_rr }}{% else %}{{ current_url_without_cl }}{% endif %}" ntr="1">
                 <img class="icon" src="" alt="Back">
@@ -361,183 +198,7 @@
             </div>
             {% endif %}
         </main>
-        <footer>
-            <nav>
-                <ul>
-                    <li id="choose-light"><a href="{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}theme=light">Light Mode</a></li>
-                    <li id="choose-dark"><a href="{{ current_url }}{% if '?' in current_url %}&{% else %}?{% endif %}theme=dark">Dark Mode</a></li>
-                    {% if not without_watermark %}
-                    <li>Bot protection by <a href="https://github.com/tn3w/flask_Captchaify" target="_blank" ntr="1">Captchaify</a></li>
-                    {% endif %}
-                </ul>
-            </nav>
-        </footer>
-        {% if is_default_choice and without_cookies and not kwargs_without_cookies %}
-        <noscript>
-            <style>
-                .cookie-banner { bottom: 20px; }
-            </style>
-        </noscript>
-        <script>
-            document.addEventListener('DOMContentLoaded', () => {
-                const cookieBanner = document.getElementById('cookie-banner');
-                const acceptCookiesBtn = document.getElementById('accept-cookies');
-                const declineCookiesBtn = document.getElementById('decline-cookies');
-            
-                const cookieConsent = getCookie('cookieConsent');
-                if (cookieConsent !== null) {
-                    cookieBanner.style.display = 'none';
-                } else {
-                    setTimeout(() => {
-                        cookieBanner.classList.add('show');
-                    }, 100);
-            
-                    acceptCookiesBtn.removeAttribute('href');
-                    declineCookiesBtn.removeAttribute('href');
-            
-                    acceptCookiesBtn.addEventListener('click', () => {
-                        createCookie('cookieConsent', '1');
-                        hideBanner();
-                    });
-
-                    declineCookiesBtn.addEventListener('click', () => {
-                        var currentUrl = window.location.href;
-                        var cookies = document.cookie.split(";");
-
-                        let kwargs = {
-                            wc: '1'
-                        };
-
-                        for (let i = 0; i < cookies.length; i++) {
-                            const cookie = cookies[i];
-                            const eqPos = cookie.indexOf("=");
-
-                            let name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-
-                            let value = '';
-                            if (eqPos > -1) {
-                                value = cookie.substr(eqPos + 1).trim();
-                            }
-
-                            if (name.length > 0 && value.length > 0) {
-                                kwargs[name] = value;
-                                
-                                document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-                            }
-                        }
-
-                        function appendQueryParams(url, params) {
-                            try {
-                                const urlObj = new URL(url, window.location.origin);
-                                if (urlObj.origin === window.location.origin) {
-                                    for (const [key, value] of Object.entries(params)) {
-                                        if (!urlObj.searchParams.has(key)) {
-                                            urlObj.searchParams.append(key, value);
-                                        }
-                                    }
-                                }
-                                return urlObj.toString();
-                            } catch (error) {
-                                if (url.startsWith('/')) {
-                                    const urlObj = new URL(url, window.location.origin);
-                                    for (const [key, value] of Object.entries(params)) {
-                                        if (!urlObj.searchParams.has(key)) {
-                                            urlObj.searchParams.append(key, value);
-                                        }
-                                    }
-                                    return urlObj.toString();
-                                }
-                                return url;
-                            }
-                        }
-
-                        function addHiddenInputs(form, params) {
-                            for (const [key, value] of Object.entries(params)) {
-                                const hiddenInput = document.createElement('input');
-                                hiddenInput.type = 'hidden';
-                                hiddenInput.name = key;
-                                hiddenInput.value = value;
-                                form.appendChild(hiddenInput);
-                            }
-                        }
-
-                        var updatedUrl = appendQueryParams(currentUrl, kwargs);
-                        window.history.replaceState({}, document.title, updatedUrl);
-
-                        var anchors = document.querySelectorAll('a');
-                        anchors.forEach(function(anchor) {
-                            var href = anchor.getAttribute('href');
-                            if (href) {
-                                anchor.setAttribute('href', appendQueryParams(href, kwargs));
-                            }
-                        });
-
-                        var forms = document.querySelectorAll('form');
-                        forms.forEach(function(form) {
-                            addHiddenInputs(form, kwargs);
-                        });
-                        hideBanner();
-                    });
-                }
-            
-                function hideBanner() {
-                    cookieBanner.classList.remove('show');
-                    setTimeout(() => {
-                        cookieBanner.style.display = 'none';
-                    }, 500);
-                }
-            
-                function createCookie(name, value) {
-                    var options = {
-                        max_age: 93312000,
-                        secure: window.location.protocol === "https:",
-                        samesite: 'Lax',
-                        domain: window.location.hostname
-                    };
-
-                    var expires = options.expires;
-
-                    if (typeof expires === "number" && expires) {
-                        var d = new Date();
-                        d.setTime(d.getTime() + expires * 1000);
-                        expires = options.expires = d;
-                    }
-                    if (expires instanceof Date) {
-                        options.expires = expires.toUTCString();
-                    }
-
-                    var cookie = encodeURIComponent(name) + "=" + encodeURIComponent(value);
-
-                    for (var propName in options) {
-                        if (options.hasOwnProperty(propName)) {
-                            cookie += "; " + propName;
-                            var propValue = options[propName];
-                            if (propValue !== true) {
-                                cookie += "=" + propValue;
-                            }
-                        }
-                    }
-
-                    document.cookie = cookie;
-                }
-
-
-                function getCookie(name) {
-                    const nameEQ = `${name}=`;
-                    const ca = document.cookie.split(';');
-                    for (let i = 0; i < ca.length; i++) {
-                        let c = ca[i];
-                        while (c.charAt(0) === ' ') {
-                            c = c.substring(1, c.length);
-                        }
-                        if (c.indexOf(nameEQ) === 0) {
-                            return c.substring(nameEQ.length, c.length);
-                        }
-                    }
-                    return null;
-                }
-            });
-        </script>
-        {% endif %}
+        {{ footer_html|safe }}
+        {{ cookie_banner_js|safe }}
     </body>
 </html>

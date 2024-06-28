@@ -1,0 +1,57 @@
+{% if is_default_choice and without_cookies and not kwargs_without_cookies %}            
+.cookie-banner {
+    position: fixed;
+    bottom: -200px;
+    left: 20px;
+    width: 300px;
+    padding: 20px;
+    color: var(--text-color);
+    background-color: var(--background-color);
+    box-shadow: 0 2px 5px var(--box-shadow);
+    transition: bottom 0.5s ease-in-out;
+    z-index: 1000;
+}
+
+.cookie-banner.show {
+    bottom: 20px;
+}
+
+.cookie-banner h2 {
+    margin-top: 0;
+}
+
+.cookie-banner p {
+    margin: 10px 0;
+}
+
+.button-container {
+    display: flex;
+    justify-content: space-between;
+}
+
+.cookie-button {
+    padding: 10px 20px;
+    background-color: var(--button-background);
+    color: var(--button-color);
+    text-decoration: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.cookie-button:hover {
+    background-color: var(--button-hover-background);
+}
+
+@media (max-width: 650px) {
+    .cookie-banner {
+        left: 50%;
+        transform: translateX(-50%);
+    }
+}
+
+@media (max-width: 400px) {
+    .cookie-banner {
+        width: 250px;
+    }
+}
+{% endif %}

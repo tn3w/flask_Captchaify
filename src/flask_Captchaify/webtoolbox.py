@@ -10,19 +10,70 @@ The original GPL-3.0 licence applies.
 
 import os
 import re
-from typing import Optional
+from typing import Final, Optional
 from urllib.parse import urlparse, parse_qs, quote
 from bs4 import BeautifulSoup, Tag
 from googletrans import Translator as GoogleTranslator
 from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
-from .utils import PICKLE, JSON, ASSETS_DIR, DATA_DIR, handle_exception, get_domain_from_url
+from .utils import PICKLE, JSON, TEMPLATE_DIR, ASSETS_DIR, DATA_DIR,\
+    handle_exception, get_domain_from_url
 from .req_info import RequestInfo
 
 
-LANGUAGES = JSON.load(os.path.join(ASSETS_DIR, 'languages.json'), [])
-LANGUAGE_CODES = [language['code'] for language in LANGUAGES]
-TRANSLATIONS_FILE_PATH = os.path.join(DATA_DIR, 'translations.pkl')
+LANGUAGES: Final[list] = JSON.load(os.path.join(ASSETS_DIR, 'languages.json'), [])
+LANGUAGE_CODES: Final[list] = [language['code'] for language in LANGUAGES]
 google_translator = GoogleTranslator()
+
+TEMPLATE_ASSETS_DIR: Final[str] = os.path.join(TEMPLATE_DIR, 'assets')
+TRANSLATIONS_FILE_PATH: Final[str] = os.path.join(DATA_DIR, 'translations.pkl')
+
+
+class SilentUndefined(Undefined):
+    """
+    Class to not get an error when specifying a non-existent argument
+    """
+
+    def _fail_with_undefined_error(self, *args, **kwargs):
+        return None
+
+
+def render_html(html: str, **kwargs) -> str:
+    """
+    Function to render HTML content
+
+    :param html: The content of the page as html.
+    :param kwargs: Arguments to be inserted into the Template with Jinja2.
+    """
+
+    env = Environment(undefined = SilentUndefined)
+    template = env.from_string(html)
+
+    return template.render(**kwargs)
+
+
+def asset(asset_name: str, **kwargs) -> Optional[str]:
+    """
+    Function to render an asset
+
+    :param asset_name: The name of the asset
+    :param kwargs: Arguments to be inserted into the Template with Jinja2.
+    """
+
+    if asset_name is None:
+        return None
+
+    file_path = os.path.join(
+        TEMPLATE_ASSETS_DIR, asset_name +\
+            ('.j2' if not asset_name.endswith('.j2') else '')
+    )
+
+    if not os.path.isfile(file_path):
+        return None
+
+    with open(file_path, "r", encoding = "utf-8") as readable_file:
+        html = readable_file.read()
+
+    return render_html(html, **kwargs)
 
 
 def render_template(template_dir: str, file_name: str,
@@ -318,14 +369,6 @@ class WebToolbox:
         if not file_path is None:
             if not os.path.isfile(file_path):
                 raise FileNotFoundError(f"File `{file_path}` does not exist")
-
-        class SilentUndefined(Undefined):
-            """
-            Class to not get an error when specifying a non-existent argument
-            """
-
-            def _fail_with_undefined_error(self, *args, **kwargs):
-                return None
 
         loader = FileSystemLoader(template_dir)
         env = Environment(
