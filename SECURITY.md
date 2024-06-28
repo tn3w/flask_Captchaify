@@ -18,7 +18,7 @@ If you work with me, you can expect me to do the following in accordance with th
 - Extend Safe Harbor for your vulnerability research that is related to this policy.
 
 ### My Expectations
-In participating in my vulnerability disclosure program in good faith, we ask that you:
+In participating in my vulnerability disclosure program in good faith, I ask that you:
 - Play by the rules, including following this policy and any other relevant agreements. If there is any inconsistency between this policy and any other applicable terms, the terms of this policy will prevail;
 - Report any vulnerability you’ve discovered promptly;
 - Avoid violating the privacy of others, disrupting other systems, destroying data, and/or harming user experience;
