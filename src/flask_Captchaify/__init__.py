@@ -1505,7 +1505,9 @@ class Captchaify:
                 "without_watermark": self.kwargs['without_watermark'],
                 "without_customisation": self.kwargs['without_customisation'],
                 "kwargs_without_cookies": self.kwargs['without_cookies'],
-                "template": template
+                "template": template,
+                "is_return_path_set": get_return_path(
+                    request, args.get('return_path', '/')).strip() != '/'
             }
 
             args.update(template_args)
@@ -2457,7 +2459,8 @@ class Captchaify:
             )
 
         redirect_url = f'/{template}' + self.route_id +\
-            ('?return_path=' + return_path if not without_return_path else '')
+            ('?return_path=' + return_path if not without_return_path\
+              and return_path != '/' else '')
 
         theme, is_default_theme = self.theme
         language, is_default_language = self.language

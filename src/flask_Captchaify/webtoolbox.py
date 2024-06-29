@@ -235,7 +235,7 @@ class Translator:
 
         for element in html_tag.descendants:
             if isinstance(element, NavigableString) and is_first_element:
-                if is_emoji(element):
+                if is_emoji(element) and len(element.strip()) == 1:
                     translated_texts.append(
                         (element, element)
                     )
