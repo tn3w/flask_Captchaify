@@ -10,9 +10,9 @@ The original GPL-3.0 licence applies.
 
 import os
 import re
-from typing import Final, Optional
+from typing import Final, Optional, Tuple
 from urllib.parse import urlparse, parse_qs, quote
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup, Tag, NavigableString
 from googletrans import Translator as GoogleTranslator
 from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
 from .utils import PICKLE, JSON, TEMPLATE_DIR, ASSETS_DIR, DATA_DIR,\
@@ -26,6 +26,22 @@ google_translator = GoogleTranslator()
 
 TEMPLATE_ASSETS_DIR: Final[str] = os.path.join(TEMPLATE_DIR, 'assets')
 TRANSLATIONS_FILE_PATH: Final[str] = os.path.join(DATA_DIR, 'translations.pkl')
+
+EMOJI_PATTERN = re.compile(
+    "["
+    "\U0001F600-\U0001F64F"  # emoticons
+    "\U0001F300-\U0001F5FF"  # symbols & pictographs
+    "\U0001F680-\U0001F6FF"  # transport & map symbols
+    "\U0001F700-\U0001F77F"  # alchemical symbols
+    "\U0001F780-\U0001F7FF"  # Geometric Shapes Extended
+    "\U0001F800-\U0001F8FF"  # Supplemental Arrows-C
+    "\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
+    "\U0001FA00-\U0001FA6F"  # Chess Symbols
+    "\U0001FA70-\U0001FAFF"  # Symbols and Pictographs Extended-A
+    "\U00002702-\U000027B0"  # Dingbats
+    "\U000024C2-\U0001F251"
+    "]+", flags=re.UNICODE
+)
 
 
 class SilentUndefined(Undefined):
@@ -100,6 +116,55 @@ def render_template(template_dir: str, file_name: str,
     return html
 
 
+def is_emoji(text: str) -> bool:
+    """
+    Checks if a given text is an emoji
+
+    :param text: The text to check
+    :return: True if the text contains an emoji, False otherwise
+    """
+
+    if text is None:
+        return False
+
+    is_found = re.search(EMOJI_PATTERN, text)
+    return bool(is_found)
+
+
+def extract_emojis(text: str) -> Tuple[str, list, list]:
+    """
+    Extracts emojis from text
+
+    :param text: The text to extract emojis from
+    :return: The text with emojis removed and a list of emojis and their positions
+    """
+
+    emojis = []
+    positions = []
+
+    for match in EMOJI_PATTERN.finditer(text):
+        emojis.append(match.group())
+        positions.append(match.start())
+
+    text_without_emojis = EMOJI_PATTERN.sub(r'', text)
+    return text_without_emojis, emojis, positions
+
+
+def insert_emojis(text: str, emojis: list, positions: list) -> str:
+    """
+    Inserts emojis into text
+
+    :param text: The text to insert emojis into
+    :param emojis: The emojis to insert
+    :param positions: The positions to insert the emojis
+    :return: The text with emojis inserted
+    """
+
+    for emoji, position in zip(emojis, positions):
+        text = text[:position] + emoji + ' ' + text[position:]
+    return text
+
+
 class Translator:
     """
     Class containing static methods for translating text.
@@ -154,49 +219,73 @@ class Translator:
 
 
     @staticmethod
-    def translate_html(html: str, from_lang: str, to_lang: str) -> Tag:
+    def translate_tag(html_tag: Tag, from_lang: str, to_lang: str):
         """
-        Function to translate a page into the correct language
+        Function to translate the text within a given HTML tag.
 
-        :param html: The content of the page as html
-        :param from_lang: The language of the text to be translated
-        :param to_lang: Into which language the text should be translated
+        :param html_tag: The HTML tag to be translated.
+        :param from_lang: The language of the text to be translated.
+        :param to_lang: Into which language the text should be translated.
+
+        :return: The translated HTML tag.
         """
 
-        def translate_tag(html_tag: Tag, from_lang: str, to_lang: str):
-            """
-            Function to translate the text within a given HTML tag.
+        translated_texts = []
+        is_first_element = True
 
-            :param html_tag: The HTML tag to be translated.
-            :param from_lang: The language of the text to be translated.
-            :param to_lang: Into which language the text should be translated.
+        for element in html_tag.descendants:
+            if isinstance(element, NavigableString) and is_first_element:
+                if is_emoji(element):
+                    translated_texts.append(
+                        (element, element)
+                    )
+                else:
+                    if element.parent.name not in ['script', 'style']:
+                        translated_texts.append(
+                            (element, Translator.translate(element, from_lang, to_lang))
+                        )
+                    is_first_element = False
 
-            :return: The translated HTML tag.
-            """
-
-            translated_texts = []
-            for tag in html_tag.find_all(text = True, recursive = True):
-                if hasattr(tag, 'attrs') and 'ntr' in tag.attrs:
+            elif isinstance(element, Tag):
+                if hasattr(element, 'attrs') and 'ntr' in element.attrs:
                     continue
 
-                if tag.parent.name not in ['script', 'style']:
-                    translated_texts.append(
-                        (tag, Translator.translate(tag, from_lang, to_lang))
-                    )
+                for attr, value in element.attrs.items():
+                    if isinstance(value, list):
+                        translated_values = [
+                            Translator.translate(val, from_lang, to_lang)
+                            for val in value
+                        ]
+                        element.attrs[attr] = translated_values
+                    else:
+                        element.attrs[attr] = Translator.translate(value, from_lang, to_lang)
 
-            for tag, translated_text in translated_texts:
-                tag.replace_with(translated_text)
+        for original, translated in translated_texts:
+            original.replace_with(translated)
 
-            translated_html = str(html_tag)
-            return translated_html
+        translated_html = str(html_tag)
+        return translated_html
+
+
+    @staticmethod
+    def translate_html(html: str, from_lang: str, to_lang: str) -> Tag:
+        """
+        Function to translate a page into the correct language.
+
+        :param html: The content of the page as html.
+        :param from_lang: The language of the text to be translated.
+        :param to_lang: Into which language the text should be translated.
+
+        :return: The translated HTML tag.
+        """
 
         soup = BeautifulSoup(html, 'html.parser')
 
         tags = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5',
-                              'h6', 'a', 'p', 'button', 'li', 'span'])
+                              'h6', 'a', 'p', 'button', 'span'])
         for tag in tags:
             if str(tag) and 'ntr' not in tag.attrs:
-                translate_tag(tag, from_lang, to_lang)
+                Translator.translate_tag(tag, from_lang, to_lang)
 
         inputs = soup.find_all('input')
         for input_tag in inputs:
@@ -209,9 +298,13 @@ class Translator:
         if head_tag:
             title_element = head_tag.find('title')
             if title_element:
-                title_element.string = Translator.translate(
-                    title_element.text.strip(), from_lang, to_lang
-                    )
+                text_with_emojis = title_element.text.strip()
+                clean_title, emojis, positions = extract_emojis(text_with_emojis)
+
+                translated_title = Translator.translate(clean_title, from_lang, to_lang)
+                final_title = insert_emojis(translated_title, emojis, positions)
+
+                title_element.string = final_title
 
             meta_title = head_tag.find('meta', attrs={'name': 'title'})
             if meta_title and 'content' in meta_title.attrs:

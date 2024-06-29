@@ -4,7 +4,7 @@
         <meta charset="UTF-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Change Language</title>
+        <title>🌐 Change Language</title>
         <style>
             {{ colors|safe }}
 
@@ -43,6 +43,7 @@
             body {
                 background-color: var(--background);
                 color: var(--text);
+                margin: 0;
                 font-family: Segoe UI, Arial, sans-serif;
             }
 
@@ -152,6 +153,16 @@
 
             .search-button img {
                 content: var(--search-button);
+            }
+
+            @media (max-width: 400px) {
+                .container {
+                    grid-template-columns: repeat(auto-fit, minmax(33.3%, 1fr));
+                }
+
+                h1 {
+                    font-size: 1.5rem;
+                }
             }
 
             {{ footer_css|safe }}
