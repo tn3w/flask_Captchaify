@@ -55,6 +55,18 @@
                 border-radius: 5px;
                 box-shadow: 2px 2px 5px var(--border);
             }
+
+            @media only screen and (max-width: 670px) {
+                .image-grid {
+                    grid-template-columns: repeat(3, 1fr);
+                }
+            }
+
+            @media only screen and (max-width: 400px) {
+                .image-grid {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+            }
             {{ footer_css|safe }}
             {{ cookie_banner_css|safe }}
         </style>

@@ -102,6 +102,20 @@
             a:hover {
                 text-decoration: underline;
             }
+
+            @media screen and (max-width: 600px) {
+                .captcha-container {
+                    max-width: 80%;
+                }
+            }
+
+            @media (max-width: 450px) {
+                .grid-item input[type="checkbox"] {
+                    transform: scale(1.2);
+                    margin-right: 1px;
+                    margin-bottom: 1px;
+                }
+            }
             {{ footer_css|safe }}
             {{ cookie_banner_css|safe }}
         </style>

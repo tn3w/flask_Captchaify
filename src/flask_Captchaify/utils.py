@@ -557,28 +557,51 @@ def search_languages(query: str, languages: list[dict]) -> list[dict]:
     :return: A list of dictionaries containing the languages sorted by similarity to the query.
     """
 
-    normalized_query = normalize_string(query)
-    if normalized_query.strip() == '':
+    normalized_query = normalize_string(query).lower()
+    if not normalized_query.strip():
         return languages
 
-    results = []
+    matching_languages = []
+    full_match = None
+
     for language in languages:
-        normalized_language_name = normalize_string(language['name'])
-        distance = levenshtein_distance(
-            normalized_query, normalized_language_name
-        )
+        normalized_language_name = normalize_string(language['name']).lower()
+        distance = levenshtein_distance(normalized_language_name, normalized_query)
 
-        if normalized_query in normalized_language_name\
-            or (distance <= 2 and not language['code'] in ['ja', 'hi', 'bn'])\
-                or normalized_query == language['code']:
-            results.append(language)
+        if normalized_language_name == normalized_query:
+            full_match = language
+        elif normalized_query in normalized_language_name or\
+            (distance <= 2 and language['code'] not in ['ja', 'hi', 'bn']):
+            matching_languages.append(language)
 
-    results.sort(key=lambda x: levenshtein_distance(
+        if language['code'] == normalized_query:
+            full_match = language
+            break
+
+        for lang_code, lang_name in language['names'].items():
+            normalized_lang_name = normalize_string(lang_name).lower()
+            distance = levenshtein_distance(normalized_query, normalized_lang_name)
+
+            if normalized_query == normalized_lang_name:
+                full_match = language
+                break
+
+            if len(normalized_query) <= 4:
+                continue
+
+            if normalized_query in normalized_lang_name or\
+                (distance <= 2 and lang_code not in ['ja', 'hi', 'bn']):
+                matching_languages.append(language)
+                break
+
+    if full_match:
+        matching_languages = [full_match]
+
+    matching_languages.sort(key=lambda x: levenshtein_distance(
         normalized_query, normalize_string(x['name'])
-        )
-    )
+    ))
 
-    return results
+    return matching_languages
 
 
 #################
