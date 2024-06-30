@@ -116,7 +116,10 @@ class CaptchaEmbed:
 
         if captcha_type == 'trueclick':
             embed = TRUECLICK_EMBED.replace('LANGUAGE', self.language)
-            embed = embed.replace('THEME', self.theme if not self.is_default_theme else '')
+            if not self.is_default_theme:
+                embed = embed.replace('THEME', self.theme)
+            else:
+                embed = embed.replace('data-theme="THEME"', '')
 
             return embed
 

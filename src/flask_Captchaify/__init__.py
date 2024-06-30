@@ -49,16 +49,6 @@ DATASET_PATHS: Final[dict] = {
 RATE_LIMIT_PATH: Final[str] = os.path.join(DATA_DIR, 'rate-limits.pkl')
 FAILED_CAPTCHAS_PATH: Final[str] = os.path.join(DATA_DIR, 'failed-captchas.pkl')
 SOLVED_CAPTCHAS_PATH: Final[str] = os.path.join(DATA_DIR, 'solved-captchas.pkl')
-GEOLITE_DATA: Final[dict] = {
-    "city": {
-        "url": "https://git.io/GeoLite2-City.mmdb",
-        "path": os.path.join(DATA_DIR, "GeoLite2-City.mmdb")
-    },
-    "asn": {
-        "url": "https://git.io/GeoLite2-ASN.mmdb",
-        "path": os.path.join(DATA_DIR, "GeoLite2-ASN.mmdb")
-    }
-}
 
 EMOJIS: Final[list] = JSON.load(os.path.join(ASSETS_DIR, 'emojis.json'), [])
 TEA_EMOJIS: Final[list] = JSON.load(os.path.join(ASSETS_DIR, 'tea_emojis.json'), [])

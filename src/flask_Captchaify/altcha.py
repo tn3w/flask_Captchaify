@@ -122,7 +122,7 @@ class Altcha:
             "error": 'Verification failed. Reloading page...',
             "expired": 'Verification expired. Reloading page...',
             "footer": 'Captcha by ALTCHA',
-            "label": 'I\'m not a robot.',
+            "label": 'I am not a robot.',
             "verified": 'Verified.',
             "verifying": 'Verifying...',
             "waitAlert": 'Verifying... please wait.'
