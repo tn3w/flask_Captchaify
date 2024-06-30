@@ -14,12 +14,9 @@ requirements = [str(requirement.requirement)\
 with open('README.md', 'r', encoding='utf-8') as readable_file:
     long_description = readable_file.read()
 
-long_description = long_description.split('<h1 align="center">𝐟𝐥𝐚𝐬𝐤_𝐂𝐚𝐩𝐭𝐜𝐡𝐚𝐢𝐟𝐲</h1>')[1]
-long_description = '<h1 align="center">𝐟𝐥𝐚𝐬𝐤_𝐂𝐚𝐩𝐭𝐜𝐡𝐚𝐢𝐟𝐲</h1>' + long_description
-
 setup(
     name='flask_Captchaify',
-    version='1.7.6.6',
+    version='1.7.6.7',
     description='Protect against bots and DDoS attacks',
     long_description=long_description,
     long_description_content_type='text/markdown',
