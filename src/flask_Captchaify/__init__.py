@@ -1520,19 +1520,19 @@ class Captchaify:
             )
             args.update({
                 "current_url_with_config": remove_args_from_url(
-                    self.url, ['ct', 'ci', 'captcha', 'js']
+                    self.url, ['ct', 'ci', 'cs', 'captcha', 'js']
                 ),
                 "url_args": extract_args(remove_args_from_url(
-                    self.url, ['ct', 'ci', 'captcha']
+                    self.url, ['ct', 'ci', 'cs', 'captcha']
                 )),
                 "url_args_without_rr": extract_args(remove_args_from_url(
-                    self.url, ['ct', 'ci', 'captcha', 'rr']
+                    self.url, ['ct', 'ci', 'cs', 'captcha', 'rr']
                 )),
                 "url_args_without_lang": extract_args(remove_args_from_url(
-                    self.url, ['ct', 'ci', 'captcha', 'rr', 'language']
+                    self.url, ['ct', 'ci', 'cs', 'captcha', 'rr', 'language']
                 )),
                 "current_url": remove_args_from_url(
-                    current_url, ['ct', 'ci', 'captcha', 'tc', 'ac']
+                    current_url, ['ct', 'ci', 'cs', 'captcha', 'tc', 'ac']
                 ),
                 "current_url_without_cl": remove_args_from_url(current_url, ['cl']),
                 "current_url_without_wc": remove_args_from_url(self.url, ['wc']),

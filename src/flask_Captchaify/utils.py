@@ -569,7 +569,8 @@ def search_languages(query: str, languages: list[dict]) -> list[dict]:
         )
 
         if normalized_query in normalized_language_name\
-            or (distance <= 2 and not language['code'] == 'ja'):
+            or (distance <= 2 and not language['code'] in ['ja', 'hi', 'bn'])\
+                or normalized_query == language['code']:
             results.append(language)
 
     results.sort(key=lambda x: levenshtein_distance(
