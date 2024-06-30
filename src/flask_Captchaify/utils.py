@@ -435,7 +435,7 @@ def convert_image_to_base64(image_data: bytes) -> str:
 
     encoded_image = b64encode(image_data).decode('utf-8')
 
-    data_url = f'data:image/webp;base64,{encoded_image}'
+    data_url = f'data:image/png;base64,{encoded_image}'
 
     return data_url
 
@@ -496,7 +496,7 @@ def manipulate_image_bytes(image_data: bytes, is_small: bool = False,
     size = 100 if is_small else 200
     shifted_img = cv2.resize(shifted_img, (size, size), interpolation=cv2.INTER_LINEAR)
 
-    _, output_bytes = cv2.imencode('.webp', shifted_img)
+    _, output_bytes = cv2.imencode('.png', shifted_img)
     if not _:
         raise ValueError("Image encoding failed.")
 

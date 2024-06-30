@@ -1236,10 +1236,11 @@ class Captchaify:
         captcha_data['keyword'] = keyword
 
         images = dataset[keyword]
+
         original_image = get_random_image(images)
 
-        second_value = next(key for key in dataset.keys() if key != keyword)
         if len(keywords) == 2:
+            second_value = next(key for key in dataset.keys() if key != keyword)
             other_keywords = [second_value for _ in range(5)]
         else:
             other_keywords = []
@@ -1277,6 +1278,7 @@ class Captchaify:
                 )
             ) for image in captcha_images
         ]
+
         captcha_images = [{'id': str(i), 'src': image_data}
                             for i, image_data in enumerate(captcha_images)]
 

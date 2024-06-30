@@ -234,6 +234,9 @@ class Translator:
         is_first_element = True
 
         for element in html_tag.descendants:
+            if element.getText().strip() == "":
+                continue
+
             if isinstance(element, NavigableString) and is_first_element:
                 if is_emoji(element) and len(element.strip()) == 1:
                     translated_texts.append(
