@@ -23,6 +23,9 @@ if __name__ == '__main__':
     app.run(host = 'localhost', port = 9000)
 ```
 
+> [!IMPORTANT]
+> In the latest Version 1.7.7.1 the `captcha` action is now called `auto`. If you use `captcha` the action will default to `auto`.
+
 
 ### Table of Contents
    - [Table of Contents](#table-of-contents)
@@ -171,6 +174,7 @@ if __name__ == '__main__':
 All args and default value:
 ```python
 args = {
+   "app": None, "rules": [],
    "action": 'captcha', "captcha_type": 'oneclick',
    "dataset": 'keys', "dataset_size": (20, 100),
    "dataset_dir": DATASETS_DIR, "hardness": 1,
@@ -379,7 +383,7 @@ args = {
    | allow          | Allows all traffic through, regardless of whether the IP is blocked. |
    | block          | Blocks all traffic if it is blocked, without captcha.                |
    | fight          | Displays a captcha to all traffic, whether suspicious or not.        |
-   | captcha        | Default value, shows only suspicious traffic captchas.               |
+   | auto           | Default value, shows only suspicious traffic captchas.               |
 
    Example of a website that has set its action to "block" for specific ips:
    ```python
@@ -479,7 +483,7 @@ args = {
    | allow          | Allows all traffic through, regardless of whether the IP is blocked. |
    | block          | Blocks all traffic if it is blocked, without captcha.                |
    | fight          | Displays a captcha to all traffic, whether suspicious or not.        |
-   | captcha        | Default value, shows only suspicious traffic captchas.               |
+   | auto           | Default value, shows only suspicious traffic captchas.               |
 
 <br>
 

@@ -61,7 +61,7 @@ ALL_CAPTCHA_TYPES: Final[list] = [
     'friendlycaptcha', 'altcha', 'trueclick'
 ]
 ALL_DATASET_TYPES: Final[list] = ['keys', 'animals', 'ki-dogs']
-ALL_ACTIONS: Final[list] = ['allow', 'block', 'fight', 'captcha']
+ALL_ACTIONS: Final[list] = ['allow', 'block', 'fight', 'auto']
 ALL_THIRD_PARTIES: Final[list] = ['geoip', 'tor', 'ipapi', 'stopforumspam']
 ALL_TEMPLATE_TYPES: Final[list] = [
     'captcha_text_audio', 'captcha_multiclick', 'captcha_oneclick',
@@ -241,8 +241,8 @@ ERROR_CODES: Final[dict] = {
 }
 
 DEFAULT_KWARGS: Final[dict] = {
-    "action": 'captcha', "captcha_type": 'oneclick',
-    "dataset": 'keys', "dataset_size": (20, 100),
+    "action": 'auto', "captcha_type": 'oneclick',
+    "dataset": 'keys', "dataset_size": 'full',
     "dataset_dir": DATASETS_DIR, "hardness": 1,
     "verification_age": 3600, "template_dir": TEMPLATE_DIR,
     "without_customisation": False, "without_cookies": False,
@@ -268,8 +268,8 @@ class Captchaify:
 
     def __init__(self, app: Optional[Flask] = None,
                  rules: Optional[dict[tuple, str]] = None,
-                 action: str = 'captcha', captcha_type: str = 'oneclick',
-                 dataset: str = 'keys', dataset_size: Union[tuple[int, int], str] = (20, 100),
+                 action: str = 'auto', captcha_type: str = 'oneclick',
+                 dataset: str = 'keys', dataset_size: Union[tuple[int, int], str] = 'full',
                  dataset_dir: str = DATASETS_DIR, hardness: int = 1, verification_age: int = 3600,
                  template_dir: str = TEMPLATE_DIR, without_customisation: bool = False,
                  without_cookies: bool = False, without_arg_transfer: bool = False,
@@ -489,6 +489,7 @@ class Captchaify:
 
                 if not request.is_json:
                     return jsonify({'status': 'error', 'error': 'Invalid request'})
+
                 data = request.get_json()
 
                 captcha_id, captcha_token = data.get('id'), data.get('token')
@@ -525,10 +526,9 @@ class Captchaify:
             for error_code in error_codes_to_handle:
                 if not isinstance(error_code, dict):
                     codes.append(error_code)
-                elif isinstance(error_code['code'], list):
-                    codes.extend(error_code['code'])
-                else:
-                    codes.append(error_code['code'])
+                    break
+
+                codes.append(error_code['code'])
 
             for error_code in codes:
                 app.register_error_handler(error_code, self._render_exception)
@@ -2010,16 +2010,26 @@ class Captchaify:
 
         dataset = JSON.load(dataset_path)
 
+        dataset_size = self.kwargs['dataset_size']
+        if dataset_size == 'full':
+            self.loaded_datasets[dataset_path] = dataset
+            return dataset
+
+        if isinstance(dataset_size, str):
+            dataset_size = DATASET_SIZES.get(dataset_size, (20, 100))
+
         new_dataset = {}
-        if not len(dataset.keys()) == self.kwargs['dataset_size'][1]:
-            max_dataset_keys = min(len(dataset.keys()), self.kwargs['dataset_size'][1])
+        if not len(dataset.keys()) == dataset_size[1]:
+            max_dataset_keys = min(len(dataset.keys()), dataset_size[1])
+
             for _ in range(max_dataset_keys):
                 random_keyword = secrets.choice(list(dataset.keys()))
                 while random_keyword in new_dataset:
                     random_keyword = secrets.choice(list(dataset.keys()))
+
                 new_dataset[random_keyword] = dataset[random_keyword]
 
-        dataset = {keyword: images[:self.kwargs['dataset_size'][0]]
+        dataset = {keyword: images[:dataset_size[0]]
                    for keyword, images in new_dataset.items()}
 
         self.loaded_datasets[dataset_path] = dataset
