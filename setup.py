@@ -16,7 +16,7 @@ with open('README.md', 'r', encoding='utf-8') as readable_file:
 
 setup(
     name='flask_Captchaify',
-    version='1.7.7.2',
+    version='1.7.7.3',
     description='Protect against bots and DDoS attacks',
     long_description=long_description,
     long_description_content_type='text/markdown',

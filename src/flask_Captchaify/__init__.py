@@ -929,11 +929,11 @@ class Captchaify:
         return self._is_captcha_valid('turnstile')
 
 
-    def is_friendlycaptcha_valid(self) -> bool:
+    def is_friendly_valid(self) -> bool:
         """
-        Check if the friendlycaptcha is valid
+        Check if the friendly is valid
 
-        :return: True if the friendlycaptcha is valid, False otherwise
+        :return: True if the friendly is valid, False otherwise
         """
 
         return self._is_captcha_valid('friendlycaptcha')
