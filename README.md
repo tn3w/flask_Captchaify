@@ -14,7 +14,7 @@ captchaify = Captchaify(app)
 @app.route('/')
 def index():
     """
-    Very good protected Route
+    Extremely well protected route
     """
 
     return 'Hello human!🖐️'
