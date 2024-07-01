@@ -175,7 +175,7 @@ All args and default value:
 ```python
 args = {
    "app": None, "rules": [],
-   "action": 'captcha', "captcha_type": 'oneclick',
+   "action": 'auto', "captcha_type": 'oneclick',
    "dataset": 'keys', "dataset_size": (20, 100),
    "dataset_dir": DATASETS_DIR, "hardness": 1,
    "verification_age": 3600, "template_dir": TEMPLATE_DIR,
