@@ -159,6 +159,10 @@ class TrueClick:
         if captcha_id in captchas:
             del captchas[captcha_id]
 
+            if len(captchas) == 0:
+                os.remove(CAPTCHAS_FILE_PATH)
+                return
+
             PICKLE.dump(captchas, CAPTCHAS_FILE_PATH)
 
 
@@ -194,7 +198,7 @@ class TrueClick:
 
         captcha = self.get_captcha(captcha_id)
 
-        if not captcha or not Hashing().compare(captcha_token, captcha['htoken']):
+        if not self.is_captcha_token_valid(captcha_id, captcha_token):
             return False
 
         is_verified = captcha.get('verified', False)
@@ -216,7 +220,7 @@ class TrueClick:
 
         captcha = self.get_captcha(captcha_id)
 
-        if not Hashing().compare(captcha_token, captcha['htoken']):
+        if not captcha or not Hashing().compare(captcha_token, captcha['htoken']):
             return False
 
         return True
@@ -236,11 +240,15 @@ class TrueClick:
             return False
 
         captcha = self.get_captcha(captcha_id)
+        if captcha.get('verified') is True:
+            return False
+
         if sorted(selected_indices) != sorted(captcha['data']['correct']):
             self.remove_captcha(captcha_id)
             return False
 
         captcha['verified'] = True
+        del captcha['data']
         self.remove_captcha(captcha_id)
 
         captchas = self._load()

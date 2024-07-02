@@ -221,26 +221,26 @@ class Cache(dict):
     """
 
 
-    def __init__(self, file_name: str, ttl: Optional[int] = None) -> None:
+    def __init__(self, cache_key: str, ttl: Optional[int] = 259200) -> None:
         """
         Initializes the Cache object.
 
-        :param file_name: The name of the file to store cache data.
+        :param cache_key: The name of the file to store cache data.
         :param ttl: The time to live in seconds, after that time data will be removed
                     from the cache.
         """
 
-        self.file_name = file_name
+        self.cache_key = cache_key
         self.ttl = ttl
 
         super().__init__()
 
 
-    def load(self, default: Optional[Union[dict, list]] = None) -> Union[dict, list]:
+    @property
+    def load(self) -> any:
         """
         Loads and returns the cache data from the file.
 
-        :param default: Returned if no data was found
         :return: The cache data from the file. If the cache file does not contain
                  data for this file_name, an empty dictionary is returned.
         """
@@ -248,7 +248,7 @@ class Cache(dict):
         data = PICKLE.load(CACHE_FILE_PATH)
 
         if self.ttl is not None:
-            now = time.time()
+            now = int(time.time())
             data = {
                 file_name: {key: value
                             for key, value in file_data.items()
@@ -256,7 +256,7 @@ class Cache(dict):
                 for file_name, file_data in data.items()
             }
 
-        return data.get(self.file_name, default)
+        return data
 
 
     def __getitem__(self, key: any) -> any:
@@ -267,8 +267,13 @@ class Cache(dict):
         :return: The value associated with the key, or None if the key is not found.
         """
 
-        data = self.load({}).get(self.file_name, {})
-        return data.get(key, {}).get('value')
+        data = self.load
+        key_data = data.get(self.cache_key, {}).get(key, ())
+
+        try:
+            return key_data[0]
+        except Exception:
+            return None
 
 
     def __setitem__(self, key: any, value: any) -> None:
@@ -279,12 +284,12 @@ class Cache(dict):
         :param value: The value to be set for the key.
         """
 
-        data = self.load(default={})
+        data = self.load
 
-        if self.file_name not in data:
-            data[self.file_name] = {}
+        if not self.cache_key in data:
+            data[self.cache_key] = {}
 
-        data[self.file_name][key] = (value, time.time())
+        data[self.cache_key][key] = (value, int(time.time()))
         PICKLE.dump(data, CACHE_FILE_PATH)
 
 
@@ -295,10 +300,10 @@ class Cache(dict):
         :param key: The key for which the value is to be deleted.
         """
 
-        data = self.load(default={})
+        data = self.load
 
-        if self.file_name in data:
-            del data[self.file_name][key]
+        if self.cache_key in data and key in data[self.cache_key]:
+            del data[self.cache_key][key]
 
         PICKLE.dump(data, CACHE_FILE_PATH)
 
@@ -448,14 +453,14 @@ class RequestInfo:
                     else:
                         continue
 
-                if field in ['as', 'as_code']:
+                if field in ['as', 'as_number']:
                     try:
-                        reader = geoip2.database.Reader(GEOLITE_DATA['as']['data_path'])
+                        reader = geoip2.database.Reader(GEOLITE_DATA['asn']['data_path'])
                         asn = reader.asn(client_ip)
 
                         stored_ip_info.update({
                             "as": asn.autonomous_system_organization,
-                            "as_code": asn.autonomous_system_number,
+                            "as_number": asn.autonomous_system_number,
                         })
                     except Exception:
                         pass
@@ -480,13 +485,14 @@ class RequestInfo:
                              'country_code', 'region', 'region_code',
                              'city', 'zip', 'lat', 'lon', 'timezone',
                              'offset', 'currency', 'isp', 'org', 'as',
-                             'as_code', 'reverse', 'mobile', 'proxy',
+                             'as_number', 'reverse', 'mobile', 'proxy',
                              'hosting'] and\
                         'ipapi' in self.third_parties:
+
                     ipapi_data = self.get_ipapi_data()
-                    if ipapi_data is not None:
+                    if ipapi_data is not None and field in ipapi_data:
                         stored_ip_info.update(ipapi_data)
-                        continue
+                        break
 
                 i += 1
                 if i > 1:
@@ -609,14 +615,15 @@ class RequestInfo:
                         value = ' '.join(as_value.split(' ')[1:])
 
             if key == 'as' and isinstance(value, str):
-                as_code = value.split(' ')[0]
+                as_number = value.split(' ')[0]
                 as_org = ' '.join(value.split(' ')[1:])
-                if not as_code.isdigit():
+                if not as_number.isdigit():
                     continue
-                value = int(as_code)
+
+                value = int(as_number)
 
             key = {'region': 'region_code', 'regionname':\
-                   'region', 'as': 'as_code', 'asname': 'as'}\
+                   'region', 'as': 'as_number', 'asname': 'as'}\
                    .get(key.lower(), re.sub('([A-Z])', r'_\1', key).lower())
             ipapi_data[key] = value
 

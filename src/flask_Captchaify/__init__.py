@@ -903,6 +903,24 @@ class Captchaify:
 
 
     @property
+    def as_name(self) -> Optional[str]:
+        """
+        Returns the autonomous system of the current request.
+        """
+
+        return self._req_info.get_ip_info(['as'])
+
+
+    @property
+    def as_number(self) -> Optional[str]:
+        """
+        Returns the autonomous system number of the current request.
+        """
+
+        return self._req_info.get_ip_info(['as_number'])
+
+
+    @property
     def is_valid_ip(self) -> bool:
         """
         Check if the client's IP is valid.
