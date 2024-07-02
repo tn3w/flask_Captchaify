@@ -982,6 +982,25 @@ class Captchaify:
     #######################
 
 
+    def is_captcha_valid(self) -> bool:
+        """
+        Check if the captcha is valid
+        """
+
+        return self._is_captcha_verifier_valid()
+
+
+    def show_captcha(self, return_path: Optional[str] = None) -> bool:
+        """
+        Show the captcha
+        """
+
+        if return_path is None:
+            return_path = get_return_path(request, '/')
+
+        return self._render_captcha(return_path = quote(return_path))
+
+
     def _is_captcha_valid(self, captcha_type: str) -> bool:
         """	
         Check if the captcha is valid
@@ -2030,10 +2049,6 @@ class Captchaify:
             if request.path in self._own_routes and not without_redirect:
                 return
 
-            return_path = get_return_path(request)
-            if return_path is None:
-                return_path = '/'
-
             client_ip = self.ip
             action = self._current_configuration['action']
 
@@ -2041,6 +2056,7 @@ class Captchaify:
                 return self._render_block()
 
             is_valid_ct, is_failed_captcha = self._verify_captcha_token()
+            return_path = get_return_path(request, '/')
             if is_valid_ct:
                 return self._valid_captcha(return_path)
 

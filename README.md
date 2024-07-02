@@ -38,6 +38,7 @@ if __name__ == '__main__':
       - [Contributing](#note-for-contributors)
    - [Documentation](#documentation)
       - [Captcha Integration](#captcha-integration)
+      - [Special Cases](#special-cases)
       - [Arguments](#arguments)
 
 
@@ -92,12 +93,11 @@ In situations where it is deemed necessary, a captivating challenge may be prese
 
 
 ### To-Do's
-- [x] Add option that can integrate Captchaify Trueclick, Google reCaptcha, hCaptcha or Cloudflare Turnstile into forms like https://github.com/KnugiHK/flask-hcaptcha
 - [x] Integrate Captchaify Trueclick as captcha type
 - [x] Add location propertys
+- [x] Add is_captcha_valid and show_captcha function to add an way to check in an specific case in an route
 - [ ] Add clickable Captcha
 - [ ] Captcha data set with emojis
-- [ ] Add is_captcha_valid and show_captcha function to add an way to check in an specific case in an route
 
 
 ### Note for Contributors
@@ -168,6 +168,22 @@ def index():
 
 if __name__ == '__main__':
    app.run()
+```
+
+<br>
+
+## Special Cases
+
+In some cases or if you like it better, you can use a combination of `captchaify.is_captcha_valid()` and `captchaify.show_captcha()` to show a captcha when needed.
+
+An example route that displays a captcha to all clients using proxies:
+```python
+@app.route('/login')
+def login():
+   if not captchaify.is_captcha_valid() and captchaify.is_proxy:
+      return captchaify.show_captcha()
+
+   return 'MY LOGIN TEMPLATE' # Here: the user is not a robot.
 ```
 
 <br>
