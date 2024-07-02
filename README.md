@@ -50,13 +50,14 @@ In situations where it is deemed necessary, a captivating challenge may be prese
 - **Bot Identification:** flask_Captchaify can automatically identify and block known bots using block lists, API`s and similar mechanisms.
 - **Rate Limiting:** flask_Captchaify allows you to set rate limits for requests to prevent bots from overwhelming your server.
 - **Client-Specific Rules:** You can set rules specific to individual clients, such as allowing certain IP addresses to bypass the captcha.
-- **JavaScript not required:** flask_Captchaify does not require JavaScript. All captchas are fully functional without it.
-- **Crawler Detection:** flask_Captchaify can detect and block web crawlers from accessing your site.
+- **JavaScript not required:** flask_Captchaify does not require JavaScript. All captchas are fully functional without it. (Third party services like Google reCaptcha, hCaptcha, Cloudflare Turnstile, Friendly Captcha, Altcha and Trueclick require JavaScript to work.)
+- **Crawler Detection:** flask_Captchaify can detect and block web crawlers from accessing your site. Web Crawlers can also be given hints and be shown meta tags.
 - **Customizable Dataset:** You can customize the captchas by providing your own dataset of images and keywords.
 - **Customizable Templates:** You can customize the templates used for the captchas and error pages.
 - **Customizable Themes:** Users can customize the themes used for the captchas and error pages.
 - **Multiple Captcha Types:** flask_Captchaify supports multiple types of captchas, including one-click captchas, custom captchas, and captchas from third-party services.
 - **Personalization:** You can customize the behavior of flask_Captchaify by providing your own arguments and values.
+- **Error Handling:** flask_Captchaify handles errors and displays custom error pages.
 - **Fully Open Source:** flask_Captchaify is fully open source and free to use. ʕっ•ᴥ•ʔっ
 
 <br>
@@ -91,13 +92,12 @@ In situations where it is deemed necessary, a captivating challenge may be prese
 
 
 ### To-Do's
-- [x] Re-implementation of hardness as a way to regulate sophistication
 - [x] Add option that can integrate Captchaify Trueclick, Google reCaptcha, hCaptcha or Cloudflare Turnstile into forms like https://github.com/KnugiHK/flask-hcaptcha
 - [x] Integrate Captchaify Trueclick as captcha type
+- [x] Add location propertys
 - [ ] Add clickable Captcha
 - [ ] Captcha data set with emojis
 - [ ] Add is_captcha_valid and show_captcha function to add an way to check in an specific case in an route
-- [ ] Add location propertys
 
 
 ### Note for Contributors

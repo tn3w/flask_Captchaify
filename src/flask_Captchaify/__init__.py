@@ -781,6 +781,128 @@ class Captchaify:
 
 
     @property
+    def location(self) -> Optional[dict]:
+        """
+        Returns the location of the current request.
+        """
+
+        if not self.is_valid_ip:
+            return None
+
+        info = self._req_info.get_ip_info(
+            ['continent', 'continent_code', 'country',
+             'country_code', 'region', 'region_code',
+             'city', 'zip', 'lat', 'lon']
+        )
+
+        return info
+
+
+    def _get_location_value(self, key: str) -> Optional[str]:
+        """
+        Returns the value of a location key.
+        """
+
+        if not self.is_valid_ip:
+            return None
+
+        if self.location is None or key not in self.location:
+            return None
+
+        return self.location[key]
+
+
+    @property
+    def continent(self) -> Optional[str]:
+        """
+        Returns the continent of the current request.
+        """
+
+        return self._get_location_value('continent')
+
+
+    @property
+    def continent_code(self) -> Optional[str]:
+        """
+        Returns the continent code of the current request.
+        """
+
+        return self._get_location_value('continent_code')
+
+
+    @property
+    def country(self) -> Optional[str]:
+        """
+        Returns the country of the current request.
+        """
+
+        return self._get_location_value('country')
+
+
+    @property
+    def country_code(self) -> Optional[str]:
+        """
+        Returns the country code of the current request.
+        """
+
+        return self._get_location_value('country_code')
+
+
+    @property
+    def region(self) -> Optional[str]:
+        """
+        Returns the region of the current request.
+        """
+
+        return self._get_location_value('region')
+
+
+    @property
+    def region_code(self) -> Optional[str]:
+        """
+        Returns the region code of the current request.
+        """
+
+        return self._get_location_value('region_code')
+
+
+    @property
+    def city(self) -> Optional[str]:
+        """
+        Returns the city of the current request.
+        """
+
+        return self._get_location_value('city')
+
+
+    @property
+    def zip(self) -> Optional[str]:
+        """
+        Returns the zip code of the current request.
+        """
+
+        return self._get_location_value('zip')
+
+
+    @property
+    def lat(self) -> Optional[str]:
+        """
+        Returns the latitude of the current request.
+        """
+
+        return self._get_location_value('lat')
+
+
+    @property
+    def lon(self) -> Optional[str]:
+        """
+        Returns the longitude of the current request.
+        """
+
+        return self._get_location_value('lon')
+
+
+    @property
     def is_valid_ip(self) -> bool:
         """
         Check if the client's IP is valid.
