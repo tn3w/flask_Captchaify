@@ -23,9 +23,6 @@ if __name__ == '__main__':
     app.run(host = 'localhost', port = 9000)
 ```
 
-> [!IMPORTANT]
-> In the latest Version 1.7.7.1 the `captcha` action is now called `auto`. If you use `captcha` the action will default to `auto`.
-
 
 ### Table of Contents
    - [Table of Contents](#table-of-contents)
@@ -178,12 +175,24 @@ In some cases or if you like it better, you can use a combination of `captchaify
 
 An example route that displays a captcha to all clients using proxies:
 ```python
+from flask import Flask
+from flask_Captchaify import Captchaify
+
+app = Flask(__name__)
+captchaify = Captchaify(app, action = 'allow') # Captchaify is detecting proxies automatically, here this is disabled
+
+# Or use:
+# captchaify = Captchaify(app, rules = [{'rule': ['path', 'is', '/login'], 'change': {'action': 'allow'}}])
+
 @app.route('/login')
 def login():
-   if not captchaify.is_captcha_valid() and captchaify.is_proxy:
+   if not captchaify.is_captcha_valid() and (captchaify.is_proxy or captchaify.is_spammer or captchaify.is_tor): # Crawler: `or captchaify.is_crawler`
       return captchaify.show_captcha()
 
    return 'MY LOGIN TEMPLATE' # Here: the user is not a robot.
+
+if __name__ == '__main__':
+   app.run()
 ```
 
 <br>
