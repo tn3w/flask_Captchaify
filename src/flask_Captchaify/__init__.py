@@ -1011,7 +1011,11 @@ class Captchaify:
         if return_path is None:
             return_path = get_return_path(request, '/')
 
-        return self._render_captcha(return_path = quote(return_path))
+        is_valid_ct, is_failed_captcha = self._verify_captcha_token()
+        if is_valid_ct:
+            return self._valid_captcha(return_path)
+
+        return self._render_captcha(is_failed_captcha, quote(return_path))
 
 
     def _is_captcha_valid(self, captcha_type: str) -> bool:

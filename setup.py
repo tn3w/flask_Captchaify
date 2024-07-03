@@ -16,7 +16,7 @@ with open('README.md', 'r', encoding='utf-8') as readable_file:
 
 setup(
     name='flask_Captchaify',
-    version='1.7.7.9',
+    version='1.7.8',
     description='Protect against bots and DDoS attacks',
     long_description=long_description,
     long_description_content_type='text/markdown',
@@ -39,6 +39,6 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
     license='GPL-3.0',
-    keywords='flask, Python, Bot, Captcha, DDoS',
+    keywords='flask, Python, Bot, Captcha, DDoS, robot, crawler, rate-limiting, bot-protection ',
     install_requires=requirements
 )

@@ -184,12 +184,14 @@ captchaify = Captchaify(app, action = 'allow') # Captchaify is detecting proxies
 # Or use:
 # captchaify = Captchaify(app, rules = [{'rule': ['path', 'is', '/login'], 'change': {'action': 'allow'}}])
 
-@app.route('/login')
+@app.route('/login') # you can also use an endpoint
 def login():
-   if not captchaify.is_captcha_valid() and (captchaify.is_proxy or captchaify.is_spammer or captchaify.is_tor): # Crawler: `or captchaify.is_crawler`
+   if not captchaify.is_captcha_valid() and\
+      (not captchaify.is_valid_ip or captchaify.is_proxy\
+       or captchaify.is_spammer or captchaify.is_tor): # Crawler: `or captchaify.is_crawler`
       return captchaify.show_captcha()
 
-   return 'MY LOGIN TEMPLATE' # Here: the user is not a robot.
+   return 'MY LOGIN TEMPLATE' # the user is not a robot.
 
 if __name__ == '__main__':
    app.run()
