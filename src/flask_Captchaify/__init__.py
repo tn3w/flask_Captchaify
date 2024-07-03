@@ -266,10 +266,9 @@ class Captchaify:
     """
 
 
-    def __init__(self, app: Optional[Flask] = None,
-                 rules: Optional[dict[tuple, str]] = None,
+    def __init__(self, app: Optional[Flask] = None, rules: Optional[dict] = None,
                  action: str = 'auto', captcha_type: str = 'oneclick',
-                 dataset: str = 'keys', dataset_size: Union[tuple[int, int], str] = 'full',
+                 dataset: str = 'keys', dataset_size: Union[Tuple[int, int], str] = 'full',
                  dataset_dir: str = DATASETS_DIR, hardness: int = 1, verification_age: int = 3600,
                  template_dir: str = TEMPLATE_DIR, without_customisation: bool = False,
                  without_cookies: bool = False, without_arg_transfer: bool = False,
@@ -457,7 +456,7 @@ class Captchaify:
                     mimetype = 'application/javascript', max_age=31536000
                 )
 
-            @app.route('/trueclick_captchaify/<action>', methods = ['POST'],
+            @app.route('/trueclick_captchaify/<action>', methods = ['GET', 'POST'],
                         endpoint = 'trueclick_captchaify')
             def trueclick_captchaify(action = None) -> Response:
                 """
@@ -468,8 +467,18 @@ class Captchaify:
                             the request is valid, otherwise the error.
                 """
 
-                if not action in ['generate', 'verify']:
-                    return jsonify({'status': 'error', 'error': 'Invalid request'})
+                invalid_request = jsonify(
+                    {
+                        'status': 'error',
+                        'error': 'Invalid request',
+                        'challenge': None,
+                        'dataset': None
+                    }
+                )
+
+                if not action in ['generate', 'verify']\
+                    or request.method.lower() != 'post':
+                    return invalid_request
 
                 config = self._current_configuration
                 dataset_dir, hardness, dataset =\
@@ -481,14 +490,15 @@ class Captchaify:
 
                     return jsonify(
                         {
-                            'status': 'ok', 'error': None,
+                            'status': 'ok',
+                            'error': None,
                             'challenge': captcha_challenge,
                             'dataset': dataset
                         }
                     )
 
                 if not request.is_json:
-                    return jsonify({'status': 'error', 'error': 'Invalid request'})
+                    return invalid_request
 
                 data = request.get_json()
 
@@ -499,7 +509,7 @@ class Captchaify:
                 ]
 
                 if not captcha_id or not captcha_token or not selected_indices:
-                    return jsonify({'status': 'error', 'error': 'Invalid request'})
+                    return invalid_request
 
                 is_verified = trueclick.verify_captcha(
                     captcha_id, captcha_token, selected_indices
@@ -512,7 +522,7 @@ class Captchaify:
                         'challenge':
                             trueclick.generate_captcha(dataset)\
                                 if not is_verified else None,
-                        'dataset': dataset
+                        'dataset': dataset if not is_verified else None,
                     }
                 )
 
@@ -524,11 +534,14 @@ class Captchaify:
         if len(error_codes_to_handle) != 0:
             codes = []
             for error_code in error_codes_to_handle:
-                if not isinstance(error_code, dict):
-                    codes.append(error_code)
-                    break
+                if isinstance(error_code, dict):
+                    codes.append(error_code['code'])
+                    continue
 
-                codes.append(error_code['code'])
+                if isinstance(error_code, str) and error_code.isdigit():
+                    error_code = int(error_code)
+
+                codes.append(error_code)
 
             for error_code in codes:
                 app.register_error_handler(error_code, self._render_exception)

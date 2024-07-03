@@ -817,9 +817,11 @@ def matches_rule(rule: list, req_info: RequestInfo) -> bool:
         if rule[i] == 'and':
             return matches_rule(rule[:i], req_info) and \
                 matches_rule(rule[i+1:], req_info)
+
         if rule[i] == 'or':
             return matches_rule(rule[:i], req_info) or \
                 matches_rule(rule[i+1:], req_info)
+
         i += 1
 
     field, operator, value = rule
@@ -837,40 +839,59 @@ def matches_rule(rule: list, req_info: RequestInfo) -> bool:
     if field not in client_info:
         client_info[field] = req_info.get_ip_info([field])
 
-    info = client_info[field]
-
     try:
-        if isinstance(operator, str):
-            operator = operator.strip(' ')
+        info = client_info.get(field)
+        if info is None:
+            return False
 
-        if operator in ('==', 'equals', 'equal', 'is'):
+        if isinstance(operator, str):
+            operator = operator.strip(' ').lower()
+
+        if operator in ('==', 'equals', 'equal', 'is', 'isthesameas'):
             return matches_asterisk_rule(info, value)
         if operator in ('!=', 'doesnotequal', 'doesnotequals', 'notequals', 'notequal', 'notis'):
             return not matches_asterisk_rule(info, value)
+
         if operator in ('contains', 'contain'):
             return value in info
         if operator in ('doesnotcontain', 'doesnotcontains', 'notcontain', 'notcontains'):
             return value not in info
+
         if operator in ('isin', 'in'):
             return info in value
         if operator in ('isnotin', 'notisin', 'notin'):
             return info not in value
-        if operator in ('greaterthan', 'largerthan'):
+
+        if operator in ('greaterthan', 'largerthan', 'lessthan'):
+            if isinstance(info, str) and info.is_digit():
+                info = int(info)
+            elif not isinstance(info, int):
+                return False
+
+            if operator == 'lessthan':
+                return info < value
+
             return info > value
-        if operator == 'lessthan':
-            return info < value
-        if operator in ('startswith', 'beginswith'):
-            return info.startswith(value)
-        if operator in ('endswith', 'concludeswith', 'finisheswith'):
+
+        if operator in ('startswith', 'beginswith', 'endswith', 'concludeswith', 'finisheswith'):
+            if isinstance(info, int):
+                info = str(info)
+            elif not isinstance(info, str):
+                return False
+
+            if operator in ('startswith', 'beginswith'):
+                return info.startswith(value)
+
             return info.endswith(value)
+
     except Exception as exc:
         handle_exception(exc, is_app_error=False)
         return False
 
     short_error_message = f'UnknownOperatorError: {operator} is not known.'
     handle_exception(
-        short_error_message + '.', is_app_error=False, long_error_message=
-        short_error_message + ' this is because you have specified an incorrect operator '
-                             'field in the rules argument (valid: `==`, invalid: `is the same as`)'
+        short_error_message + '.', is_app_error = False, long_error_message =
+        short_error_message + (' This is because you have specified an incorr'
+                               'ect operator field in the rules argument.')
     )
     return False
