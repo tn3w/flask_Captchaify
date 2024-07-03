@@ -1284,7 +1284,16 @@ class Captchaify:
         :return: The rendered change language page.
         """
 
-        return_path = get_return_path(request, '/')
+        return_path = get_return_path(request)
+        if return_path is None:
+            if not self.kwargs['as_route']:
+                return_path = extract_path_and_args(remove_args_from_url(self.url, ['cl']))
+
+        if return_path is None:
+            return_path = '/'
+
+        return_url = get_return_url(return_path, request)
+
         if self.kwargs['as_route']:
             if not without_redirect:
                 return redirect(self._create_route_url('change_language'))
@@ -1296,10 +1305,6 @@ class Captchaify:
             search = request.args.get('cs')
             if search.strip() != '':
                 languages = search_languages(search, LANGUAGES)
-
-        return_url = None
-        if return_path is not None:
-            return_url = get_return_url(return_path, request)
 
         return_route = None
         if self.kwargs['as_route']:
