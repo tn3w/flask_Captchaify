@@ -1011,9 +1011,15 @@ class Captchaify:
         if return_path is None:
             return_path = get_return_path(request, '/')
 
+        if self._to_many_attempts(self._current_configuration['action']):
+            return self._render_block()
+
         is_valid_ct, is_failed_captcha = self._verify_captcha_token()
         if is_valid_ct:
             return self._valid_captcha(return_path)
+
+        if is_failed_captcha and not self.ip is None:
+            self._add_failed_captcha_attempt(self.ip)
 
         return self._render_captcha(is_failed_captcha, quote(return_path))
 
@@ -1220,7 +1226,16 @@ class Captchaify:
         if not without_redirect and self.kwargs['as_route']:
             return redirect(self._create_route_url('blocked'))
 
-        return_path = get_return_path(request, '/')
+        return_path = get_return_path(request)
+        if not self.kwargs['as_route']:
+            return_path = extract_path_and_args(
+                remove_args_from_url(
+                    self.url, ['return_path', 'ct', 'ci', 'cs', 'tc', 'ac']
+                )
+            )
+        else:
+            return_path = get_return_path(request, '/')
+
         return_url = get_return_url(return_path, request)
 
         emoji = random.choice(EMOJIS)
@@ -1244,7 +1259,16 @@ class Captchaify:
         if not without_redirect and self.kwargs['as_route']:
             return redirect(self._create_route_url('nojs'))
 
-        return_path = get_return_path(request, '/')
+        return_path = get_return_path(request)
+        if not self.kwargs['as_route']:
+            return_path = extract_path_and_args(
+                remove_args_from_url(
+                    self.url, ['return_path', 'ct', 'ci', 'cs', 'tc', 'ac']
+                )
+            )
+        else:
+            return_path = get_return_path(request, '/')
+
         return_url = get_return_url(return_path, request)
 
         return self._render_template(
@@ -1266,7 +1290,16 @@ class Captchaify:
         if not without_redirect and self.kwargs['as_route']:
             return redirect(self._create_route_url('rate_limited'))
 
-        return_path = get_return_path(request, '/')
+        return_path = get_return_path(request)
+        if not self.kwargs['as_route']:
+            return_path = extract_path_and_args(
+                remove_args_from_url(
+                    self.url, ['return_path', 'ct', 'ci', 'cs', 'tc', 'ac']
+                )
+            )
+        else:
+            return_path = get_return_path(request, '/')
+
         return_url = get_return_url(return_path, request)
 
         emoji = random.choice(TEA_EMOJIS)
