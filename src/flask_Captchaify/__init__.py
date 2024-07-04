@@ -38,14 +38,6 @@ from .embed import CaptchaEmbed
 from .trueclick import TrueClick
 
 
-DATASET_PATHS: Final[dict] = {
-    'default': os.path.join(DATASETS_DIR, 'keys.json'),
-    'oneclick_keys': os.path.join(DATASETS_DIR, 'keys.json'),
-    'multiclick_keys': os.path.join(DATASETS_DIR, 'keys.json'),
-    'oneclick_animals': os.path.join(DATASETS_DIR, 'animals.json'),
-    'multiclick_animals': os.path.join(DATASETS_DIR, 'animals.json'),
-}
-
 RATE_LIMIT_PATH: Final[str] = os.path.join(DATA_DIR, 'rate-limits.pkl')
 FAILED_CAPTCHAS_PATH: Final[str] = os.path.join(DATA_DIR, 'failed-captchas.pkl')
 SOLVED_CAPTCHAS_PATH: Final[str] = os.path.join(DATA_DIR, 'solved-captchas.pkl')
@@ -80,7 +72,7 @@ DATASET_SIZES: Final[dict] = {
     'little': (6, 8)
 }
 
-CAPTCHA_THIRD_PARTIES_API_URLS: dict[str] = {
+CAPTCHA_THIRD_PARTIES_API_URLS: Final[dict] = {
     "recaptcha": "https://www.google.com/recaptcha/api/siteverify",
     "hcaptcha": "https://hcaptcha.com/siteverify",
     "turnstile": "https://challenges.cloudflare.com/turnstile/v0/siteverify",
@@ -388,10 +380,12 @@ class Captchaify:
 
         keyword_args = {}
         for key, value in DEFAULT_KWARGS.items():
-            if key not in kwargs:
-                keyword_args[key] = value
-            else:
+            if key in kwargs:
                 keyword_args[key] = kwargs[key]
+                continue
+
+            keyword_args[key] = value
+
         self.kwargs = keyword_args
 
         ################
@@ -436,6 +430,64 @@ class Captchaify:
 
         elif not keyword_args['without_customisation']:
             app.before_request(self._change_language)
+
+        ################################
+        #### before & after_request ####
+        ################################
+
+        app.before_request(self._rate_limit)
+        app.before_request(self._check_for_bots)
+
+        app.after_request(self._add_rate_limit)
+        app.after_request(self._add_args)
+        app.after_request(self._set_cookies)
+
+        if keyword_args['crawler_hints']:
+            app.after_request(self._crawler_hints)
+
+        ########################
+        #### Error handlers ####
+        ########################
+
+        error_codes_to_handle = keyword_args['error_codes']
+        if len(error_codes_to_handle) != 0:
+            codes = []
+            for error_code in error_codes_to_handle:
+                if isinstance(error_code, dict):
+                    codes.append(error_code['code'])
+                    continue
+
+                if isinstance(error_code, str) and error_code.isdigit():
+                    error_code = int(error_code)
+
+                codes.append(error_code)
+
+            for error_code in codes:
+                app.register_error_handler(error_code, self._render_exception)
+
+        ############################
+        #### Context Processors ####
+        ############################
+
+        @app.context_processor
+        def add_third_parties():
+            embed = CaptchaEmbed(self.language[0], self.theme, self.altcha)
+
+            embeds = {'altcha': Markup(embed.get_embed('altcha', None))}
+            if not self.kwargs['without_trueclick']:
+                embeds['trueclick'] = Markup(embed.get_embed('trueclick', None))
+
+            for third_party in ['recaptcha', 'hcaptcha', 'turnstile', 'friendly']:
+                if not None in [keyword_args[f'{third_party}_site_key'],
+                                keyword_args[f'{third_party}_secret']]:
+
+                    embeds[third_party] = Markup(
+                        embed.get_embed(
+                            third_party, keyword_args[f'{third_party}_site_key']
+                        )
+                    )
+
+            return embeds
 
         ###################
         #### Trueclick ####
@@ -526,94 +578,6 @@ class Captchaify:
                     }
                 )
 
-        ########################
-        #### Error handlers ####
-        ########################
-
-        error_codes_to_handle = keyword_args['error_codes']
-        if len(error_codes_to_handle) != 0:
-            codes = []
-            for error_code in error_codes_to_handle:
-                if isinstance(error_code, dict):
-                    codes.append(error_code['code'])
-                    continue
-
-                if isinstance(error_code, str) and error_code.isdigit():
-                    error_code = int(error_code)
-
-                codes.append(error_code)
-
-            for error_code in codes:
-                app.register_error_handler(error_code, self._render_exception)
-
-        ################################
-        #### before & after_request ####
-        ################################
-
-        app.before_request(self._rate_limit)
-        app.before_request(self._check_for_bots)
-
-        app.after_request(self._add_rate_limit)
-        app.after_request(self._add_args)
-        app.after_request(self._set_cookies)
-
-        if keyword_args['crawler_hints']:
-            app.after_request(self._crawler_hints)
-
-        ############################
-        #### Context Processors ####
-        ############################
-
-        if not None in [keyword_args['recaptcha_site_key'], keyword_args['recaptcha_secret']]:
-            @app.context_processor
-            def add_recaptcha():
-                embed = CaptchaEmbed(self.language[0], self.theme, self.altcha)
-
-                return {'recaptcha': Markup(
-                    embed.get_embed('recaptcha', keyword_args['recaptcha_site_key'])
-                    )
-                }
-
-        if not None in [keyword_args['hcaptcha_site_key'], keyword_args['hcaptcha_secret']]:
-            @app.context_processor
-            def add_hcaptcha():
-                embed = CaptchaEmbed(self.language[0], self.theme, self.altcha)
-
-                return {'hcaptcha': Markup(
-                    embed.get_embed('hcaptcha', keyword_args['hcaptcha_site_key'])
-                    )
-                }
-
-        if not None in [keyword_args['turnstile_site_key'], keyword_args['turnstile_secret']]:
-            @app.context_processor
-            def add_turnstile():
-                embed = CaptchaEmbed(self.language[0], self.theme, self.altcha)
-
-                return {'turnstile': Markup(
-                    embed.get_embed('turnstile', keyword_args['turnstile_site_key'])
-                    )
-                }
-
-        if not None in [keyword_args['friendly_site_key'], keyword_args['friendly_secret']]:
-            @app.context_processor
-            def add_friendly():
-                embed = CaptchaEmbed(self.language[0], self.theme, self.altcha)
-
-                return {'friendly': Markup(
-                    embed.get_embed('friendly', keyword_args['friendly_site_key'])
-                    )
-                }
-
-        @app.context_processor
-        def add_altcha_trueclick():
-            embed = CaptchaEmbed(self.language[0], self.theme, self.altcha)
-
-            embeds = {'altcha': Markup(embed.get_embed('altcha', None))}
-            if not self.kwargs['without_trueclick']:
-                embeds['trueclick'] = Markup(embed.get_embed('trueclick', None))
-
-            return embeds
-
 
     def _download_datasets(self) -> None:
         """
@@ -648,16 +612,11 @@ class Captchaify:
         :return: An object containing information about the current request.
         """
 
-        stored_req_info = getattr(
-            g, 'captchaify_request_info',
-            RequestInfo(
-                request, g, LANGUAGE_CODES,
-                self.kwargs['third_parties']
-            )
+        return RequestInfo(
+            request, g, LANGUAGE_CODES,
+            self.kwargs['third_parties'],
+            'captchaify'
         )
-
-        g.captchaify_request_info = stored_req_info
-        return stored_req_info
 
 
     @property
@@ -745,7 +704,7 @@ class Captchaify:
 
 
     @property
-    def ip(self) -> str:
+    def ip(self) -> Optional[str]:
         """
         Returns the IP address of the current request.
         """
@@ -799,9 +758,6 @@ class Captchaify:
         Returns the location of the current request.
         """
 
-        if not self.is_valid_ip:
-            return None
-
         info = self._req_info.get_ip_info(
             ['continent', 'continent_code', 'country',
              'country_code', 'region', 'region_code',
@@ -815,9 +771,6 @@ class Captchaify:
         """
         Returns the value of a location key.
         """
-
-        if not self.is_valid_ip:
-            return None
 
         if self.location is None or key not in self.location:
             return None
@@ -957,9 +910,6 @@ class Captchaify:
         Check if the client's IP is a Tor exit node.
         """
 
-        if not self.is_valid_ip:
-            return False
-
         return self._req_info.is_tor()
 
 
@@ -969,9 +919,6 @@ class Captchaify:
         Check if the client is a spammer.
         """
 
-        if not self.is_valid_ip:
-            return False
-
         return self._req_info.is_spammer()
 
 
@@ -980,9 +927,6 @@ class Captchaify:
         """
         Check if the client is a proxy.
         """
-
-        if not self.is_valid_ip:
-            return False
 
         info = self._req_info.get_ip_info(['proxy', 'hosting'])
 

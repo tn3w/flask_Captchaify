@@ -26,8 +26,41 @@ from .utils import PICKLE, DATA_DIR, ASSETS_DIR, handle_exception, get_domain_fr
 
 CACHE_FILE_PATH: Final[str] = os.path.join(DATA_DIR, 'cache.pkl')
 
-UNWANTED_IPS: Final[list] = ['127.0.0.1', '192.168.0.1', '10.0.0.1',
-                             '192.0.2.1', '198.51.100.1', '203.0.113.1']
+UNWANTED_IPV4_RANGES: Final[list] = [
+    ('0.0.0.0', '0.255.255.255'),
+    ('10.0.0.0', '10.255.255.255'),
+    ('100.64.0.0', '100.127.255.255'),
+    ('127.0.0.0', '127.255.255.255'),
+    ('169.254.0.0', '169.254.255.255'),
+    ('172.16.0.0', '172.31.255.255'),
+    ('192.0.0.0', '192.0.0.255'),
+    ('192.0.2.0', '192.0.2.255'),
+    ('192.88.99.0', '192.88.99.255'),
+    ('192.168.0.0', '192.168.255.255'),
+    ('198.18.0.0', '198.19.255.255'),
+    ('198.51.100.0', '198.51.100.255'),
+    ('203.0.113.0', '203.0.113.255'),
+    ('224.0.0.0', '239.255.255.255'),
+    ('233.252.0.0', '233.252.0.255'),
+    ('240.0.0.0', '255.255.255.254'),
+    ('255.255.255.255', '255.255.255.255')
+]
+UNWANTED_IPV6_RANGES: Final[list] = [
+    ('::', '::'),
+    ('::1', '::1'),
+    ('::ffff:0:0', '::ffff:0:ffff:ffff'),
+    ('64:ff9b::', '64:ff9b::ffff:ffff'),
+    ('64:ff9b:1::', '64:ff9b:1:ffff:ffff:ffff:ffff'),
+    ('100::', '100::ffff:ffff:ffff:ffff'),
+    ('2001::', '2001:0:ffff:ffff:ffff:ffff:ffff:ffff'),
+    ('2001:20::', '2001:2f:ffff:ffff:ffff:ffff:ffff:ffff'),
+    ('2001:db8::', '2001:db8:ffff:ffff:ffff:ffff:ffff:ffff'),
+    ('2002::', '2002:ffff:ffff:ffff:ffff:ffff:ffff:ffff'),
+    ('5f00::', '5f00:ffff:ffff:ffff:ffff:ffff:ffff:ffff'),
+    ('fc00::', 'fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff'),
+    ('fe80::', 'fe80::ffff:ffff:ffff:ffff'),
+    ('ff00::', 'ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff')
+]
 IPV4_PATTERN: Final[str] = r'^(\d{1,3}\.){3}\d{1,3}$'
 IPV6_PATTERN: Final[str] = (
     r'^('
@@ -63,66 +96,9 @@ GEOLITE_DATA: Final[dict] = {
 }
 
 
-def update_geolite_databases(allow_download: bool = True) -> None:
-    """
-    Downloads and updates GeoLite2 databases.
-
-    :param allow_download: Flag indicating if the download should be allowed.
-    :return: None
-    """
-
-    if not os.path.isdir(DATA_DIR):
-        os.makedirs(DATA_DIR, exist_ok=True)
-
-    if allow_download:
-        for database_data in GEOLITE_DATA.values():
-            if not os.path.isfile(database_data['data_path']):
-                urllib.request.urlretrieve(
-                    database_data['url'],
-                    database_data['data_path']
-                )
-        return
-
-    for database_data in GEOLITE_DATA.values():
-        if os.path.isfile(database_data['data_path']):
-            continue
-
-        if os.path.isfile(database_data['assets_path']):
-            shutil.copyfile(
-                database_data['assets_path'],
-                database_data['data_path']
-            )
-
-
-def is_valid_ip(ip_address: Optional[str] = None,
-                without_filter: bool = False) -> bool:
-    """
-    Checks whether the given IP address is valid.
-
-    :param ip_address: IPv4 or IPv6 address (optional)
-    :param without_filter: If True, the input IP address will not be filtered
-    :return: True if the IP address is valid, False otherwise
-    """
-
-    if not isinstance(ip_address, str):
-        return False
-
-    if not without_filter:
-        if ip_address in UNWANTED_IPS:
-            return False
-
-    ipv4_regex = re.compile(IPV4_PATTERN)
-    ipv6_regex = re.compile(IPV6_PATTERN)
-
-    if ipv4_regex.match(ip_address):
-        octets = ip_address.split('.')
-        if all(0 <= int(octet) <= 255 for octet in octets):
-            return True
-    elif ipv6_regex.match(ip_address):
-        return True
-
-    return False
-
+############################
+#### IP Address Helpers ####
+############################
 
 
 def is_ipv6(ip_address: str) -> bool:
@@ -172,6 +148,114 @@ def explode_ipv6(ip_address: str) -> str:
     return expanded_groups
 
 
+def ipv4_to_int(ipv4_address: str) -> int:
+    """
+    Converts an IPv4 address to an integer.
+
+    :param ip: IPv4 address
+    :return: Integer representation of the IPv4 address
+    """
+
+    parts = map(int, ipv4_address.split('.'))
+    return sum(part << (8 * (3 - i)) for i, part in enumerate(parts))
+
+
+def ipv6_to_int(ipv6_address: str) -> int:
+    """
+    Converts an IPv6 address to an integer.
+
+    :param ip: IPv6 address
+    :return: Integer representation of the IPv6 address
+    """
+
+    parts = ipv6_address.split(':')
+    parts = [int(part, 16) if part else 0 for part in parts]
+
+    ip_int = 0
+    for i, part in enumerate(parts):
+        ip_int += part << (16 * (7 - i))
+
+    return ip_int
+
+
+def is_unwanted_ipv4(ipv4_address: Optional[str] = None) -> bool:
+    """
+    Checks whether the given IPv4 address is unwanted.
+
+    :param ipv4_address: IPv4 address (optional)
+    :return: True if the IPv4 address is unwanted, False otherwise
+    """
+
+    if not isinstance(ipv4_address, str):
+        return False
+
+    ipv4_address_int = ipv4_to_int(ipv4_address)
+
+    for start_ip, end_ip in UNWANTED_IPV4_RANGES:
+        start_ipv4_int = ipv4_to_int(start_ip)
+        end_ipv4_int = ipv4_to_int(end_ip)
+
+        if start_ipv4_int <= ipv4_address_int <= end_ipv4_int:
+            return True
+
+    return False
+
+
+def is_unwanted_ipv6(ipv6_address: Optional[str] = None) -> bool:
+    """
+    Checks whether the given IPv6 address is unwanted.
+
+    :param ipv6_address: IPv6 address (optional)
+    :return: True if the IPv6 address is unwanted, False otherwise
+    """
+
+    print('CALLED!')
+
+    if not isinstance(ipv6_address, str):
+        return False
+
+    ipv6_address_int = ipv6_to_int(ipv6_address)
+
+    for start_ipv6, end_ipv6 in UNWANTED_IPV6_RANGES:
+        start_ipv6_int = ipv6_to_int(start_ipv6)
+        end_ipv6_int = ipv6_to_int(end_ipv6)
+
+        if start_ipv6_int <= ipv6_address_int <= end_ipv6_int:
+            return True
+
+    return False
+
+
+def is_valid_ip(ip_address: Optional[str] = None,
+                without_filter: bool = False) -> bool:
+    """
+    Checks whether the given IP address is valid.
+
+    :param ip_address: IPv4 or IPv6 address (optional)
+    :param without_filter: If True, the input IP address will not be filtered
+    :return: True if the IP address is valid, False otherwise
+    """
+
+    if not isinstance(ip_address, str):
+        return False
+
+    if not without_filter:
+        if is_ipv6(ip_address) and is_unwanted_ipv6(ip_address) or is_unwanted_ipv4(ip_address):
+            return False
+
+    ipv4_regex = re.compile(IPV4_PATTERN)
+    ipv6_regex = re.compile(IPV6_PATTERN)
+
+    if ipv4_regex.match(ip_address):
+        octets = ip_address.split('.')
+        if all(0 <= int(octet) <= 255 for octet in octets):
+            return True
+    elif ipv6_regex.match(ip_address):
+        return True
+
+    return False
+
+
 def reverse_ip(ip_address: str) -> str:
     """
     Reverse the IP address for DNS lookup.
@@ -186,6 +270,42 @@ def reverse_ip(ip_address: str) -> str:
         return ':'.join(reversed(ip_address))
 
     return '.'.join(reversed(ip_address.split('.')))
+
+
+###########################
+#### Generic functions ####
+###########################
+
+
+def update_geolite_databases(allow_download: bool = True) -> None:
+    """
+    Downloads and updates GeoLite2 databases.
+
+    :param allow_download: Flag indicating if the download should be allowed.
+    :return: None
+    """
+
+    if not os.path.isdir(DATA_DIR):
+        os.makedirs(DATA_DIR, exist_ok=True)
+
+    if allow_download:
+        for database_data in GEOLITE_DATA.values():
+            if not os.path.isfile(database_data['data_path']):
+                urllib.request.urlretrieve(
+                    database_data['url'],
+                    database_data['data_path']
+                )
+        return
+
+    for database_data in GEOLITE_DATA.values():
+        if os.path.isfile(database_data['data_path']):
+            continue
+
+        if os.path.isfile(database_data['assets_path']):
+            shutil.copyfile(
+                database_data['assets_path'],
+                database_data['data_path']
+            )
 
 
 def matches_asterisk_rule(obj: str, asterisk_rule: str) -> bool:
@@ -213,6 +333,25 @@ def matches_asterisk_rule(obj: str, asterisk_rule: str) -> bool:
         return obj.startswith(start) and obj.endswith(end) and middle in obj
 
     return obj == asterisk_rule
+
+
+def remove_duplicates(origin_list: list) -> list:
+    """
+    Remove duplicates from a list.
+
+    :param origin_list: The list to be processed.
+    :return: A list without duplicates.
+    """
+
+    if not isinstance(origin_list, list):
+        return origin_list
+
+    return list(dict.fromkeys(origin_list).keys())
+
+
+#################
+#### Classes ####
+#################
 
 
 class Cache(dict):
@@ -369,9 +508,10 @@ class RequestInfo:
         stored_ips = getattr(self.global_data, self.store_token + 'ips', [])
 
         if len(stored_ips) > 0:
-            if return_all:
-                return stored_ips
-            return stored_ips[0]
+            if 'notfound' in stored_ips:
+                return None if not return_all else []
+
+            return stored_ips if return_all else stored_ips[0]
 
         ips = [
             self.request.remote_addr,
@@ -386,20 +526,17 @@ class RequestInfo:
             self.request.headers.get('X-Appengine-User-Ip', None)
         ]
 
-        valid_ips = [ip for ip in ips if is_valid_ip(ip)]
-        invalid_ips = [ip for ip in ips if is_valid_ip(ip, True)]
+        valid_ips = remove_duplicates([ip for ip in ips if is_valid_ip(ip)])
+        invalid_ips = remove_duplicates([ip for ip in ips if is_valid_ip(ip, True)])
 
-        if len(valid_ips) > 0:
-            setattr(self.global_data, self.store_token + 'ips', valid_ips)
+        for ips in [valid_ips, invalid_ips]:
+            if len(ips) == 0:
+                continue
 
-            if not return_all:
-                return valid_ips[0]
+            setattr(self.global_data, self.store_token + 'ips', ips)
+            return ips if return_all else ips[0]
 
-            return valid_ips
-
-        if not return_all and len(invalid_ips) > 0:
-            return invalid_ips[0]
-
+        setattr(self.global_data, self.store_token + 'ips', ['notfound'])
         return None if not return_all else []
 
 
@@ -416,8 +553,9 @@ class RequestInfo:
 
         if client_ip is None:
             client_ip = self.get_ip()
-            if client_ip is None:
-                return None
+
+        if not is_valid_ip(client_ip):
+            return None
 
         stored_ip_info = getattr(self.global_data, self.store_token + 'ip_info', {})
 
@@ -545,8 +683,9 @@ class RequestInfo:
 
         if client_ip is None:
             client_ip = self.get_ip()
-            if client_ip is None:
-                return False
+
+        if not is_valid_ip(client_ip):
+            return False
 
         cache = Cache('tor')
         if cache[client_ip] is not None:
@@ -579,8 +718,9 @@ class RequestInfo:
 
         if client_ip is None:
             client_ip = self.get_ip()
-            if client_ip is None:
-                return False
+
+        if not is_valid_ip(client_ip):
+            return False
 
         cache = Cache('ipapi')
         if cache[client_ip] is not None:
@@ -642,8 +782,9 @@ class RequestInfo:
 
         if client_ip is None:
             client_ip = self.get_ip()
-            if client_ip is None:
-                return False
+
+        if not is_valid_ip(client_ip):
+            return False
 
         cache = Cache('forum_spammer')
         if cache[client_ip] is not None:
