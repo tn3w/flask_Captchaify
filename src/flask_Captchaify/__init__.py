@@ -930,6 +930,9 @@ class Captchaify:
 
         info = self._req_info.get_ip_info(['proxy', 'hosting'])
 
+        if not isinstance(info, dict):
+            return False
+
         return info.get('proxy', False) is True\
             or info.get('hosting', False) is True
 
