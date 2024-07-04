@@ -22,7 +22,7 @@ from .req_info import RequestInfo
 
 LANGUAGES: Final[list] = JSON.load(os.path.join(ASSETS_DIR, 'languages.json'), [])
 LANGUAGE_CODES: Final[list] = [language['code'] for language in LANGUAGES]
-google_translator = GoogleTranslator()
+GOOGLE_TRANSLATOR: Final[GoogleTranslator] = GoogleTranslator()
 
 TEMPLATE_ASSETS_DIR: Final[str] = os.path.join(TEMPLATE_DIR, 'assets')
 TRANSLATIONS_FILE_PATH: Final[str] = os.path.join(DATA_DIR, 'translations.pkl')
@@ -195,7 +195,7 @@ class Translator:
                 return translation["translated_output"]
 
         try:
-            translated_output = google_translator.translate(
+            translated_output = GOOGLE_TRANSLATOR.translate(
                 text_to_translate, src=from_lang, dest=to_lang
             ).text
 
