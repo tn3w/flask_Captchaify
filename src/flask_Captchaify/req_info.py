@@ -209,8 +209,6 @@ def is_unwanted_ipv6(ipv6_address: Optional[str] = None) -> bool:
     :return: True if the IPv6 address is unwanted, False otherwise
     """
 
-    print('CALLED!')
-
     if not isinstance(ipv6_address, str):
         return False
 
