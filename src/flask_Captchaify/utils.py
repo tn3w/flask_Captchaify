@@ -89,12 +89,31 @@ IP_INFO_KEYS: Final[list] = ['continent', 'continentCode', 'country', 'countryCo
                 'lon', 'timezone', 'offset', 'currency', 'isp', 'org', 'as',
                 'asname', 'reverse', 'mobile', 'proxy', 'hosting', 'time']
 TOR_EXIT_IPS_URL: Final[str] = 'https://check.torproject.org/torbulkexitlist'
-WRITE_EXECUTOR = ThreadPoolExecutor(max_workers=1)
+WRITE_EXECUTOR = ThreadPoolExecutor()
 
 
-#######################
-#### General Tools ####
-#######################
+###########################
+#### Generic functions ####
+###########################
+
+
+def remove_duplicates(origin_list: list) -> list:
+    """
+    Remove duplicates from a list.
+
+    :param origin_list: The list to be processed.
+    :return: A list without duplicates.
+    """
+
+    if not isinstance(origin_list, list):
+        return origin_list
+
+    objs = []
+    for obj in origin_list:
+        if obj not in objs:
+            objs.append(obj)
+
+    return objs
 
 
 def random_user_agent() -> str:
@@ -597,6 +616,8 @@ def search_languages(query: str, languages: list[dict]) -> list[dict]:
     if full_match:
         matching_languages = [full_match]
 
+    matching_languages = remove_duplicates(matching_languages)
+
     matching_languages.sort(key=lambda x: levenshtein_distance(
         normalized_query, normalize_string(x['name'])
     ))
@@ -611,13 +632,14 @@ def search_languages(query: str, languages: list[dict]) -> list[dict]:
 
 file_locks = {}
 
+
 class Json:
     """
     Class for loading / saving JavaScript Object Notation (= JSON)
     """
 
     def __init__(self) -> None:
-        self.data = None
+        self.data = {}
 
 
     def load(self, file_path: str, default: Optional[
@@ -667,14 +689,26 @@ class Json:
         if file_path not in file_locks:
             file_locks[file_path] = threading.Lock()
 
+        self.data[file_path] = data
+        WRITE_EXECUTOR.submit(self._write, data, file_path)
+
+        return True
+
+    @staticmethod
+    def _write(data: Union[dict, list], file_path: str) -> None:
+        """
+        Function to save a JSON file securely.
+        
+        :param data: The data to be stored should be either dict or list
+        :param file_path: The file to save to
+        """
+
         with file_locks[file_path]:
-            self.data = data
             try:
                 with open(file_path, 'w', encoding = 'utf-8') as file:
                     json.dump(data, file)
             except Exception as exc:
                 handle_exception(exc, is_app_error = False)
-        return True
 
 
 class Pickle:
@@ -734,15 +768,27 @@ class Pickle:
         if file_path not in file_locks:
             file_locks[file_path] = threading.Lock()
 
+        self.data[file_path] = data
+        WRITE_EXECUTOR.submit(self._write, data, file_path)
+
+        return True
+
+
+    @staticmethod
+    def _write(data: Union[dict, list], file_path: str) -> None:
+        """
+        Function to save a Pickle file securely.
+        
+        :param data: The data to be stored should be either dict or list
+        :param file_path: The file to save to
+        """
+
         with file_locks[file_path]:
-            self.data[file_path] = data
             try:
                 with open(file_path, 'wb') as file:
                     pickle.dump(data, file)
             except Exception as exc:
                 handle_exception(exc, is_app_error = False)
-
-        return True
 
 
 JSON = Json()

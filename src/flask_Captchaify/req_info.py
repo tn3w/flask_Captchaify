@@ -21,7 +21,8 @@ import dns.resolver
 import geoip2.database
 import crawleruseragents
 from werkzeug import Request
-from .utils import PICKLE, DATA_DIR, ASSETS_DIR, handle_exception, get_domain_from_url
+from .utils import PICKLE, DATA_DIR, ASSETS_DIR, handle_exception, get_domain_from_url,\
+    remove_duplicates
 
 
 CACHE_FILE_PATH: Final[str] = os.path.join(DATA_DIR, 'cache.pkl')
@@ -331,20 +332,6 @@ def matches_asterisk_rule(obj: str, asterisk_rule: str) -> bool:
         return obj.startswith(start) and obj.endswith(end) and middle in obj
 
     return obj == asterisk_rule
-
-
-def remove_duplicates(origin_list: list) -> list:
-    """
-    Remove duplicates from a list.
-
-    :param origin_list: The list to be processed.
-    :return: A list without duplicates.
-    """
-
-    if not isinstance(origin_list, list):
-        return origin_list
-
-    return list(dict.fromkeys(origin_list).keys())
 
 
 #################

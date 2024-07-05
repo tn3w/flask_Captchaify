@@ -713,6 +713,18 @@ class Captchaify:
 
 
     @property
+    def _ip(self) -> Optional[str]:
+        """
+        An modified property that returns the IP address
+        of the current request or ´None´ if it cannot be found.
+        """
+
+        client_ip = self.ip
+
+        return 'None' if not isinstance(client_ip, str) else client_ip
+
+
+    @property
     def user_agent(self) -> str:
         """
         Returns the user agent of the current request.
@@ -1173,15 +1185,22 @@ class Captchaify:
         if not without_redirect and self.kwargs['as_route']:
             return redirect(self._create_route_url('blocked'))
 
-        return_path = get_return_path(request)
         if not self.kwargs['as_route']:
             return_path = extract_path_and_args(
                 remove_args_from_url(
-                    self.url, ['return_path', 'ct', 'ci', 'cs', 'tc', 'ac']
+                    self.url,
+                    [
+                        'cl', 'wc', 'return_path', 'ct',
+                        'ci', 'cs', 'tc', 'ac', 'rr', 'js',
+                        'theme', 'language', 'captcha'
+                    ]
                 )
             )
         else:
             return_path = get_return_path(request, '/')
+
+        if return_path is None:
+            return_path = '/'
 
         return_url = get_return_url(return_path, request)
 
@@ -1206,15 +1225,22 @@ class Captchaify:
         if not without_redirect and self.kwargs['as_route']:
             return redirect(self._create_route_url('nojs'))
 
-        return_path = get_return_path(request)
         if not self.kwargs['as_route']:
             return_path = extract_path_and_args(
                 remove_args_from_url(
-                    self.url, ['return_path', 'ct', 'ci', 'cs', 'tc', 'ac']
+                    self.url,
+                    [
+                        'cl', 'wc', 'return_path', 'ct',
+                        'ci', 'cs', 'tc', 'ac', 'rr', 'js',
+                        'theme', 'language', 'captcha'
+                    ]
                 )
             )
         else:
             return_path = get_return_path(request, '/')
+
+        if return_path is None:
+            return_path = '/'
 
         return_url = get_return_url(return_path, request)
 
@@ -1237,17 +1263,24 @@ class Captchaify:
         if not without_redirect and self.kwargs['as_route']:
             return redirect(self._create_route_url('rate_limited'))
 
-        return_path = get_return_path(request)
         if not self.kwargs['as_route']:
             return_path = extract_path_and_args(
                 remove_args_from_url(
-                    self.url, ['return_path', 'ct', 'ci', 'cs', 'tc', 'ac']
+                    self.url,
+                    [
+                        'cl', 'wc', 'return_path', 'ct',
+                        'ci', 'cs', 'tc', 'ac', 'rr', 'js',
+                        'theme', 'language', 'captcha'
+                    ]
                 )
             )
         else:
             return_path = get_return_path(request, '/')
 
         return_url = get_return_url(return_path, request)
+
+        if return_path is None:
+            return_path = '/'
 
         emoji = random.choice(TEA_EMOJIS)
         return self._render_template(
@@ -1267,7 +1300,16 @@ class Captchaify:
         return_path = get_return_path(request)
         if return_path is None:
             if not self.kwargs['as_route']:
-                return_path = extract_path_and_args(remove_args_from_url(self.url, ['cl']))
+                return_path = extract_path_and_args(
+                    remove_args_from_url(
+                        self.url,
+                        [
+                            'cl', 'wc', 'return_path', 'ct',
+                            'ci', 'cs', 'tc', 'ac', 'rr', 'js',
+                            'theme', 'language', 'captcha'
+                        ]
+                    )
+                )
 
         if return_path is None:
             return_path = '/'
@@ -1741,10 +1783,6 @@ class Captchaify:
                 and request.path == '/rate_limited' + self.route_id):
                 return
 
-            client_ip = self.ip
-            if client_ip is None:
-                client_ip = 'None'
-
             rate_limited_ips = PICKLE.load(RATE_LIMIT_PATH)
             rate_limit, max_rate_limit = config['rate_limit'], config['max_rate_limit']
 
@@ -1755,7 +1793,7 @@ class Captchaify:
                 count = sum(1 for request_time in ip_timestamps\
                             if int(time()) - int(request_time) <= 10)
 
-                if ip == client_ip:
+                if ip == self._ip:
                     ip_request_count += count
                 request_count += count
 
@@ -1815,8 +1853,7 @@ class Captchaify:
         """
 
         try:
-            client_ip = self.ip
-            if not self._current_configuration['enable_rate_limit'] or client_ip is None:
+            if not self._current_configuration['enable_rate_limit'] or self.ip is None:
                 return response
 
             rate_limit = self._current_configuration['rate_limit']
@@ -1824,7 +1861,7 @@ class Captchaify:
 
             found = False
             for ip, ip_timestamps in rate_limited_ips.items():
-                if ip == client_ip:
+                if ip == self._ip:
                     found = True
 
                     new_timestamps = []
@@ -1837,7 +1874,7 @@ class Captchaify:
                     break
 
             if not found:
-                rate_limited_ips[client_ip] = [str(int(time()))]
+                rate_limited_ips[self._ip] = [str(int(time()))]
 
             PICKLE.dump(rate_limited_ips, RATE_LIMIT_PATH)
 
@@ -2051,7 +2088,6 @@ class Captchaify:
             if request.path in self._own_routes and not without_redirect:
                 return
 
-            client_ip = self.ip
             action = self._current_configuration['action']
 
             if action == 'block' or self._to_many_attempts(action):
@@ -2099,8 +2135,8 @@ class Captchaify:
             if not without_redirect and self.kwargs['as_route']:
                 return redirect(self._create_route_url('captcha'))
 
-            if is_failed_captcha and not client_ip is None:
-                self._add_failed_captcha_attempt(client_ip)
+            if is_failed_captcha and not self.ip is None:
+                self._add_failed_captcha_attempt(self.ip)
 
             return self._render_captcha(
                 is_error = is_failed_captcha,
@@ -2202,7 +2238,6 @@ class Captchaify:
         """
 
         url_path = urlparse(self._req_info.get_url()).path
-        client_ip = self.ip
 
         config = self._current_configuration
         captcha_type = config['captcha_type'].split('_')[0]
@@ -2210,7 +2245,7 @@ class Captchaify:
 
         captcha_data = {
             "id": captcha_id, "type": captcha_type,
-            "ip": ('None' if client_ip is None else Hashing().hash(client_ip)),
+            "ip": ('None' if self.ip is None else Hashing().hash(self.ip)),
             "user_agent": Hashing().hash(self.user_agent),
             "path": Hashing().hash(url_path), "time": str(int(time())),
             "hardness": config['hardness']
@@ -2253,7 +2288,6 @@ class Captchaify:
 
         try:
             url_path = urlparse(request.url).path
-            client_ip = self.ip
 
             request_data = request.form if request.method.lower() == 'post' else request.args
             request_captcha_token = request_data.get('ct', None)
@@ -2393,15 +2427,17 @@ class Captchaify:
                 comparison_path = Hashing().compare(
                     url_path, decrypted_token_data['path']
                 )
-                comparison_ip = True if client_ip is None else\
-                Hashing().compare(
-                    client_ip, decrypted_token_data['ip']
-                )
+                comparison_ip = True if self.ip is None else\
+                    Hashing().compare(
+                        self.ip, decrypted_token_data['ip']
+                    )
                 comparison_user_agent = Hashing().compare(
                     self.user_agent, decrypted_token_data['user_agent']
                 )
 
-                if not comparison_path or (not comparison_ip and not comparison_user_agent):
+                if not comparison_path or\
+                    (not comparison_ip and not comparison_user_agent)\
+                        or not comparison_user_agent:
                     is_failed_captcha = True
                 else:
                     return True, False
@@ -2421,8 +2457,6 @@ class Captchaify:
         """
 
         try:
-            client_ip = self.ip
-
             captcha_string = None
             if request.args.get('captcha') is not None:
                 captcha_string = request.args.get('captcha')
@@ -2449,7 +2483,8 @@ class Captchaify:
                     user_agent = crypto.decrypt(ip_data['user_agent'])
 
                     if not int(time()) - int(ip_data['time']) > self.kwargs['verification_age'] and\
-                            ip == client_ip and user_agent == self.user_agent:
+                            (ip == self._ip or user_agent == self.user_agent)\
+                                and user_agent == self.user_agent:
                         return True
                     break
         except Exception as exc:
@@ -2551,10 +2586,9 @@ class Captchaify:
 
         symcrypto = SymmetricCrypto(self.captcha_secret)
 
-        client_ip = self.ip
         data = {
             'time': int(time()),
-            'ip': ('None' if client_ip is None else symcrypto.encrypt(client_ip)),
+            'ip': symcrypto.encrypt(self._ip),
             'user_agent': symcrypto.encrypt(self.user_agent),
         }
 

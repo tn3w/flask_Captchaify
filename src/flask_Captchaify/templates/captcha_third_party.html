@@ -94,9 +94,7 @@
                             data-sitekey="{{ site_key }}" 
                             data-callback="onSuccess"
                             {% if not is_default_theme %} 
-                                data-theme="{% if theme == 'light' %}light
-                                            {% elif theme == 'dark' %}dark
-                                            {% else %}{% endif %}" 
+                                data-theme="{% if theme == 'light' %}light{% elif theme == 'dark' %}dark{% else %}{% endif %}" 
                             {% endif %}
                             {% if not third_party == 'friendlycaptcha' %}
                             data-language="{{ language }}"
@@ -168,6 +166,7 @@
                 scriptElement.defer = true;
 
                 document.head.appendChild(scriptElement);
+            });
             {% endif %}
         </script>
         {{ cookie_banner_js|safe }}

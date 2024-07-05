@@ -179,7 +179,7 @@
             <div class="search-form">
                 <form class="search-form" action="{{ current_url }}" method="GET">
                     <input type="text" class="search-input" name="cs" placeholder="Search Language" value="{{ search if search|default else '' }}">
-                    {% if return_path|default %}
+                    {% if is_return_path_set %}
                     <input type="hidden" name="return_path" value="{{ return_path }}">
                     {% endif %}
                     {% if return_route|default %}
