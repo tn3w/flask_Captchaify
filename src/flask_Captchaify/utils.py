@@ -69,26 +69,34 @@ DATASETS_DIR: Final[str] = os.path.join(WORK_DIR, 'datasets')
 ASSETS_DIR: Final[str] = os.path.join(WORK_DIR, 'assets')
 LOG_FILE: Final[str] = os.path.join(CURRENT_DIR, 'log.txt')
 
-USER_AGENTS: Final[list] =\
-    [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'+
-        ' (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.3',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/'+
-        '605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.1',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/5'+
-        '37.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.3',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/6'+
-        '05.1.15 (KHTML, like Gecko) Version/13.1.2 Safari/605.1.1',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/6'+
-        '05.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.1',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/6'+
-        '05.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.1'
+USER_AGENTS: Final[list] = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'+
+    ' (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.3',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/'+
+    '605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.1',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/5'+
+    '37.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.3',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/6'+
+    '05.1.15 (KHTML, like Gecko) Version/13.1.2 Safari/605.1.1',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/6'+
+    '05.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.1',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/6'+
+    '05.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.1'
 ]
 IP_INFO_KEYS: Final[list] = ['continent', 'continentCode', 'country', 'countryCode',
                 'region', 'regionName', 'city', 'district', 'zip', 'lat',
                 'lon', 'timezone', 'offset', 'currency', 'isp', 'org', 'as',
                 'asname', 'reverse', 'mobile', 'proxy', 'hosting', 'time']
 TOR_EXIT_IPS_URL: Final[str] = 'https://check.torproject.org/torbulkexitlist'
+PERMISSION_MODES: Final[dict] = {
+    'r': os.R_OK,
+    'w': os.W_OK,
+    'x': os.X_OK,
+    'rw': os.R_OK | os.W_OK,
+    'rx': os.R_OK | os.X_OK,
+    'wx': os.W_OK | os.X_OK,
+}
+
 WRITE_EXECUTOR = ThreadPoolExecutor()
 
 
@@ -131,6 +139,32 @@ def write_to_file(log_file: str, message: str) -> None:
 
     with open(log_file, 'a', encoding = 'utf-8') as f:
         f.write(message + '\n')
+
+
+def has_permission(path: str, mode: str = 'r') -> bool:
+    """
+    Determines if a file can be accessed with the specified mode at the specified path.
+
+    :param path: A string representing the file path to check.
+    :param mode: A string representing the access mode. Default is 'w' for write access.
+    :return: Returns True if the file at the given path can be accessed with the
+             specified mode, False otherwise.
+    """
+
+    if not os.path.isfile(path):
+        path = os.path.dirname(path)
+        while not os.path.isdir(path):
+            if len(path) < 5:
+                break
+
+            path = os.path.dirname(path)
+
+        if not os.path.isdir(path):
+            return False
+
+    used_mode = PERMISSION_MODES.get(mode, os.R_OK)
+
+    return os.access(path, used_mode)
 
 
 def generate_random_string(length: int, with_punctuation: bool = True, with_letters: bool = True):
@@ -654,7 +688,7 @@ class Json:
         if default is None:
             default = {}
 
-        if not os.path.isfile(file_path):
+        if not has_permission(file_path, 'r'):
             return default
 
         if file_path not in file_locks:
@@ -683,7 +717,7 @@ class Json:
         """
 
         file_directory = os.path.dirname(file_path)
-        if not os.path.isdir(file_directory):
+        if not has_permission(file_directory, 'w'):
             return False
 
         if file_path not in file_locks:
@@ -703,12 +737,12 @@ class Json:
         :param file_path: The file to save to
         """
 
-        with file_locks[file_path]:
-            try:
+        try:
+            with file_locks[file_path]:
                 with open(file_path, 'w', encoding = 'utf-8') as file:
                     json.dump(data, file)
-            except Exception as exc:
-                handle_exception(exc, is_app_error = False)
+        except Exception as exc:
+            handle_exception(exc, is_app_error = False)
 
 
 class Pickle:
@@ -732,7 +766,7 @@ class Pickle:
         if default is None:
             default = {}
 
-        if not os.path.isfile(file_path):
+        if not has_permission(file_path, 'r'):
             return default
 
         if file_path not in file_locks:
@@ -762,7 +796,7 @@ class Pickle:
         """
 
         file_directory = os.path.dirname(file_path)
-        if not os.path.isdir(file_directory):
+        if not has_permission(file_directory, 'w'):
             return False
 
         if file_path not in file_locks:
@@ -783,13 +817,12 @@ class Pickle:
         :param file_path: The file to save to
         """
 
-        with file_locks[file_path]:
-            try:
+        try:
+            with file_locks[file_path]:
                 with open(file_path, 'wb') as file:
                     pickle.dump(data, file)
-            except Exception as exc:
-                handle_exception(exc, is_app_error = False)
-
+        except Exception as exc:
+            handle_exception(exc, is_app_error = False)
 
 JSON = Json()
 PICKLE = Pickle()

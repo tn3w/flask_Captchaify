@@ -14,7 +14,7 @@ import urllib.request
 from typing import Optional, Tuple
 from flask import request
 from .utils import DATASETS_DIR, DATA_DIR, JSON, PICKLE, Hashing, get_random_image,\
-    convert_image_to_base64, manipulate_image_bytes, generate_random_string
+    convert_image_to_base64, manipulate_image_bytes, generate_random_string, has_permission
 
 
 CAPTCHAS_FILE_PATH = os.path.join(DATA_DIR, 'captchas.pkl')
@@ -88,8 +88,11 @@ class TrueClick:
 
         cleaned_captchas = {}
         for captcha_id, captcha in captchas.items():
-            if int(time()) - captcha['time'] <= 720:
-                cleaned_captchas[captcha_id] = captcha
+            if 'time' not in captcha or not isinstance(captcha['time'], int)\
+                or int(time()) - captcha['time'] > 720:
+                continue
+
+            cleaned_captchas[captcha_id] = captcha
 
         return cleaned_captchas
 
@@ -160,7 +163,9 @@ class TrueClick:
             del captchas[captcha_id]
 
             if len(captchas) == 0:
-                os.remove(CAPTCHAS_FILE_PATH)
+                if has_permission(CAPTCHAS_FILE_PATH, 'w'):
+                    os.remove(CAPTCHAS_FILE_PATH)
+
                 return
 
             PICKLE.dump(captchas, CAPTCHAS_FILE_PATH)
