@@ -11,12 +11,12 @@ from pip._internal.req import parse_requirements
 requirements = [str(requirement.requirement)\
                 for requirement in list(parse_requirements("requirements.txt", session=False))]
 
-with open('README.md', 'r', encoding='utf-8') as readable_file:
+with open('README.md', 'r', encoding = 'utf-8') as readable_file:
     long_description = readable_file.read()
 
 setup(
     name='flask_Captchaify',
-    version='1.7.9.1',
+    version='1.7.9.2',
     description='Protect against bots and DDoS attacks',
     long_description=long_description,
     long_description_content_type='text/markdown',
