@@ -271,6 +271,27 @@ def reverse_ip(ip_address: str) -> str:
     return '.'.join(reversed(ip_address.split('.')))
 
 
+def is_tor(ip_address: Optional[str] = None) -> bool:
+    """
+    Check if an IP address is a Tor exit node.
+
+    :param ip_address: The IP address to check.
+    :return: True if the IP address is a Tor exit node, False otherwise.
+    """
+
+    query = reverse_ip(ip_address)
+
+    try:
+        answers = dns.resolver.resolve(query, 'A')
+        for rdata in answers:
+            if rdata.to_text() == '127.0.0.2':
+                return True
+    except Exception:
+        pass
+
+    return False
+
+
 ###########################
 #### Generic functions ####
 ###########################
@@ -676,20 +697,10 @@ class RequestInfo:
         if cache[client_ip] is not None:
             return cache[client_ip]
 
-        query = reverse_ip(client_ip)
+        is_tor_ip = is_tor(client_ip)
 
-        is_tor = False
-        try:
-            answers = dns.resolver.resolve(query, 'A')
-            for rdata in answers:
-                if rdata.to_text() == '127.0.0.2':
-                    is_tor = True
-                    break
-        except Exception:
-            pass
-
-        cache[client_ip] = is_tor
-        return is_tor
+        cache[client_ip] = is_tor_ip
+        return is_tor_ip
 
 
     def get_ipapi_data(self, client_ip: Optional[str] = None) -> dict:
