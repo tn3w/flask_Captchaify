@@ -881,12 +881,75 @@ class Captchaify:
 
 
     @property
-    def as_name(self) -> Optional[str]:
+    def timezone(self) -> Optional[str]:
         """
-        Returns the autonomous system of the current request.
+        Returns the timezone of the current request.
+        """
+
+        return self._req_info.get_ip_info(['timezone'])
+
+
+    @property
+    def offset(self) -> Optional[int]:
+        """
+        Returns the timezone offset of the current request.
+        """
+
+        return self._req_info.get_ip_info(['offset'])
+
+
+    @property
+    def currency(self) -> Optional[str]:
+        """
+        Returns the currency of the current request.
+        """
+
+        return self._req_info.get_ip_info(['currency'])
+
+
+    @property
+    def isp(self) -> Optional[str]:
+        """
+        Returns the ISP of the current request.
+        """
+
+        return self._req_info.get_ip_info(['isp'])
+
+
+    @property
+    def org(self) -> Optional[str]:
+        """
+        Returns the organization of the current request.
+        """
+
+        return self._req_info.get_ip_info(['org'])
+
+
+    @property
+    def asorg(self) -> Optional[str]:
+        """
+        Returns the autonomous system organization of the current request.
         """
 
         return self._req_info.get_ip_info(['as'])
+
+
+    @property
+    def as_name(self) -> Optional[str]:
+        """
+        Returns the autonomous system organization of the current request.
+        """
+
+        return self._req_info.get_ip_info(['as'])
+
+
+    @property
+    def asn(self) -> Optional[str]:
+        """
+        Returns the autonomous system number of the current request.
+        """
+
+        return self._req_info.get_ip_info(['as_number'])
 
 
     @property
@@ -896,6 +959,15 @@ class Captchaify:
         """
 
         return self._req_info.get_ip_info(['as_number'])
+
+
+    @property
+    def reverse(self) -> Optional[str]:
+        """
+        Returns the reverse of the current request.
+        """
+
+        return self._req_info.get_ip_info(['reverse'])
 
 
     @property

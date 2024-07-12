@@ -355,6 +355,28 @@ def matches_asterisk_rule(obj: str, asterisk_rule: str) -> bool:
     return obj == asterisk_rule
 
 
+def convert_string_to_int(string: str) -> int:
+    """
+    Convert a string to an integer.
+
+    :param string: The string to be converted.
+    :return: The integer representation of the string.
+    """
+
+    if not isinstance(string, str):
+        return string
+
+    string = string.strip()
+
+    if string.lstrip('-').isdigit():
+        return int(string)
+
+    if string.endswith('-') and string[:-1].isdigit():
+        return -int(string[:-1])
+
+    return string
+
+
 #################
 #### Classes ####
 #################
@@ -756,7 +778,10 @@ class RequestInfo:
                 if not as_number.isdigit():
                     continue
 
-                value = int(as_number)
+                value = convert_string_to_int(as_number)
+
+            if key == 'offset':
+                value = convert_string_to_int(value)
 
             key = {'region': 'region_code', 'regionname':\
                    'region', 'as': 'as_number', 'asname': 'as'}\
