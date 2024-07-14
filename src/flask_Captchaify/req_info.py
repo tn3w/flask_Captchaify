@@ -414,7 +414,7 @@ class Cache(dict):
         data = self.load
 
         if isinstance(key, str):
-            key = self.hash_key(key)
+            key = hash_key(key)
 
         try:
             cache_key_data = data.get(self.cache_key, {})
@@ -441,7 +441,7 @@ class Cache(dict):
             data[self.cache_key] = {}
 
         if isinstance(key, str):
-            key = self.hash_key(key)
+            key = hash_key(key)
 
         try:
             data[self.cache_key][key] = (value, int(time.time()))
@@ -461,7 +461,7 @@ class Cache(dict):
         data = self.load
 
         if isinstance(key, str):
-            key = self.hash_key(key)
+            key = hash_key(key)
 
         if self.cache_key not in data\
             or key not in data[self.cache_key]:
