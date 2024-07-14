@@ -264,6 +264,17 @@ def validate_captcha_response(response: dict, expected_hostname: str) -> bool:
     return True
 
 
+def hash_key(key: str) -> str:
+    """
+    Hashes the given key.
+
+    :param key: The key to be used in the cache key.
+    :return: The generated cache key.
+    """
+
+    return hashlib.sha512(key.encode('utf-8')).hexdigest()
+
+
 ###################
 #### URL Tools ####
 ###################
@@ -688,7 +699,8 @@ class Json:
         if default is None:
             default = {}
 
-        if not has_permission(file_path, 'r'):
+        if not os.path.isfile(file_path)\
+            or not has_permission(file_path, 'r'):
             return default
 
         if file_path not in file_locks:
@@ -717,7 +729,8 @@ class Json:
         """
 
         file_directory = os.path.dirname(file_path)
-        if not has_permission(file_directory, 'w'):
+        if not os.path.isdir(file_directory)\
+            or not has_permission(file_directory, 'w'):
             return False
 
         if file_path not in file_locks:
@@ -766,7 +779,8 @@ class Pickle:
         if default is None:
             default = {}
 
-        if not has_permission(file_path, 'r'):
+        if not os.path.isfile(file_path)\
+            or not has_permission(file_path, 'r'):
             return default
 
         if file_path not in file_locks:
@@ -796,7 +810,8 @@ class Pickle:
         """
 
         file_directory = os.path.dirname(file_path)
-        if not has_permission(file_directory, 'w'):
+        if not os.path.isdir(file_directory)\
+            or not has_permission(file_directory, 'w'):
             return False
 
         if file_path not in file_locks:

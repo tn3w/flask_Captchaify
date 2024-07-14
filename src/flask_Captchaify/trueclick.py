@@ -13,11 +13,48 @@ from time import time
 import urllib.request
 from typing import Optional, Tuple
 from flask import request
+import numpy as np
 from .utils import DATASETS_DIR, DATA_DIR, JSON, PICKLE, Hashing, get_random_image,\
     convert_image_to_base64, manipulate_image_bytes, generate_random_string, has_permission
 
 
 CAPTCHAS_FILE_PATH = os.path.join(DATA_DIR, 'captchas.pkl')
+
+
+def calculate_human_score(interaction_data: dict) -> float:
+    """
+    Calculate the human score of an interaction data.
+
+    :param interaction_data: The interaction data.
+    :return: The human score.
+    """
+
+    mouse_movements = interaction_data.get('mouseMovements', [])
+    clicks = interaction_data.get('clicks', [])
+    form_inputs = interaction_data.get('formInputs', [])
+
+    if not mouse_movements or not clicks:
+        return 1.0
+
+    movement_times = [movement['timestamp'] for movement in mouse_movements]
+    click_times = [click['timestamp'] for click in clicks]
+    input_times = [input['timestamp'] for input in form_inputs]
+
+    all_times = movement_times + click_times + input_times
+    all_times.sort()
+
+    intervals = np.diff(all_times)
+
+    if len(intervals) == 0:
+        return 1.0
+
+    mean_interval = np.mean(intervals)
+    std_interval = np.std(intervals)
+
+    human_score = (1.0 - (std_interval / mean_interval)) if mean_interval > 0 else 1.0
+    human_score = max(0.0, min(1.0, human_score))
+
+    return human_score
 
 
 class TrueClick:

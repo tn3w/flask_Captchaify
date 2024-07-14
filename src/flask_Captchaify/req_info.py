@@ -22,7 +22,7 @@ import geoip2.database
 import crawleruseragents
 from werkzeug import Request
 from .utils import PICKLE, DATA_DIR, ASSETS_DIR, handle_exception, get_domain_from_url,\
-    remove_duplicates
+    remove_duplicates, hash_key
 
 
 CACHE_FILE_PATH: Final[str] = os.path.join(DATA_DIR, 'cache.pkl')
@@ -403,6 +403,78 @@ class Cache(dict):
         super().__init__()
 
 
+    def __getitem__(self, key: any) -> any:
+        """
+        Retrieves the value associated with the given key from the cache.
+
+        :param key: The key for which the value is to be retrieved.
+        :return: The value associated with the key, or None if the key is not found.
+        """
+
+        data = self.load
+
+        if isinstance(key, str):
+            key = self.hash_key(key)
+
+        try:
+            cache_key_data = data.get(self.cache_key, {})
+            key_data = cache_key_data.get(key, ())
+
+            return key_data[0]
+        except Exception as exc:
+            handle_exception(exc, is_app_error = False)
+
+        return None
+
+
+    def __setitem__(self, key: any, value: any) -> None:
+        """
+        Sets the value associated with the given key in the cache.
+
+        :param key: The key for which the value is to be set.
+        :param value: The value to be set for the key.
+        """
+
+        data = self.load
+
+        if not self.cache_key in data:
+            data[self.cache_key] = {}
+
+        if isinstance(key, str):
+            key = self.hash_key(key)
+
+        try:
+            data[self.cache_key][key] = (value, int(time.time()))
+        except Exception as exc:
+            handle_exception(exc, is_app_error = False)
+        else:
+            PICKLE.dump(data, CACHE_FILE_PATH)
+
+
+    def __delitem__(self, key: any) -> None:
+        """
+        Deletes the value associated with the given key from the cache.
+
+        :param key: The key for which the value is to be deleted.
+        """
+
+        data = self.load
+
+        if isinstance(key, str):
+            key = self.hash_key(key)
+
+        if self.cache_key not in data\
+            or key not in data[self.cache_key]:
+            return
+
+        try:
+            del data[self.cache_key][key]
+        except Exception as exc:
+            handle_exception(exc, is_app_error = False)
+        else:
+            PICKLE.dump(data, CACHE_FILE_PATH)
+
+
     @property
     def load(self) -> any:
         """
@@ -424,55 +496,6 @@ class Cache(dict):
             }
 
         return data
-
-
-    def __getitem__(self, key: any) -> any:
-        """
-        Retrieves the value associated with the given key from the cache.
-
-        :param key: The key for which the value is to be retrieved.
-        :return: The value associated with the key, or None if the key is not found.
-        """
-
-        data = self.load
-        key_data = data.get(self.cache_key, {}).get(key, ())
-
-        try:
-            return key_data[0]
-        except Exception:
-            return None
-
-
-    def __setitem__(self, key: any, value: any) -> None:
-        """
-        Sets the value associated with the given key in the cache.
-
-        :param key: The key for which the value is to be set.
-        :param value: The value to be set for the key.
-        """
-
-        data = self.load
-
-        if not self.cache_key in data:
-            data[self.cache_key] = {}
-
-        data[self.cache_key][key] = (value, int(time.time()))
-        PICKLE.dump(data, CACHE_FILE_PATH)
-
-
-    def __delitem__(self, key: any) -> None:
-        """
-        Deletes the value associated with the given key from the cache.
-
-        :param key: The key for which the value is to be deleted.
-        """
-
-        data = self.load
-
-        if self.cache_key in data and key in data[self.cache_key]:
-            del data[self.cache_key][key]
-
-        PICKLE.dump(data, CACHE_FILE_PATH)
 
 
 class RequestInfo:

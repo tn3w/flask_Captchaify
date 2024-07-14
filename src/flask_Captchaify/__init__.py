@@ -30,7 +30,7 @@ from .utils import DATASETS_DIR, DATA_DIR, TEMPLATE_DIR, ASSETS_DIR, JSON, PICKL
     SymmetricCrypto, SSES, generate_random_string, remove_all_args_from_url, search_languages,\
     get_random_image, manipulate_image_bytes, convert_image_to_base64, get_return_path,\
     get_return_url, extract_path_and_args, handle_exception, get_domain_from_url,\
-    validate_captcha_response, remove_args_from_url, extract_args, get_char
+    validate_captcha_response, remove_args_from_url, extract_args, get_char, hash_key
 from .webtoolbox import WebToolbox, asset, render_template
 from .req_info import RequestInfo, update_geolite_databases, matches_rule, is_valid_ip
 from .altcha import Altcha
@@ -1409,7 +1409,7 @@ class Captchaify:
             if return_route not in ['captcha', 'blocked', 'nojs', 'rate_limited']:
                 return_route = 'captcha'
 
-        args = {
+        kwargs = {
             "search": search, "languages": languages,
             "return_path": return_path, "return_url": return_url,
             "return_url_without_lang": remove_args_from_url(return_url, ['language']),
@@ -1419,7 +1419,7 @@ class Captchaify:
         g.captchaify_page = True
 
         return self._render_template(
-            'change_language', **args
+            'change_language', **kwargs
         )
 
 
@@ -1728,12 +1728,12 @@ class Captchaify:
         return captcha_display_function(is_error, return_path)
 
 
-    def _render_template(self, template: str, **args) -> Response:
+    def _render_template(self, template: str, **kwargs) -> Response:
         """
         Retrieves and renders templates based on the specified template type.
 
         :param template: The template to retrieve and render
-        :param **args: Additional keyword arguments to be passed to the template renderer
+        :param **kwargs: Additional keyword arguments to be passed to the template renderer
         :return: A Flask response object
         """
 
@@ -1757,7 +1757,7 @@ class Captchaify:
             client_language, is_default_language = self.language
             without_cookies, is_default_choice = self.without_cookies
 
-            template_args = {
+            template_kwargs = {
                 "theme": client_theme,
                 "without_cookies": without_cookies,
                 "is_default_theme": is_default_theme,
@@ -1774,26 +1774,26 @@ class Captchaify:
                 "kwargs_without_cookies": self.kwargs['without_cookies'],
                 "template": template,
                 "is_return_path_set": get_return_path(
-                    request, args.get('return_path', '/')).strip() != '/'
+                    request, kwargs.get('return_path', '/')).strip() != '/'
             }
 
-            args.update(template_args)
+            kwargs.update(template_kwargs)
 
             for asset_name in [
                 'colors', 'cookie_banner_css', 'cookie_banner_html',
                 'cookie_banner_js', 'footer_css', 'footer_html']:
 
-                args[asset_name] = asset(asset_name, **args)
+                kwargs[asset_name] = asset(asset_name, **kwargs)
 
             if self.kwargs['as_route']:
-                args['captcha_url'] = self._create_route_url('captcha')
+                kwargs['captcha_url'] = self._create_route_url('captcha')
 
             current_url = remove_args_from_url(
                 self.url,
                 ['theme', 'language'] +
                 (['wc'] if not without_cookies else [])
             )
-            args.update({
+            kwargs.update({
                 "current_url_with_config": remove_args_from_url(
                     self.url, ['ct', 'ci', 'cs', 'captcha', 'js']
                 ),
@@ -1822,7 +1822,7 @@ class Captchaify:
             return render_template(
                 template_dir, file_name,
                 'en', client_language,
-                **args
+                **kwargs
             )
 
         if page_ext == 'json':
@@ -1855,17 +1855,19 @@ class Captchaify:
                 and request.path == '/rate_limited' + self.route_id):
                 return
 
-            rate_limited_ips = PICKLE.load(RATE_LIMIT_PATH)
+            rate_limited_ips = PICKLE.load(RATE_LIMIT_PATH, {})
             rate_limit, max_rate_limit = config['rate_limit'], config['max_rate_limit']
+
+            hashed_key = hash_key(self._ip)
 
             request_count = 0
             ip_request_count = 0
 
-            for ip, ip_timestamps in rate_limited_ips.items():
+            for hashed_ip, ip_timestamps in rate_limited_ips.items():
                 count = sum(1 for request_time in ip_timestamps\
                             if int(time()) - int(request_time) <= 10)
 
-                if ip == self._ip:
+                if hashed_ip == hashed_key:
                     ip_request_count += count
                 request_count += count
 
@@ -1929,30 +1931,34 @@ class Captchaify:
                 return response
 
             rate_limit = self._current_configuration['rate_limit']
-            rate_limited_ips = PICKLE.load(RATE_LIMIT_PATH)
+            rate_limited_ips = PICKLE.load(RATE_LIMIT_PATH, {})
+
+            hashed_key = hash_key(self._ip)
 
             found = False
-            for ip, ip_timestamps in rate_limited_ips.items():
-                if ip == self._ip:
-                    found = True
+            for hashed_ip, ip_timestamps in rate_limited_ips.items():
+                if not hashed_ip == hashed_key:
+                    continue
 
-                    new_timestamps = []
-                    for request_time in ip_timestamps:
-                        if not int(time()) - int(request_time) > 10:
-                            new_timestamps.append(request_time)
-                    new_timestamps = [str(int(time()))] + new_timestamps
+                found = True
 
-                    rate_limited_ips[ip] = new_timestamps[:round(rate_limit*1.2)]
-                    break
+                new_timestamps = []
+                for request_time in ip_timestamps:
+                    if not int(time()) - int(request_time) > 10:
+                        new_timestamps.append(request_time)
+                new_timestamps = [str(int(time()))] + new_timestamps
+
+                rate_limited_ips[hashed_ip] = new_timestamps[:round(rate_limit*1.2)]
+                break
 
             if not found:
-                rate_limited_ips[self._ip] = [str(int(time()))]
+                rate_limited_ips[hashed_key] = [str(int(time()))]
 
             PICKLE.dump(rate_limited_ips, RATE_LIMIT_PATH)
-
-            return response
         except Exception as exc:
             handle_exception(exc)
+
+        return response
 
 
     def _add_args(self, response: Response) -> Response:
@@ -1964,17 +1970,15 @@ class Captchaify:
         """
 
         try:
-            if not response.content_type.startswith('text/html'):
+            is_default_choice, without_cookies = self.without_cookies
+            if not response.content_type.startswith('text/html') or\
+                (not is_default_choice and getattr(g, 'captchaify_page', False) is True):
                 return response
 
-            without_cookies, is_default_choice = self.without_cookies
-            if not without_cookies and getattr(g, 'captchaify_page', False) is True:
-                return response
-
-            args = {}
+            kwargs = {}
 
             if not is_default_choice and request.args.get('captcha') is None:
-                args['wc'] = str(int(without_cookies))
+                kwargs['wc'] = str(int(without_cookies))
 
             if self.kwargs['as_route'] and not getattr(
                 g, 'captchaify_template', ''
@@ -1985,27 +1989,28 @@ class Captchaify:
                     return_route = request.form.get('rr')
 
                 if return_route in ['captcha', 'blocked', 'nojs', 'rate_limited']:
-                    args['rr'] = return_route
+                    kwargs['rr'] = return_route
 
             is_captcha_set = False
-            if hasattr(g, 'captchaify_captcha'):
-                if g.captchaify_captcha is not None:
-                    args['captcha'] = g.captchaify_captcha
-                    is_captcha_set = True
+            if getattr(g, 'captchaify_captcha', None) is not None:
+                kwargs['captcha'] = g.captchaify_captcha
+                is_captcha_set = True
 
-            if request.args.get('captcha') is not None and not is_captcha_set:
-                args['captcha'] = request.args.get('captcha')
+            kwargs['captcha'] = request.args.get('captcha') if not is_captcha_set else None
 
             if not self.kwargs['without_customisation'] and without_cookies:
                 theme, is_default_theme = self.theme
-                if not is_default_theme:
-                    args['theme'] = theme
-
                 language, is_default_language = self.language
-                if not is_default_language:
-                    args['language'] = language
 
-            response.data = WebToolbox.add_arguments(response.data, self._req_info, **args)
+                kwargs['theme'] = theme if not is_default_theme else None
+                kwargs['language'] = language if not is_default_language else None
+
+            new_kwargs = {}
+            for key, value in kwargs.items():
+                if value is not None:
+                    new_kwargs[key] = value
+
+            response.data = WebToolbox.add_arguments(response.data, self._req_info, **new_kwargs)
         except Exception as exc:
             handle_exception(exc)
 
@@ -2033,11 +2038,9 @@ class Captchaify:
 
                 return response
 
-            kwargs = {}
-
-            if hasattr(g, 'captchaify_captcha'):
-                if isinstance(g.captchaify_captcha, str):
-                    kwargs["captcha"] = g.captchaify_captcha
+            kwargs = {
+                "captcha": getattr(g, 'captchaify_captcha', None),
+            }
 
             if not getattr(g, 'captchaify_no_new_cookies', False):
                 if not is_default_choice and request.cookies.get('cookieConsent') != '1':
@@ -2056,6 +2059,9 @@ class Captchaify:
                     response.delete_cookie(cookie)
 
             for key, value in kwargs.items():
+                if not isinstance(key, str) or not isinstance(value, str):
+                    continue
+
                 response.set_cookie(
                     key, value, max_age = 93312000, samesite = 'Lax',
                     secure = self.app.config.get('HTTPS'),
@@ -2080,7 +2086,6 @@ class Captchaify:
                 return response
 
             path = request.path
-
             copy_crawler_hints = self.crawler_hints_cache.copy()
 
             found = None
@@ -2555,8 +2560,8 @@ class Captchaify:
                     user_agent = crypto.decrypt(ip_data['user_agent'])
 
                     if not int(time()) - int(ip_data['time']) > self.kwargs['verification_age'] and\
-                            (ip == self._ip or user_agent == self.user_agent)\
-                                and user_agent == self.user_agent:
+                        (ip == self._ip or user_agent == self.user_agent)\
+                            and user_agent == self.user_agent:
                         return True
                     break
         except Exception as exc:
