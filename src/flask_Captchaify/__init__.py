@@ -26,11 +26,11 @@ from bs4 import BeautifulSoup
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
 from flask import Flask, Response, request, g, abort, send_file, make_response, redirect, jsonify
-from .utils import DATASETS_DIR, DATA_DIR, TEMPLATE_DIR, ASSETS_DIR, JSON, PICKLE, Hashing,\
-    SymmetricCrypto, SSES, generate_random_string, remove_all_args_from_url, search_languages,\
-    get_random_image, manipulate_image_bytes, convert_image_to_base64, get_return_path,\
-    get_return_url, extract_path_and_args, handle_exception, get_domain_from_url,\
-    validate_captcha_response, remove_args_from_url, extract_args, get_char, hash_key
+from .utils import DATASETS_DIR, DATA_DIR, TEMPLATE_DIR, ASSETS_DIR, JSON, PICKLE, Hashing, Cache,\
+    SymmetricEncryption, SSES, TimeStorage, generate_random_string, remove_all_args_from_url,\
+    search_languages, get_random_image, manipulate_image_bytes, convert_image_to_base64,\
+    get_return_path, get_return_url, extract_path_and_args, handle_exception, get_domain_from_url,\
+    validate_captcha_response, remove_args_from_url, extract_args, get_char
 from .webtoolbox import WebToolbox, asset, render_template
 from .req_info import RequestInfo, update_geolite_databases, matches_rule, is_valid_ip
 from .altcha import Altcha
@@ -243,6 +243,7 @@ DEFAULT_KWARGS: Final[dict] = {
     "rate_limit": (15, 300), "block_crawler": True,
     "crawler_hints": True, "as_route": False,
     "fixed_route_name": '_captchaify', "theme": 'light', "language": 'en',
+    "store_anonymously": True,
     "without_trueclick": False, "error_codes": [],
     "recaptcha_site_key": None, "recaptcha_secret": None,
     "hcaptcha_site_key": None, "hcaptcha_secret": None,
@@ -268,7 +269,7 @@ class Captchaify:
                  as_route: bool = False, fixed_route_name: str = '_captchaify',
                  enable_rate_limit: bool = True, rate_limit: Tuple[int, int] = (15, 300),
                  block_crawler: bool = True, crawler_hints: bool = True,
-                 theme: str = 'light', language: str = 'en',
+                 theme: str = 'light', language: str = 'en', store_anonymously: bool = True,
                  without_trueclick: bool = False, error_codes: Optional[list] = None,
                  recaptcha_site_key: Optional[str] = None, recaptcha_secret: Optional[str] = None,
                  hcaptcha_site_key: Optional[str] = None, hcaptcha_secret: Optional[str] = None,
@@ -301,6 +302,7 @@ class Captchaify:
         :param crawler_hints: Whether to show crawler hints
         :param theme: The default theme
         :param language: The default language
+        :param store_anonymously: Whether to store ip data anonymously
         :param without_trueclick: Whether to disable TrueClick
         :param error_codes: The default error codes to handle
         :param recaptcha_site_key: The reCAPTCHA site key
@@ -343,7 +345,7 @@ class Captchaify:
             "as_route": as_route, "fixed_route_name": fixed_route_name,
             "enable_rate_limit": enable_rate_limit, "rate_limit": rate_limit,
             "block_crawler": block_crawler, "crawler_hints": crawler_hints,
-            "theme": theme, "language": language,
+            "theme": theme, "language": language, "store_anonymously": store_anonymously,
             "without_trueclick": without_trueclick, "error_codes": error_codes,
             "recaptcha_site_key": recaptcha_site_key, "recaptcha_secret": recaptcha_secret,
             "hcaptcha_site_key": hcaptcha_site_key, "hcaptcha_secret": hcaptcha_secret,
@@ -438,7 +440,6 @@ class Captchaify:
         app.before_request(self._rate_limit)
         app.before_request(self._check_for_bots)
 
-        app.after_request(self._add_rate_limit)
         app.after_request(self._add_args)
         app.after_request(self._set_cookies)
 
@@ -615,7 +616,7 @@ class Captchaify:
         return RequestInfo(
             request, g, LANGUAGE_CODES,
             self.kwargs['third_parties'],
-            'captchaify'
+            'captchaify', self.kwargs['store_anonymously']
         )
 
 
@@ -1843,44 +1844,6 @@ class Captchaify:
     ################################
 
 
-    def _rate_limit(self) -> Optional[str]:
-        """
-        Checks for rate limits based on IP addresses and overall request counts.
-        """
-
-        try:
-            config = self._current_configuration
-
-            if not config['enable_rate_limit'] or (self.kwargs['as_route']
-                and request.path == '/rate_limited' + self.route_id):
-                return
-
-            rate_limited_ips = PICKLE.load(RATE_LIMIT_PATH, {})
-            rate_limit, max_rate_limit = config['rate_limit'], config['max_rate_limit']
-
-            hashed_key = hash_key(self._ip)
-
-            request_count = 0
-            ip_request_count = 0
-
-            for hashed_ip, ip_timestamps in rate_limited_ips.items():
-                count = sum(1 for request_time in ip_timestamps\
-                            if int(time()) - int(request_time) <= 10)
-
-                if hashed_ip == hashed_key:
-                    ip_request_count += count
-                request_count += count
-
-            if (ip_request_count >= rate_limit and not rate_limit == 0) or \
-                (request_count >= max_rate_limit and not max_rate_limit == 0):
-                return self._render_rate_limit()
-
-        except Exception as exc:
-            handle_exception(exc)
-
-            return self._render_block()
-
-
     def _change_language(self) -> Optional[str]:
         """
         Change the language of the web application based on the provided query parameters.
@@ -1918,47 +1881,35 @@ class Captchaify:
             return self._captchaify()
 
 
-    def _add_rate_limit(self, response: Response) -> Response:
-        """
-        This method handles rate limiting for incoming requests.
-
-        :param response: The response object to be returned
-        :return: The response object with rate limit added
-        """
-
+    def _rate_limit(self) -> Optional[str]:
         try:
-            if not self._current_configuration['enable_rate_limit'] or self.ip is None:
-                return response
+            config = self._current_configuration
 
-            rate_limit = self._current_configuration['rate_limit']
-            rate_limited_ips = PICKLE.load(RATE_LIMIT_PATH, {})
+            if not config['enable_rate_limit'] or (self.kwargs['as_route']
+                and request.path in [
+                    '/rate_limited' + self.route_id,
+                    '/rate_limited' + self.route_id + '/']
+                    ):
+                return
 
-            hashed_key = hash_key(self._ip)
+            rate_limit, max_rate_limit = config['rate_limit'], config['max_rate_limit']
 
-            found = False
-            for hashed_ip, ip_timestamps in rate_limited_ips.items():
-                if not hashed_ip == hashed_key:
-                    continue
+            storage = TimeStorage(
+                'rate_limit', store_anonymously = self.kwargs['store_anonymously'],
+                ttl = 10, max_size = rate_limit
+            )
+            storage.add_time(self._ip)
 
-                found = True
+            ip_count, total_count = storage.get_counts(self._ip)
 
-                new_timestamps = []
-                for request_time in ip_timestamps:
-                    if not int(time()) - int(request_time) > 10:
-                        new_timestamps.append(request_time)
-                new_timestamps = [str(int(time()))] + new_timestamps
+            if ip_count >= rate_limit and not rate_limit == 0:
+                return self._render_rate_limit()
 
-                rate_limited_ips[hashed_ip] = new_timestamps[:round(rate_limit*1.2)]
-                break
+            if total_count >= max_rate_limit and not max_rate_limit == 0:
+                return self._render_rate_limit()
 
-            if not found:
-                rate_limited_ips[hashed_key] = [str(int(time()))]
-
-            PICKLE.dump(rate_limited_ips, RATE_LIMIT_PATH)
         except Exception as exc:
             handle_exception(exc)
-
-        return response
 
 
     def _add_args(self, response: Response) -> Response:
@@ -2093,7 +2044,7 @@ class Captchaify:
                 comparison = Hashing().compare(path, hashed_path)
                 if comparison:
                     data_time = path_data['time']
-                    title = SymmetricCrypto(path).decrypt(path_data['title'])
+                    title = SymmetricEncryption(path).decrypt(path_data['title'])
 
                     if title is not None and not int(time()) - int(data_time) > 7200:
                         found = hashed_path
@@ -2101,7 +2052,7 @@ class Captchaify:
                         del copy_crawler_hints[hashed_path]
                     break
 
-            symmetric_crypto = SymmetricCrypto(path)
+            symmetric_crypto = SymmetricEncryption(path)
             is_captchaify_page = getattr(g, 'captchaify_page', False)
 
             if found is None and not is_captchaify_page:
@@ -2555,7 +2506,7 @@ class Captchaify:
             for hashed_id, ip_data in solved_captchas.items():
                 comparison = Hashing().compare(captcha_id, hashed_id)
                 if comparison:
-                    crypto = SymmetricCrypto(self.captcha_secret)
+                    crypto = SymmetricEncryption(self.captcha_secret)
                     ip = crypto.decrypt(ip_data['ip'])
                     user_agent = crypto.decrypt(ip_data['user_agent'])
 
@@ -2661,7 +2612,7 @@ class Captchaify:
                     for hashed_id, _ in solved_captchas.items()):
             captcha_id = generate_random_string(8, with_punctuation=False)
 
-        symcrypto = SymmetricCrypto(self.captcha_secret)
+        symcrypto = SymmetricEncryption(self.captcha_secret)
 
         data = {
             'time': int(time()),

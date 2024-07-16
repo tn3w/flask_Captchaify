@@ -11,7 +11,6 @@ The original GPL-3.0 licence applies.
 import re
 import os
 import json
-import time
 import shutil
 import socket
 import urllib.request
@@ -21,8 +20,8 @@ import dns.resolver
 import geoip2.database
 import crawleruseragents
 from werkzeug import Request
-from .utils import PICKLE, DATA_DIR, ASSETS_DIR, handle_exception, get_domain_from_url,\
-    remove_duplicates, hash_key
+from .utils import Cache, DATA_DIR, ASSETS_DIR, handle_exception, get_domain_from_url,\
+    remove_duplicates
 
 
 CACHE_FILE_PATH: Final[str] = os.path.join(DATA_DIR, 'cache.pkl')
@@ -377,127 +376,6 @@ def convert_string_to_int(string: str) -> int:
     return string
 
 
-#################
-#### Classes ####
-#################
-
-
-class Cache(dict):
-    """
-    A dictionary-based cache that loads and saves data to a file using pickle.
-    """
-
-
-    def __init__(self, cache_key: str, ttl: Optional[int] = 259200) -> None:
-        """
-        Initializes the Cache object.
-
-        :param cache_key: The name of the file to store cache data.
-        :param ttl: The time to live in seconds, after that time data will be removed
-                    from the cache.
-        """
-
-        self.cache_key = cache_key
-        self.ttl = ttl
-
-        super().__init__()
-
-
-    def __getitem__(self, key: any) -> any:
-        """
-        Retrieves the value associated with the given key from the cache.
-
-        :param key: The key for which the value is to be retrieved.
-        :return: The value associated with the key, or None if the key is not found.
-        """
-
-        data = self.load
-
-        if isinstance(key, str):
-            key = hash_key(key)
-
-        try:
-            cache_key_data = data.get(self.cache_key, {})
-            key_data = cache_key_data.get(key, ())
-
-            return key_data[0]
-        except Exception as exc:
-            handle_exception(exc, is_app_error = False)
-
-        return None
-
-
-    def __setitem__(self, key: any, value: any) -> None:
-        """
-        Sets the value associated with the given key in the cache.
-
-        :param key: The key for which the value is to be set.
-        :param value: The value to be set for the key.
-        """
-
-        data = self.load
-
-        if not self.cache_key in data:
-            data[self.cache_key] = {}
-
-        if isinstance(key, str):
-            key = hash_key(key)
-
-        try:
-            data[self.cache_key][key] = (value, int(time.time()))
-        except Exception as exc:
-            handle_exception(exc, is_app_error = False)
-        else:
-            PICKLE.dump(data, CACHE_FILE_PATH)
-
-
-    def __delitem__(self, key: any) -> None:
-        """
-        Deletes the value associated with the given key from the cache.
-
-        :param key: The key for which the value is to be deleted.
-        """
-
-        data = self.load
-
-        if isinstance(key, str):
-            key = hash_key(key)
-
-        if self.cache_key not in data\
-            or key not in data[self.cache_key]:
-            return
-
-        try:
-            del data[self.cache_key][key]
-        except Exception as exc:
-            handle_exception(exc, is_app_error = False)
-        else:
-            PICKLE.dump(data, CACHE_FILE_PATH)
-
-
-    @property
-    def load(self) -> any:
-        """
-        Loads and returns the cache data from the file.
-
-        :return: The cache data from the file. If the cache file does not contain
-                 data for this file_name, an empty dictionary is returned.
-        """
-
-        data = PICKLE.load(CACHE_FILE_PATH)
-
-        if self.ttl is not None:
-            now = int(time.time())
-            data = {
-                file_name: {key: value
-                            for key, value in file_data.items()
-                            if now - value[1] < self.ttl}
-                for file_name, file_data in data.items()
-            }
-
-        return data
-
-
 class RequestInfo:
     """
     A class to handle various request-related information.
@@ -506,7 +384,8 @@ class RequestInfo:
 
     def __init__(self, request: Request, global_data: any,
                  languages: list, third_parties: list,
-                 store_token: Optional[str] = None) -> None:
+                 store_token: Optional[str] = None,
+                 store_anonymously: bool = True) -> None:
         """
         Initialize the RequestInfo class.
 
@@ -515,12 +394,14 @@ class RequestInfo:
         :param languages: A list of supported languages.
         :param third_parties: A list of third-party services.
         :param store_token: A token with which all data is saved in the global data.
+        :param store_anonymously: Whether to store the cache data anonymously.
         """
 
         self.request = request
         self.global_data = global_data
         self.languages = languages
         self.third_parties = third_parties
+        self.store_anonymously = store_anonymously
 
         if isinstance(store_token, str):
             self.store_token = store_token + '_'
@@ -738,7 +619,7 @@ class RequestInfo:
         if not is_valid_ip(client_ip):
             return False
 
-        cache = Cache('tor')
+        cache = Cache('tor', store_anonymously = self.store_anonymously)
         if cache[client_ip] is not None:
             return cache[client_ip]
 
@@ -763,7 +644,7 @@ class RequestInfo:
         if not is_valid_ip(client_ip):
             return False
 
-        cache = Cache('ipapi')
+        cache = Cache('ipapi', store_anonymously = self.store_anonymously)
         if cache[client_ip] is not None:
             return cache[client_ip]
 
@@ -830,7 +711,7 @@ class RequestInfo:
         if not is_valid_ip(client_ip):
             return False
 
-        cache = Cache('forum_spammer')
+        cache = Cache('forum_spammer', store_anonymously = self.store_anonymously)
         if cache[client_ip] is not None:
             return cache[client_ip]
 
