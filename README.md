@@ -830,6 +830,19 @@ args = {
 
 <br>
 
+9. ***`store_anonymously` Arg***
+
+   Whether to store the captcha data anonymously or not. (Default: True)
+
+   If it is stored anonymously, all cache data is stored hashed and encrypted. This can be slower but more secure for the end user.
+
+   Web page where user data is not stored anonymously:
+   ```python
+   captchaify = Captchaify(app, store_anonymously=False)
+   ```
+
+<br>
+
 9. ***`without_trueclick` Arg***
 
    Whether to add an TrueClick route. If you do not use TrueClick at all, activate this option. It removes all routes that are not required for TrueClick. (Default: False)
