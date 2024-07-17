@@ -888,7 +888,7 @@ class SymmetricEncryption:
                 algorithm = hashes.SHA256(),
                 length = 32,
                 salt = salt,
-                iterations = 100000,
+                iterations = 20000,
                 backend = default_backend()
             )
             key = kdf_.derive(self.password)
@@ -974,7 +974,7 @@ class SymmetricEncryption:
                 algorithm=hashes.SHA256(),
                 length=32,
                 salt=salt,
-                iterations=100000,
+                iterations=20000,
                 backend=default_backend()
             )
             key = kdf_.derive(self.password)
@@ -1396,6 +1396,25 @@ class Cache(dict):
         self.ttl = ttl
 
         super().__init__()
+
+
+    def does_exist(self, key: any) -> bool:
+        """
+        Checks if the given key exists in the cache.
+
+        :param key: The key to check.
+        :return: True if the key exists in the cache, False otherwise.
+        """
+
+        data = self.load()
+        if self.store_anonymously:
+            for hashed_key in data.keys():
+                if Hashing().compare(key, hashed_key):
+                    return True
+
+            return False
+
+        return key in data
 
 
     def __getitem__(self, key: any) -> any:

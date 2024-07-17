@@ -38,10 +38,6 @@ from .embed import CaptchaEmbed
 from .trueclick import TrueClick
 
 
-RATE_LIMIT_PATH: Final[str] = os.path.join(DATA_DIR, 'rate-limits.pkl')
-FAILED_CAPTCHAS_PATH: Final[str] = os.path.join(DATA_DIR, 'failed-captchas.pkl')
-SOLVED_CAPTCHAS_PATH: Final[str] = os.path.join(DATA_DIR, 'solved-captchas.pkl')
-
 EMOJIS: Final[list] = JSON.load(os.path.join(ASSETS_DIR, 'emojis.json'), [])
 TEA_EMOJIS: Final[list] = JSON.load(os.path.join(ASSETS_DIR, 'tea_emojis.json'), [])
 LANGUAGES: Final[list] = JSON.load(os.path.join(ASSETS_DIR, 'languages.json'), [])
@@ -696,6 +692,31 @@ class Captchaify:
 
 
     @property
+    def to_many_attempts(self) -> bool:
+        """
+        Check if there are too many failed attempts for the specified action.
+
+        :return: True if there are too many failed attempts, False otherwise.
+        """
+
+        try:
+            client_ip = self._req_info.get_ip()
+            if client_ip is None:
+                client_ip = 'None'
+
+            storage = TimeStorage(
+                'failed_captchas', store_anonymously = self.kwargs['store_anonymously'],
+                ttl = 7200, max_size = 4
+            )
+
+            return storage.get_counts(client_ip)[0] >= 3
+        except Exception as exc:
+            handle_exception(exc)
+
+        return False
+
+
+    @property
     def url(self) -> str:
         """
         Returns the URL of the current request.
@@ -1043,7 +1064,7 @@ class Captchaify:
         if return_path is None:
             return_path = get_return_path(request, '/')
 
-        if self._to_many_attempts(self._current_configuration['action']):
+        if self.to_many_attempts:
             return self._render_block()
 
         is_valid_ct, is_failed_captcha = self._verify_captcha_token()
@@ -2118,7 +2139,7 @@ class Captchaify:
 
             action = self._current_configuration['action']
 
-            if action == 'block' or self._to_many_attempts(action):
+            if action == 'block' or self.to_many_attempts:
                 return self._render_block()
 
             is_valid_ct, is_failed_captcha = self._verify_captcha_token()
@@ -2496,58 +2517,24 @@ class Captchaify:
             if captcha_string is None:
                 return False
 
-            if len(captcha_string) != 30:
+            if len(captcha_string) != 15:
                 return False
 
-            captcha_id = captcha_string[:8]
+            cache = Cache(
+                'solved_captchas', store_anonymously = self.kwargs['store_anonymously'],
+                ttl = self.kwargs['verification_age']
+            )
+            data = cache[captcha_string]
 
-            solved_captchas = PICKLE.load(SOLVED_CAPTCHAS_PATH)
+            if not isinstance(data, dict):
+                return False
 
-            for hashed_id, ip_data in solved_captchas.items():
-                comparison = Hashing().compare(captcha_id, hashed_id)
-                if comparison:
-                    crypto = SymmetricEncryption(self.captcha_secret)
-                    ip = crypto.decrypt(ip_data['ip'])
-                    user_agent = crypto.decrypt(ip_data['user_agent'])
+            ip, user_agent = data.get('ip'), data.get('user_agent')
+            if None in [ip, user_agent]:
+                return False
 
-                    if not int(time()) - int(ip_data['time']) > self.kwargs['verification_age'] and\
-                        (ip == self._ip or user_agent == self.user_agent)\
-                            and user_agent == self.user_agent:
-                        return True
-                    break
-        except Exception as exc:
-            handle_exception(exc)
-
-        return False
-
-
-    def _to_many_attempts(self, action: str) -> bool:
-        """
-        Check if there are too many failed attempts for the specified action.
-
-        :param action: The action for which to check the failed attempts.
-        :return: True if there are too many failed attempts, False otherwise.
-        """
-
-        try:
-            client_ip = self._req_info.get_ip()
-            if client_ip is None:
-                client_ip = 'None'
-
-            failed_captchas = PICKLE.load(FAILED_CAPTCHAS_PATH)
-
-            for hashed_ip, ip_records in failed_captchas.items():
-                comparison = Hashing().compare(client_ip, hashed_ip)
-                if comparison:
-                    records_length = 0
-                    for record in ip_records:
-                        if not int(time()) - int(record) > 14400:
-                            records_length += 1
-
-                    if (action == 'fight') and records_length > 2\
-                        or records_length > 3:
-
-                        return True
+            if ip == self._ip and user_agent == self.user_agent:
+                return True
         except Exception as exc:
             handle_exception(exc)
 
@@ -2566,31 +2553,12 @@ class Captchaify:
             client_ip = 'None'
 
         try:
-            failed_captchas = PICKLE.load(FAILED_CAPTCHAS_PATH)
+            storage = TimeStorage(
+                'failed_captchas', store_anonymously = self.kwargs['store_anonymously'],
+                ttl = 7200, max_size = 4
+            )
 
-            is_found = False
-
-            for hashed_ip, ip_records in failed_captchas.items():
-                comparison = Hashing().compare(client_ip, hashed_ip)
-                if comparison:
-                    is_found = True
-
-                    records_length = 0
-                    for record in ip_records:
-                        if not int(time()) - int(record) > 7200:
-                            records_length += 1
-                    records_length += 1
-
-                    ip_records.append(int(time()))
-                    failed_captchas[hashed_ip] = ip_records
-
-                    PICKLE.dump(failed_captchas, FAILED_CAPTCHAS_PATH)
-
-            if not is_found:
-                hashed_client_ip = Hashing().hash(client_ip)
-                failed_captchas[hashed_client_ip] = [int(time())]
-
-                PICKLE.dump(failed_captchas, FAILED_CAPTCHAS_PATH)
+            storage.add_time(client_ip)
         except Exception as exc:
             handle_exception(exc)
 
@@ -2603,30 +2571,21 @@ class Captchaify:
         :return: None or redirect to a url + args
         """
 
-        captcha_id = generate_random_string(8, with_punctuation=False)
-        captcha_token = generate_random_string(22, with_punctuation=False)
+        cache = Cache(
+            'solved_captchas', store_anonymously = self.kwargs['store_anonymously'],
+            ttl = self.kwargs['verification_age']
+        )
 
-        solved_captchas = PICKLE.load(SOLVED_CAPTCHAS_PATH)
+        captcha_id = None
+        while captcha_id is None or cache.does_exist(captcha_id):
+            captcha_id = generate_random_string(15, with_punctuation=False)
 
-        while any(Hashing().compare(captcha_id, hashed_id)\
-                    for hashed_id, _ in solved_captchas.items()):
-            captcha_id = generate_random_string(8, with_punctuation=False)
-
-        symcrypto = SymmetricEncryption(self.captcha_secret)
-
-        data = {
-            'time': int(time()),
-            'ip': symcrypto.encrypt(self._ip),
-            'user_agent': symcrypto.encrypt(self.user_agent),
+        cache[captcha_id] = {
+            "ip": self._ip,
+            "user_agent": self.user_agent
         }
 
-        solved_captchas = PICKLE.load(SOLVED_CAPTCHAS_PATH)
-
-        solved_captchas[Hashing().hash(captcha_id)] = data
-
-        PICKLE.dump(solved_captchas, SOLVED_CAPTCHAS_PATH)
-
-        g.captchaify_captcha = captcha_id + captcha_token
+        g.captchaify_captcha = captcha_id
 
         if self.kwargs['as_route']:
             url = get_return_url(return_path, request)
@@ -2637,7 +2596,7 @@ class Captchaify:
 
         char = get_char(url)
         if without_cookies:
-            url += char + 'captcha=' + quote(str(captcha_id + captcha_token))
+            url += char + 'captcha=' + captcha_id
 
         if not self.kwargs['without_arg_transfer'] and without_cookies:
             theme, is_default_theme = self.theme

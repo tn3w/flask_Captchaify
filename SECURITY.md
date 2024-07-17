@@ -51,4 +51,4 @@ I commit to:
    - Any potential impact or exploit scenarios.
    - Your contact information for follow-up (optional but helpful).
 3. If you prefer, you can use my PGP key to encrypt your report. The PGP key can be found [here](https://www.tn3w.dev/publ-key.asc) or use fingerprint 0C57B74B2C3B2F026984617129B39032102303D7 to request it.
-4. 🎉Error fixed🎉
+4. 🎉 Vulnerability fixed 🎉

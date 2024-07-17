@@ -31,6 +31,7 @@ if __name__ == '__main__':
    - [About](#about)
       - [Installation](#installation)
       - [Some Screenshots](#some-screenshots)
+      - [Speed](#speed)
       - [To-do's](#to-dos)
       - [Contributing](#note-for-contributors)
    - [Documentation](#documentation)
@@ -79,15 +80,27 @@ In situations where it is deemed necessary, a captivating challenge may be prese
    from flask_Captchaify import Captchaify
    ```
 
+### Speed
+flask_Captchaify operates very efficiently, generating a multiclick captcha with 10 images from the AI_Dogs dataset in approximately 80 milliseconds.
+
+Here are additional test results:
+| Time the program took | Total  | Type of action                                                                  |
+| --------------------- | ------ | ------------------------------------------------------------------------------- |
+| 60 ms                 | 109 ms | Executing Bot Detection and Displaying a Multi-click Captcha with 10 Images.    |
+| 27 ms                 | 55 ms  | Verifying captcha using param `captcha`, `store_anonymously` is set to True.    |
+| 3 ms                  | 22 ms  | Verifying captcha using param `captcha`, `store_anonymously` is set to False.   |
+| 18 ms                 | 63 ms  | Displaying a rate limit error page.                                             |
+
+<sub>Testing was conducted locally on localhost using Postman and internal analysis. The metric 'Total' represents the total duration of data transfer.</sub>
+
 ### Some Screenshots
 - Captcha oneclick: [Display](https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/oneclick_captcha.png)
 - Captcha multiclick: [Display](https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/multiclick_captcha.png)
-- Captcha using Google reCaptcha: [Display](https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/google_captcha.png)
+- Captcha using Google reCaptcha: [Display](https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/third_party_captcha.png)
 - Site to change language: [Display](https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/change_language.png)
 - Site when user is blocked: [Display](https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/blocked.png)
 - Site when user is rate limited: [Display](https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/rate_limited.png)
 - Site when user has javascript disabled and a captcha third party like Google reCaptcha is used: [Display](https://github.com/tn3w/flask_Captchaify/releases/download/img2_v1.7/nojs.png)
-
 
 ### To-Do's
 - [x] Integrate Captchaify Trueclick as captcha type
@@ -95,7 +108,6 @@ In situations where it is deemed necessary, a captivating challenge may be prese
 - [x] Add is_captcha_valid and show_captcha function to add an way to check in an specific case in an route
 - [ ] Add clickable Captcha
 - [ ] Captcha data set with emojis
-
 
 ### Note for Contributors
 If you want to contribute, please read [CONTRIBUTING.md](https://github.com/tn3w/flask_Captchaify/blob/master/CONTRIBUTING.md)
@@ -213,7 +225,8 @@ args = {
    "third_parties": ['geoip', 'tor', 'ipapi', 'stopforumspam'],
    "enable_rate_limit": True, "rate_limit": (15, 300),
    "block_crawler": True, "crawler_hints": True,"as_route": False,
-   "fixed_route_name": '_captchaify', "theme": 'light', "language": 'en',
+   "fixed_route_name": '_captchaify', "theme": 'light',
+   "language": 'en', "store_anonymously": True,
    "without_trueclick": False, "error_codes": [],
    "recaptcha_site_key": None, "recaptcha_secret": None,
    "hcaptcha_site_key": None, "hcaptcha_secret": None,
