@@ -14,11 +14,13 @@ import urllib.request
 from typing import Optional, Tuple
 from flask import request
 import numpy as np
-from .utils import DATASETS_DIR, DATA_DIR, JSON, PICKLE, Hashing, get_random_image,\
-    convert_image_to_base64, manipulate_image_bytes, generate_random_string, has_permission
+from .utils import DATASETS_DIR, DATA_DIR, JSON, PICKLE, get_random_image, has_permission,\
+    convert_image_to_base64, manipulate_image_bytes, generate_random_string
+from .cryptograph import Hashing
 
 
-CAPTCHAS_FILE_PATH = os.path.join(DATA_DIR, 'captchas.pkl')
+HASHING = Hashing(20000)
+CAPTCHAS_FILE_PATH = os.path.join(DATA_DIR, 'trueclick.pkl')
 
 
 def calculate_human_score(interaction_data: dict) -> float:
@@ -150,7 +152,7 @@ class TrueClick:
         captcha_token = generate_random_string(12)
 
         captcha = {
-            'htoken': Hashing().hash(captcha_token),
+            'htoken': HASHING.hash(captcha_token),
             'data': data,
             'time': int(time())
         }
@@ -262,7 +264,7 @@ class TrueClick:
 
         captcha = self.get_captcha(captcha_id)
 
-        if not captcha or not Hashing().compare(captcha_token, captcha['htoken']):
+        if not captcha or not HASHING.compare(captcha_token, captcha['htoken']):
             return False
 
         return True

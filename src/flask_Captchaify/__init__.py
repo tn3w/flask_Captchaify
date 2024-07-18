@@ -26,11 +26,11 @@ from bs4 import BeautifulSoup
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
 from flask import Flask, Response, request, g, abort, send_file, make_response, redirect, jsonify
-from .utils import DATASETS_DIR, DATA_DIR, TEMPLATE_DIR, ASSETS_DIR, JSON, PICKLE, Hashing, Cache,\
-    SymmetricEncryption, SSES, TimeStorage, generate_random_string, remove_all_args_from_url,\
-    search_languages, get_random_image, manipulate_image_bytes, convert_image_to_base64,\
-    get_return_path, get_return_url, extract_path_and_args, handle_exception, get_domain_from_url,\
-    validate_captcha_response, remove_args_from_url, extract_args, get_char
+from .utils import DATASETS_DIR, DATA_DIR, TEMPLATE_DIR, ASSETS_DIR, JSON, PICKLE, generate_random_string,\
+    remove_all_args_from_url, search_languages, get_random_image, manipulate_image_bytes,\
+    convert_image_to_base64, get_return_path, get_return_url, extract_path_and_args, handle_exception,\
+    get_domain_from_url, validate_captcha_response, remove_args_from_url, extract_args, get_char
+from .cryptograph import SymmetricEncryption, Hashing, SSES, Cache, TimeStorage
 from .webtoolbox import WebToolbox, asset, render_template
 from .req_info import RequestInfo, update_geolite_databases, matches_rule, is_valid_ip
 from .altcha import Altcha
@@ -688,7 +688,14 @@ class Captchaify:
             routes.append('/trueclick_captchaify/verify')
             routes.append('/trueclick_captchaify/generate')
 
-        return routes
+        new_routes = routes.copy()
+        for route in routes:
+            if route.endswith('/') or route + '/' in routes:
+                continue
+
+            new_routes.append(route + '/')
+
+        return new_routes
 
 
     @property
@@ -1841,11 +1848,22 @@ class Captchaify:
                 )
             })
 
-            return render_template(
+            rendered_html = render_template(
                 template_dir, file_name,
                 'en', client_language,
                 **kwargs
             )
+
+            rendered_html = WebToolbox.add_arguments(rendered_html, self._req_info,
+                **{
+                    'theme': client_theme if not is_default_theme else None,
+                    'language': client_language if not is_default_language else None,
+                    'wc': without_cookies if not is_default_choice\
+                        and not self.kwargs['without_cookies'] else None
+                }
+            )
+
+            return Response(rendered_html, mimetype = 'text/html')
 
         if page_ext == 'json':
             return JSON.load(page_path)

@@ -404,6 +404,17 @@ class WebToolbox:
             query_params = parse_qs(parsed_url.query)
             return argument_name in query_params
 
+        new_kwargs = {}
+        for key, value in kwargs.items():
+            if isinstance(value, bool):
+                value = str(int(value))
+            if not isinstance(key, str) or not isinstance(value, str):
+                continue
+
+            new_kwargs[key] = value
+
+        kwargs = new_kwargs
+
         for anchor in soup.find_all('a'):
             if not 'href' in anchor.attrs:
                 continue

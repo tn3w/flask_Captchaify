@@ -20,8 +20,8 @@ import dns.resolver
 import geoip2.database
 import crawleruseragents
 from werkzeug import Request
-from .utils import Cache, DATA_DIR, ASSETS_DIR, handle_exception, get_domain_from_url,\
-    remove_duplicates
+from .utils import DATA_DIR, ASSETS_DIR, handle_exception, get_domain_from_url, remove_duplicates
+from .cryptograph import Cache
 
 
 CACHE_FILE_PATH: Final[str] = os.path.join(DATA_DIR, 'cache.pkl')
