@@ -11,13 +11,13 @@ The original GPL-3.0 licence applies.
 import os
 import re
 from typing import Final, Optional, Tuple
-from urllib.parse import urlparse, parse_qs, quote
+from urllib.parse import quote
+from flask import request
 from bs4 import BeautifulSoup, Tag, NavigableString
 from googletrans import Translator as GoogleTranslator
 from jinja2 import Environment, FileSystemLoader, select_autoescape, Undefined
-from .utils import PICKLE, JSON, TEMPLATE_DIR, ASSETS_DIR, DATA_DIR,\
-    handle_exception, get_domain_from_url
-from .req_info import RequestInfo
+from .utils import PICKLE, JSON, TEMPLATE_DIR, ASSETS_DIR, DATA_DIR, handle_exception,\
+    get_domain_from_url, type_or_none, dict_remove_type, url_has_argument, read
 
 
 LANGUAGES: Final[list] = JSON.load(os.path.join(ASSETS_DIR, 'languages.json'), [])
@@ -49,7 +49,7 @@ class SilentUndefined(Undefined):
     Class to not get an error when specifying a non-existent argument
     """
 
-    def _fail_with_undefined_error(self, *args, **kwargs):
+    def _fail_with_undefined_error(self, *args, **kwargs) -> None:
         return None
 
 
@@ -67,7 +67,7 @@ def render_html(html: str, **kwargs) -> str:
     return template.render(**kwargs)
 
 
-def asset(asset_name: str, **kwargs) -> Optional[str]:
+def asset(asset_name: Optional[str], **kwargs) -> Optional[str]:
     """
     Function to render an asset
 
@@ -75,7 +75,7 @@ def asset(asset_name: str, **kwargs) -> Optional[str]:
     :param kwargs: Arguments to be inserted into the Template with Jinja2.
     """
 
-    if asset_name is None:
+    if not isinstance(asset_name, str):
         return None
 
     file_path = os.path.join(
@@ -83,17 +83,16 @@ def asset(asset_name: str, **kwargs) -> Optional[str]:
             ('.j2' if not asset_name.endswith('.j2') else '')
     )
 
-    if not os.path.isfile(file_path):
+    html = read(file_path)
+    if not isinstance(html, str):
         return None
 
-    with open(file_path, "r", encoding = "utf-8") as readable_file:
-        html = readable_file.read()
-
-    return render_html(html, **kwargs)
+    rendered_html = render_html(html, **kwargs)
+    return type_or_none(rendered_html, str)
 
 
-def render_template(template_dir: str, file_name: str,
-                    template_language: str = 'en', client_language: str = 'en', **kwargs) -> str:
+def render_template(template_dir: str, file_name: str, template_language:\
+                    Optional[str] = 'en', client_language: Optional[str] = 'en', **kwargs) -> str:
     """
     Renders a template file into HTML content, optionally translating it to the specified language.
 
@@ -101,30 +100,31 @@ def render_template(template_dir: str, file_name: str,
     :param file_name: The name of the template file to render.
     :param template_language: The language to translate the template to.
     :param client_language: The language to translate the template to.
-    :param kwargs: Arguments to be inserted into the WebToolbox with Jinja2.
+    :param kwargs: Arguments to be inserted into the Template with Jinja2.
 
     :return: The rendered HTML content of the template.
     """
 
-    if template_language is None:
-        template_language = "en"
-
     html = WebToolbox.render_template(template_dir, file_name, html = None, **kwargs)
-    html = Translator.translate_html(html, template_language, client_language)
+
+    if template_language in LANGUAGE_CODES\
+        and client_language in LANGUAGE_CODES:
+
+        html = Translator.translate_html(html, template_language, client_language)
+
     html = WebToolbox.minimize(html)
+    return type_or_none(html, str)
 
-    return html
 
-
-def is_emoji(text: str) -> bool:
+def is_emoji(text: Optional[str]) -> bool:
     """
-    Checks if a given text is an emoji
+    Checks if a given text contains an emoji.
 
-    :param text: The text to check
-    :return: True if the text contains an emoji, False otherwise
+    :param text: The text to check against.
+    :return: True if the text contains an emoji, False otherwise.
     """
 
-    if text is None:
+    if not isinstance(text, str):
         return False
 
     is_found = re.search(EMOJI_PATTERN, text)
@@ -174,11 +174,13 @@ class Translator:
     @staticmethod
     def translate(text_to_translate: str, from_lang: str, to_lang: str) -> str:
         """
-        Function to translate a text based on a translation file
+        Function to translate a text based on a translation file.
 
-        :param text_to_translate: The text to translate
-        :param from_lang: The language of the text to be translated
-        :param to_lang: Into which language the text should be translated
+        :param text_to_translate: The text to translate.
+        :param from_lang: The language of the text to be translated.
+        :param to_lang: Into which language the text should be translated.
+
+        :return: The translated text or the original text.
         """
 
         text_to_translate = text_to_translate.strip('\n ')
@@ -342,11 +344,11 @@ class WebToolbox:
     @staticmethod
     def _minimize_tag_content(html: str, tag: str) -> str:
         """
-        Minimizes the content of a given tag
+        Minimizes the content of a given tag.
         
-        :param html: The HTML page where the tag should be minimized
-        :param tag: The HTML tag e.g. `script` or `style`
-        :return: The HTML page with minimized tag content
+        :param html: The HTML page where the tag should be minimized.
+        :param tag: The HTML tag e.g. `script` or `style`.
+        :return: The HTML page with minimized tag content.
         """
 
         tag_pattern = rf'(<{tag}\b[^>]*>)(.*?)(<\/{tag}>)'
@@ -366,54 +368,38 @@ class WebToolbox:
     @staticmethod
     def minimize(html: str) -> str:
         """
-        Minimizes an HTML page
+        Minimizes an HTML page.
 
-        :param html: The content of the page as html
+        :param html: The content of the page as html.
+        :return: The minimized html string.
         """
 
-        html = re.sub(r'<!--(.*?)-->', '', html, flags=re.DOTALL)
-        html = re.sub(r'\s+', ' ', html)
+        try:
+            minimized_html = re.sub(r'<!--(.*?)-->', '', html, flags=re.DOTALL)
+            minimized_html = re.sub(r'\s+', ' ', minimized_html)
 
-        html = WebToolbox._minimize_tag_content(html, 'script')
-        html = WebToolbox._minimize_tag_content(html, 'style')
-        return html
+            minimized_html = WebToolbox._minimize_tag_content(minimized_html, 'script')
+            minimized_html = WebToolbox._minimize_tag_content(minimized_html, 'style')
+        except Exception as exc:
+            handle_exception(exc)
+            return html
+
+        return minimized_html
 
 
     @staticmethod
-    def add_arguments(html: str, request_info: RequestInfo, **kwargs) -> str:
+    def add_arguments(html: str, **kwargs) -> str:
         """
-        Function to add arguments to the url
+        Function to add arguments to the url.
 
-        :param html: The content of the page as html
-        :param request_info: The request information
-        :param kwargs: The arguments to add
+        :param html: The content of the page as html.
+        :param request_info: The request information.
+        :param kwargs: The arguments to add.
         """
 
+        kwargs = dict_remove_type(kwargs)
         soup = BeautifulSoup(html, 'html.parser')
 
-        def url_has_argument(url, argument_name):
-            """
-            Check if a URL contains a specific argument.
-
-            :param url: The URL to check.
-            :param argument_name: The name of the argument to look for.
-            :return: True if the URL contains the argument, False otherwise.
-            """
-
-            parsed_url = urlparse(url)
-            query_params = parse_qs(parsed_url.query)
-            return argument_name in query_params
-
-        new_kwargs = {}
-        for key, value in kwargs.items():
-            if isinstance(value, bool):
-                value = str(int(value))
-            if not isinstance(key, str) or not isinstance(value, str):
-                continue
-
-            new_kwargs[key] = value
-
-        kwargs = new_kwargs
 
         for anchor in soup.find_all('a'):
             if not 'href' in anchor.attrs:
@@ -421,7 +407,7 @@ class WebToolbox:
 
             if '://' in anchor['href']:
                 anchor_host = get_domain_from_url(anchor['href'])
-                if anchor_host != get_domain_from_url(request_info.get_url()):
+                if anchor_host != get_domain_from_url(request.url):
                     continue
             elif not anchor['href'].startswith(('/', '#', '?', '&')):
                 continue
@@ -458,7 +444,7 @@ class WebToolbox:
 
     @staticmethod
     def render_template(template_dir: str, file_name: Optional[str] = None,
-                        html: Optional[str] = None, **kwargs) -> str:
+                        html: Optional[str] = None, **kwargs) -> Optional[str]:
         """
         Function to render a HTML template (= insert arguments / translation / minimization)
 
@@ -485,11 +471,12 @@ class WebToolbox:
         )
 
         if html is None:
-            with open(file_path, "r", encoding = "utf-8") as file:
-                html = file.read()
+            html = read(file_path)
+
+        if not isinstance(html, str):
+            return None
 
         template = env.from_string(html)
 
         html = template.render(**kwargs)
-
         return html

@@ -26,10 +26,11 @@ from bs4 import BeautifulSoup
 from captcha.image import ImageCaptcha
 from captcha.audio import AudioCaptcha
 from flask import Flask, Response, request, g, abort, send_file, make_response, redirect, jsonify
-from .utils import DATASETS_DIR, DATA_DIR, TEMPLATE_DIR, ASSETS_DIR, JSON, PICKLE, generate_random_string,\
-    remove_all_args_from_url, search_languages, get_random_image, manipulate_image_bytes,\
-    convert_image_to_base64, get_return_path, get_return_url, extract_path_and_args, handle_exception,\
-    get_domain_from_url, validate_captcha_response, remove_args_from_url, extract_args, get_char
+from .utils import DATASETS_DIR, DATA_DIR, TEMPLATE_DIR, ASSETS_DIR, JSON, PICKLE,\
+    generate_random_string,remove_all_args_from_url, search_languages, get_random_image,\
+    manipulate_image_bytes, convert_image_to_base64, get_return_path, get_return_url, get_char,\
+    extract_path_and_args, handle_exception, get_domain_from_url, validate_captcha_response,\
+    remove_args_from_url, extract_args, read, execute_write, type_or_none
 from .cryptograph import SymmetricEncryption, Hashing, SSES, Cache, TimeStorage
 from .webtoolbox import WebToolbox, asset, render_template
 from .req_info import RequestInfo, update_geolite_databases, matches_rule, is_valid_ip
@@ -37,6 +38,8 @@ from .altcha import Altcha
 from .embed import CaptchaEmbed
 from .trueclick import TrueClick
 
+
+CAPTCHA_SECRET_FILE_PATH = os.path.join(DATA_DIR, 'captcha_secret.txt')
 
 EMOJIS: Final[list] = JSON.load(os.path.join(ASSETS_DIR, 'emojis.json'), [])
 TEA_EMOJIS: Final[list] = JSON.load(os.path.join(ASSETS_DIR, 'tea_emojis.json'), [])
@@ -50,7 +53,8 @@ ALL_CAPTCHA_TYPES: Final[list] = [
 ]
 ALL_DATASET_TYPES: Final[list] = ['keys', 'animals', 'ki-dogs']
 ALL_ACTIONS: Final[list] = ['allow', 'block', 'fight', 'auto']
-ALL_THIRD_PARTIES: Final[list] = ['geoip', 'tor', 'ipapi', 'stopforumspam']
+ALL_THIRD_PARTIES: Final[list] = ['geoip', 'tor', 'ipapi', 'stopforumspam', 'ipify']
+DEFAULT_THIRD_PARTIES: Final[list] = ['geoip', 'tor', 'ipapi', 'stopforumspam']
 ALL_TEMPLATE_TYPES: Final[list] = [
     'captcha_text_audio', 'captcha_multiclick', 'captcha_oneclick',
     'captcha_third_party', 'change_language', 'blocked', 'nojs',
@@ -235,11 +239,11 @@ DEFAULT_KWARGS: Final[dict] = {
     "verification_age": 3600, "template_dir": TEMPLATE_DIR,
     "without_customisation": False, "without_cookies": False,
     "without_arg_transfer": False, "without_watermark": False,
-    "third_parties": ALL_THIRD_PARTIES, "enable_rate_limit": True,
-    "rate_limit": (15, 300), "block_crawler": True,
-    "crawler_hints": True, "as_route": False,
-    "fixed_route_name": '_captchaify', "theme": 'light', "language": 'en',
-    "store_anonymously": True,
+    "third_parties": DEFAULT_THIRD_PARTIES,
+    "enable_rate_limit": True, "rate_limit": (15, 300),
+    "block_crawler": True, "crawler_hints": True,
+    "as_route": False, "fixed_route_name": '_captchaify',
+    "theme": 'light', "language": 'en', "store_anonymously": True,
     "without_trueclick": False, "error_codes": [],
     "recaptcha_site_key": None, "recaptcha_secret": None,
     "hcaptcha_site_key": None, "hcaptcha_secret": None,
@@ -311,22 +315,18 @@ class Captchaify:
         :param friendly_secret: The FriendlyCaptcha secret
         """
 
-        captcha_secret_file = os.path.join(DATA_DIR, 'captcha_secret.txt')
+        captcha_secret = read(CAPTCHA_SECRET_FILE_PATH)
 
-        if os.path.exists(captcha_secret_file):
-            with open(captcha_secret_file, 'r', encoding = 'utf-8') as file:
-                captcha_secret = file.read()
-        else:
+        if captcha_secret is None:
             captcha_secret = generate_random_string(32)
-            with open(captcha_secret_file, 'w', encoding = 'utf-8') as file:
-                file.write(captcha_secret)
+            execute_write(CAPTCHA_SECRET_FILE_PATH, captcha_secret)
 
         self.captcha_secret = captcha_secret
         self.sses = SSES(captcha_secret, with_keys = True)
         self.altcha = Altcha(secrets.token_bytes(32))
 
-        if third_parties is None:
-            third_parties = ALL_THIRD_PARTIES
+        if not isinstance(third_parties, list):
+            third_parties = DEFAULT_THIRD_PARTIES
 
         if not isinstance(error_codes, list):
             error_codes = []
@@ -471,6 +471,11 @@ class Captchaify:
             embed = CaptchaEmbed(self.language[0], self.theme, self.altcha)
 
             embeds = {'altcha': Markup(embed.get_embed('altcha', None))}
+            for hardness in range(5, 1):
+                embeds['altcha' + str(hardness)] = Markup(
+                    embed.get_embed('altcha', None, hardness)
+                )
+
             if not self.kwargs['without_trueclick']:
                 embeds['trueclick'] = Markup(embed.get_embed('trueclick', None))
 
@@ -721,6 +726,28 @@ class Captchaify:
             handle_exception(exc)
 
         return False
+
+
+    @property
+    def captcha_id(self) -> Optional[str]:
+        """
+        Returns the captchaify captcha id which is used to verify an client.
+        """
+
+        if isinstance(getattr(g, 'captchaify_captcha', None), str):
+            return g.captchaify_captcha
+
+        for data in [request.args, request.cookies, request.form]:
+            if not isinstance(data.get('captcha'), str):
+                continue
+
+            captcha_id = data.get('captcha').strip()
+            if len(captcha_id) != 15:
+                continue
+
+            return captcha_id
+
+        return None
 
 
     @property
@@ -1227,8 +1254,6 @@ class Captchaify:
         :return: The rendered exception page.
         """
 
-        g.captchaify_page = True
-
         title = None
         description = None
 
@@ -1281,8 +1306,6 @@ class Captchaify:
         :return: The rendered block page.
         """
 
-        g.captchaify_page = True
-
         if not without_redirect and self.kwargs['as_route']:
             return redirect(self._create_route_url('blocked'))
 
@@ -1321,8 +1344,6 @@ class Captchaify:
         :return: The rendered nojs page.
         """
 
-        g.captchaify_page = True
-
         if not without_redirect and self.kwargs['as_route']:
             return redirect(self._create_route_url('nojs'))
 
@@ -1358,8 +1379,6 @@ class Captchaify:
         :param without_redirect: Flag indicating if the redirect should be skipped.
         :return: The rendered rate limit page.
         """
-
-        g.captchaify_page = True
 
         if not without_redirect and self.kwargs['as_route']:
             return redirect(self._create_route_url('rate_limited'))
@@ -1766,7 +1785,8 @@ class Captchaify:
         :return: A Flask response object
         """
 
-        g.captchaify_page = True
+        if template != 'exception':
+            g.captchaify_page = True
 
         if not template in ALL_TEMPLATE_TYPES:
             template = 'blocked'
@@ -1782,8 +1802,16 @@ class Captchaify:
         if page_ext == 'html':
             g.captchaify_template = file_name
 
-            client_theme, is_default_theme = self.theme
-            client_language, is_default_language = self.language
+            if template == 'exception' and self.kwargs['without_arg_transfer']:
+                client_theme, is_default_theme = self._req_info.get_theme(
+                    True, self.kwargs['theme']
+                )
+                client_language, is_default_language = self._req_info.get_language(
+                    True, self.kwargs['language']
+                )
+            else:
+                client_theme, is_default_theme = self.theme
+                client_language, is_default_language = self.language
             without_cookies, is_default_choice = self.without_cookies
 
             template_kwargs = {
@@ -1854,11 +1882,11 @@ class Captchaify:
                 **kwargs
             )
 
-            rendered_html = WebToolbox.add_arguments(rendered_html, self._req_info,
+            rendered_html = WebToolbox.add_arguments(rendered_html,
                 **{
                     'theme': client_theme if not is_default_theme else None,
                     'language': client_language if not is_default_language else None,
-                    'wc': without_cookies if not is_default_choice\
+                    'wc': str(int(without_cookies)) if not is_default_choice\
                         and not self.kwargs['without_cookies'] else None
                 }
             )
@@ -1872,8 +1900,8 @@ class Captchaify:
             return PICKLE.load(page_path)
 
         if page_ext in ['txt', 'xml']:
-            with open(page_path, 'r', encoding = 'utf-8') as file:
-                return file.read()
+            file_content = read(page_path)
+            return type_or_none(file_content, str, '')
 
         return send_file(page_path)
 
@@ -1965,10 +1993,22 @@ class Captchaify:
                 (not is_default_choice and getattr(g, 'captchaify_page', False) is True):
                 return response
 
-            kwargs = {}
+            captcha_id = self.captcha_id
 
-            if not is_default_choice and request.args.get('captcha') is None:
-                kwargs['wc'] = str(int(without_cookies))
+            kwargs = {
+                'captcha': captcha_id,
+                'wc': str(int(without_cookies)) if not is_default_choice\
+                    and captcha_id is None else None,
+            }
+
+            if not self.kwargs['without_customisation'] and without_cookies:
+                theme, is_default_theme = self.theme
+                language, is_default_language = self.language
+
+                kwargs.update({
+                    'theme': theme if not is_default_theme else None,
+                    'language': language if not is_default_language else None
+                })
 
             if self.kwargs['as_route'] and not getattr(
                 g, 'captchaify_template', ''
@@ -1981,26 +2021,7 @@ class Captchaify:
                 if return_route in ['captcha', 'blocked', 'nojs', 'rate_limited']:
                     kwargs['rr'] = return_route
 
-            is_captcha_set = False
-            if getattr(g, 'captchaify_captcha', None) is not None:
-                kwargs['captcha'] = g.captchaify_captcha
-                is_captcha_set = True
-
-            kwargs['captcha'] = request.args.get('captcha') if not is_captcha_set else None
-
-            if not self.kwargs['without_customisation'] and without_cookies:
-                theme, is_default_theme = self.theme
-                language, is_default_language = self.language
-
-                kwargs['theme'] = theme if not is_default_theme else None
-                kwargs['language'] = language if not is_default_language else None
-
-            new_kwargs = {}
-            for key, value in kwargs.items():
-                if value is not None:
-                    new_kwargs[key] = value
-
-            response.data = WebToolbox.add_arguments(response.data, self._req_info, **new_kwargs)
+            response.data = WebToolbox.add_arguments(response.data, **kwargs)
         except Exception as exc:
             handle_exception(exc)
 
@@ -2023,8 +2044,10 @@ class Captchaify:
             if without_cookies:
                 cookies = list(dict(request.cookies).keys())
                 for cookie in cookies:
-                    if cookie != 'captcha':
-                        response.delete_cookie(cookie)
+                    if cookie not in ['cookieConsent', 'theme', 'language']:
+                        continue
+
+                    response.delete_cookie(cookie)
 
                 return response
 
@@ -2032,7 +2055,7 @@ class Captchaify:
                 "captcha": getattr(g, 'captchaify_captcha', None),
             }
 
-            if not getattr(g, 'captchaify_no_new_cookies', False):
+            if getattr(g, 'captchaify_no_new_cookies', False) is False:
                 if not is_default_choice and request.cookies.get('cookieConsent') != '1':
                     kwargs["cookieConsent"] = '1'
 
@@ -2053,7 +2076,8 @@ class Captchaify:
                     continue
 
                 response.set_cookie(
-                    key, value, max_age = 93312000, samesite = 'Lax',
+                    key, value, max_age = self.kwargs['verification_age']\
+                        if key == 'captcha' else 93312000, samesite = 'Lax',
                     secure = self.app.config.get('HTTPS'),
                     domain = urlparse(request.url).netloc
                 )
@@ -2172,28 +2196,22 @@ class Captchaify:
                 return_url = get_return_url(return_path, request)
                 char = get_char(return_url)
 
-                captcha_string = None
-                if request.args.get('captcha') is not None:
-                    captcha_string = request.args.get('captcha')
-                elif request.cookies.get('captcha') is not None:
-                    captcha_string = request.cookies.get('captcha')
-                elif request.form.get('captcha') is not None:
-                    captcha_string = request.form.get('captcha')
+                captcha_id = self.captcha_id
 
                 without_cookies, is_default_choice = self.without_cookies
-                if without_cookies and captcha_string is not None:
-                    return_url += char + 'captcha=' + captcha_string
+                if without_cookies and isinstance(captcha_id, str):
+                    return_url += char + 'captcha=' + captcha_id
 
                 if not self.kwargs['without_arg_transfer']:
                     theme, is_default_theme = self.theme
                     language, is_default_language = self.language
 
                     if not is_default_theme:
-                        return_url += '&theme=' + theme
+                        return_url += get_char(return_url) + 'theme=' + theme
                     if not is_default_language:
-                        return_url += '&language=' + language
-                    if not is_default_choice:
-                        return_url += '&wc=' + str(int(without_cookies))
+                        return_url += get_char(return_url) + 'language=' + language
+                    if without_cookies and not is_default_choice:
+                        return_url += get_char(return_url) + 'wc=' + str(int(without_cookies))
 
                 g.captchaify_page = True
                 g.captchaify_no_new_cookies = True
@@ -2524,34 +2542,27 @@ class Captchaify:
         """
 
         try:
-            captcha_string = None
-            if request.args.get('captcha') is not None:
-                captcha_string = request.args.get('captcha')
-            elif request.cookies.get('captcha') is not None:
-                captcha_string = request.cookies.get('captcha')
-            elif request.form.get('captcha') is not None:
-                captcha_string = request.form.get('captcha')
+            captcha_id = self.captcha_id
 
-            if captcha_string is None:
-                return False
+            if not isinstance(captcha_id, str) or\
+                len(captcha_id) != 15 or not captcha_id.isalnum():
 
-            if len(captcha_string) != 15:
                 return False
 
             cache = Cache(
                 'solved_captchas', store_anonymously = self.kwargs['store_anonymously'],
                 ttl = self.kwargs['verification_age']
             )
-            data = cache[captcha_string]
+            data = cache[captcha_id]
 
             if not isinstance(data, dict):
                 return False
 
             ip, user_agent = data.get('ip'), data.get('user_agent')
-            if None in [ip, user_agent]:
-                return False
 
-            if ip == self._ip and user_agent == self.user_agent:
+            if not None in [ip, user_agent]\
+                and ip == self._ip and user_agent == self.user_agent:
+
                 return True
         except Exception as exc:
             handle_exception(exc)
@@ -2671,16 +2682,5 @@ class Captchaify:
             redirect_url += get_char(redirect_url) + 'language=' + language
         if not is_default_choice and without_cookies:
             redirect_url += get_char(redirect_url) + 'wc=' + str(int(without_cookies))
-
-        captcha_string = None
-        if request.args.get('captcha') is not None:
-            captcha_string = request.args.get('captcha')
-        elif request.cookies.get('captcha') is not None:
-            captcha_string = request.cookies.get('captcha')
-        elif request.form.get('captcha') is not None:
-            captcha_string = request.form.get('captcha')
-
-        if captcha_string is not None:
-            redirect_url += '&captcha=' + captcha_string
 
         return redirect_url

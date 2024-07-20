@@ -20,11 +20,12 @@ import dns.resolver
 import geoip2.database
 import crawleruseragents
 from werkzeug import Request
-from .utils import DATA_DIR, ASSETS_DIR, handle_exception, get_domain_from_url, remove_duplicates
+from .utils import DATA_DIR, ASSETS_DIR, handle_exception, get_domain_from_url,\
+    remove_duplicates, execute_write, type_or_none, read, request
 from .cryptograph import Cache
 
 
-CACHE_FILE_PATH: Final[str] = os.path.join(DATA_DIR, 'cache.pkl')
+OWN_IP_FILE_PATH: Final[str] = os.path.join(DATA_DIR, 'own_ip.txt')
 
 UNWANTED_IPV4_RANGES: Final[list] = [
     ('0.0.0.0', '0.255.255.255'),
@@ -99,6 +100,35 @@ GEOLITE_DATA: Final[dict] = {
 ############################
 #### IP Address Helpers ####
 ############################
+
+
+def request_own_ip() -> Optional[str]:
+    """
+    Requests the own ip address.
+
+    :return: The local ip address.
+    """
+
+    own_ip = read(OWN_IP_FILE_PATH)
+    if isinstance(own_ip, str):
+        own_ip = own_ip.strip()
+        if is_valid_ip(own_ip, True):
+            return own_ip
+
+    try:
+        response_json = request('https://api64.ipify.org?format=json')
+        if not isinstance(response_json, dict):
+            return None
+
+        if isinstance(response_json.get('ip', None), str):
+            own_ip = response_json['ip'].strip()
+            execute_write(OWN_IP_FILE_PATH, own_ip)
+
+            return own_ip
+    except Exception:
+        pass
+
+    return None
 
 
 def is_ipv6(ip_address: str) -> bool:
@@ -465,8 +495,15 @@ class RequestInfo:
             if len(ips) == 0:
                 continue
 
-            setattr(self.global_data, self.store_token + 'ips', ips)
-            return ips if return_all else ips[0]
+            return_ip = ips if return_all else ips[0]
+
+            if return_ip == '127.0.0.1' and 'ipify' in self.third_parties:
+                return_ip = request_own_ip()
+                setattr(self.global_data, self.store_token + 'ips', [return_ip])
+            else:
+                setattr(self.global_data, self.store_token + 'ips', ips)
+
+            return return_ip
 
         setattr(self.global_data, self.store_token + 'ips', ['notfound'])
         return None if not return_all else []
@@ -642,21 +679,14 @@ class RequestInfo:
             client_ip = self.get_ip()
 
         if not is_valid_ip(client_ip):
-            return False
+            return None
 
         cache = Cache('ipapi', store_anonymously = self.store_anonymously)
         if cache[client_ip] is not None:
             return cache[client_ip]
 
-        url = f'http://ip-api.com/json/{client_ip}?fields=66846719'
-        req = urllib.request.Request(url, headers = {"User-Agent": 'Mozilla/5.0'})
-
-        try:
-            with urllib.request.urlopen(req, timeout = 3) as response:
-                response_data = response.read()
-
-            response_json = json.loads(response_data)
-        except Exception:
+        response_json = request(f'http://ip-api.com/json/{client_ip}?fields=66846719')
+        if not isinstance(response_json, dict):
             return None
 
         if not response_json.get('status') == 'success':
@@ -715,16 +745,9 @@ class RequestInfo:
         if cache[client_ip] is not None:
             return cache[client_ip]
 
-        url = f'https://api.stopforumspam.org/api?ip={client_ip}&json'
-        req = urllib.request.Request(url, headers={"User-Agent": 'Mozilla/5.0'})
-
-        try:
-            with urllib.request.urlopen(req, timeout = 3) as response:
-                response_data = response.read()
-
-            response_json = json.loads(response_data)
-        except Exception:
-            return None
+        response_json = request(f'https://api.stopforumspam.org/api?ip={client_ip}&json')
+        if not isinstance(response_json, dict):
+            return False
 
         if not response_json.get('success') == 1:
             cache[client_ip] = None
@@ -820,11 +843,9 @@ class RequestInfo:
                 setattr(self.global_data, self.store_token + 'lang', set_language)
                 return set_language, False
 
-        language = self.request.accept_languages\
-                        .best_match(self.languages)
-        if language is None:
-            return default, True
-        return language, True
+        language = self.request.accept_languages.best_match(self.languages)
+
+        return type_or_none(language, str, default), True
 
 
     def get_without_cookies(self, without_cookies: bool = False) -> Tuple[bool, bool]:
@@ -838,13 +859,20 @@ class RequestInfo:
         if without_cookies:
             return True, True
 
-        for arg in [self.request.args.get('wc'),
-                      self.request.form.get('wc')]:
-            if arg is not None:
-                return arg == '1', False
+        for data in [self.request.args, self.request.form]:
+            if not isinstance(data.get('wc'), str):
+                continue
+
+            return data.get('wc') == '1', False
 
         if self.request.cookies.get('cookieConsent') is not None:
             return self.request.cookies.get('cookieConsent') == '0', False
+
+        for data in [self.request.args, self.request.cookies]:
+            if not isinstance(data.get('captcha'), str):
+                continue
+
+            return data == self.request.args, False
 
         if self.request.args.get('captcha') is not None:
             return True, False

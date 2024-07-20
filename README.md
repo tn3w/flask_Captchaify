@@ -90,6 +90,7 @@ Here are additional test results:
 | 27 ms                 | 55 ms  | Verifying captcha using param `captcha`, `store_anonymously` is set to True.    |
 | 3 ms                  | 22 ms  | Verifying captcha using param `captcha`, `store_anonymously` is set to False.   |
 | 18 ms                 | 63 ms  | Displaying a rate limit error page.                                             |
+| 3~6 ms                | 56 ms  | Translating a page after the translations were cached.                          |
 
 <sub>Testing was conducted locally on localhost using Postman and internal analysis. The metric 'Total' represents the total duration of data transfer.</sub>
 
@@ -127,7 +128,7 @@ Here are all the available captcha third parties:
 | hCaptcha             | Uses hCaptcha for verification. Set `hcaptcha_site_key` and `hcaptcha_secret`.                                                    | is_hcaptcha_valid()  |
 | Cloudflare Turnstile | Uses Cloudflare Turnstile for verification. Set `turnstile_site_key` and `turnstile_secret`.                                      | is_turnstile_valid() |
 | Friendly Captcha     | Uses Friendly Captcha for verification. Set `friendly_site_key` and `friendly_secret`.                                            | is_friendly_valid()  |
-| Altcha               | Use a Prove-of-Work from Altcha to make spam more difficult. (Recommended if you do not want to use our own tools.)               | is_altcha_valid()    |
+| Altcha               | Use a Prove-of-Work from Altcha to make spam more difficult. You can set the hardness by supplementing it like this: `altcha1`    | is_altcha_valid()    |
 | Trueclick            | Uses Trueclick for verification. See [https://github.com/tn3w/TrueClick](https://github.com/tn3w/TrueClick) for more information. | is_trueclick_valid() |
 
 
@@ -144,7 +145,7 @@ Template example:
       <form method="POST">
          <input name="name" type="text">
          <input name="password" type="password">
-         {{ altcha }}
+         {{ altcha }} <!-- or {{ altcha2 }} -->
          <button type="submit">Submit</button>
       </form>
    </body>
@@ -458,9 +459,9 @@ args = {
 
    **Rate Limits (`rate_limit`)**
 
-   The syntax is a bit different from the others, because two values are specified `(rate_limit, max_rate_limit)`. The variable rate_limit must be a number indicating how many requests per minute can come from a given ip. max_rate_limit indicates how many requests can come from all ips per minute, also a number.
+   The syntax is a bit different from the others, because two values are specified `(rate_limit, max_rate_limit)`. The variable rate_limit must be a number indicating how many requests per 10 seconds can come from a given ip. max_rate_limit indicates how many requests can come from all ips per 10 seconds, also a int.
 
-   Example of a website that has set its rate limit to (20, 1200) for specific ips:
+   Example of a website that has set its rate limit to (20, 300) for specific ips:
    ```python
    rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"rate_limit": (20, 1200)}]
    ```
@@ -736,6 +737,7 @@ args = {
    | reverse              | `socket.gethostbyaddr(client_ip)` is used to get the reverse DNS name of the IP address.                                               |
    | ipapi                | [Ipapi](https://ipapi.com) is requested with the Ip and the result of the fields "proxy" and "hosting" is used                         |
    | stopforumspam        | [StopForumSpam](https://stopforumspam.com) is requested and the result is used                                                         |
+   | ipify                | (FOR DEBUG ONLY, can possibly leak local IP) The local IP address `127.0.0.1` is converted to your real IP address using ipify.        |
 
 <br>
 
@@ -778,11 +780,11 @@ args = {
    It is a tuple of 2 values: (rate_limit, max_rate_limit)
 
    `rate_limit` is a number indicating how many requests per 10 seconds can come from a given ip.
-   `max_rate_limit` indicates how many requests can come from all ips 10 seconds, also a number.
+   `max_rate_limit` indicates how many requests can come from all ips 10 seconds, also a int.
 
    Example of a web page with custom rate_limit:
    ```python
-   captchaify = Captchaify(app, rate_limit=60)
+   captchaify = Captchaify(app, rate_limit=(20, 300))
    ```
 
 <br>

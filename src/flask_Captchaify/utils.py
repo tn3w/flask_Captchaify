@@ -21,6 +21,7 @@ import secrets
 import traceback
 import threading
 import unicodedata
+import urllib.request
 from typing import Union, Optional, Final
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
@@ -37,7 +38,10 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 # not want to install the module with pip but want to import it from this
 # folder, e.g. to display code changes directly.
 if not os.path.exists(os.path.join(CURRENT_DIR, 'test.env')):
-    import pkg_resources
+    try:
+        import pkg_resources
+    except Exception:
+        pass
 
 def get_work_dir():
     """
@@ -49,7 +53,16 @@ def get_work_dir():
     if os.path.exists(os.path.join(CURRENT_DIR, 'test.env')):
         return CURRENT_DIR
 
-    return pkg_resources.resource_filename('flask_Captchaify', '')
+    try:
+        file_path = pkg_resources.resource_filename('flask_Captchaify', '')
+    except Exception as exc:
+        handle_exception(exc)
+        return CURRENT_DIR
+
+    if not isinstance(file_path, str):
+        return CURRENT_DIR
+
+    return file_path
 
 WORK_DIR: Final[str] = get_work_dir()
 DATA_DIR: Final[str] = os.path.join(WORK_DIR, 'data')
@@ -64,6 +77,7 @@ DATASETS_DIR: Final[str] = os.path.join(WORK_DIR, 'datasets')
 ASSETS_DIR: Final[str] = os.path.join(WORK_DIR, 'assets')
 LOG_FILE: Final[str] = os.path.join(CURRENT_DIR, 'log.txt')
 
+REQUEST_HEADERS: Final[dict] = {"User-Agent": 'Mozilla/5.0'}
 USER_AGENTS: Final[list] = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'+
     ' (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.3',
@@ -100,6 +114,48 @@ WRITE_EXECUTOR = ThreadPoolExecutor()
 ###########################
 
 
+def type_or_none(data: any, required_type = any, default: any = None) -> Optional[any]:
+    """
+    Checks whether data has the correct type, if not None is returned.
+
+    :param data: The data that must have a certain type.
+    :param required_type: The requested type of data.
+    :param default: The default data which is returned if data is not required_type.
+
+    :return: default or `data`
+    """
+
+    if not isinstance(data, required_type):
+        return default
+
+    return data
+
+
+def dict_remove_type(dictionary: dict, value_type: any = str, default: any = False) -> dict:
+    """
+    Removes all keys and value pairs that have not the correct type.
+
+    :param dictionary: The dict that contains the values that must have a certain type.
+    :param value_type: The requested type of the values.
+    :param default: The default data which is returned if the dict is empty.
+
+    :return: dictionary or `default`
+    """
+
+    return_dict = {}
+
+    for key, value in dictionary.items():
+        if type_or_none(value, value_type) is None:
+            continue
+
+        return_dict[key] = value
+
+    if default is not False and len(return_dict) < 1:
+        return default
+
+    return return_dict
+
+
 def remove_duplicates(origin_list: list) -> list:
     """
     Remove duplicates from a list.
@@ -108,7 +164,7 @@ def remove_duplicates(origin_list: list) -> list:
     :return: A list without duplicates.
     """
 
-    if not isinstance(origin_list, list):
+    if type_or_none(origin_list, list) is None:
         return origin_list
 
     objs = []
@@ -125,41 +181,6 @@ def random_user_agent() -> str:
     """
 
     return secrets.choice(USER_AGENTS)
-
-
-def write_to_file(log_file: str, message: str) -> None:
-    """
-    Writes the given content to the specified file.
-    """
-
-    with open(log_file, 'a', encoding = 'utf-8') as f:
-        f.write(message + '\n')
-
-
-def has_permission(path: str, mode: str = 'r') -> bool:
-    """
-    Determines if a file can be accessed with the specified mode at the specified path.
-
-    :param path: A string representing the file path to check.
-    :param mode: A string representing the access mode. Default is 'w' for write access.
-    :return: Returns True if the file at the given path can be accessed with the
-             specified mode, False otherwise.
-    """
-
-    if not os.path.isfile(path):
-        path = os.path.dirname(path)
-        while not os.path.isdir(path):
-            if len(path) < 5:
-                break
-
-            path = os.path.dirname(path)
-
-        if not os.path.isdir(path):
-            return False
-
-    used_mode = PERMISSION_MODES.get(mode, os.R_OK)
-
-    return os.access(path, used_mode)
 
 
 def generate_random_string(length: int, with_punctuation: bool = True, with_letters: bool = True):
@@ -194,11 +215,14 @@ def handle_exception(error_message: str, print_error: bool =\
     :param print_error: Whether the error should be printed in the console.
     :param is_app_error: Whether the error is in the application or not.
     :param long_error_message: The long error message, if given, no
-                               traceback is requested by format_exc().
+            traceback is requested by format_exc().
     """
 
     if long_error_message is None:
-        long_error_message = traceback.format_exc()
+        try:
+            long_error_message = traceback.format_exc()
+        except Exception:
+            long_error_message = error_message
 
     timestamp = time.strftime(r'%Y-%m-%d %H:%M:%S', time.localtime())
     error_id = generate_random_string(12, with_punctuation=False)
@@ -209,7 +233,7 @@ def handle_exception(error_message: str, print_error: bool =\
 
     app_error_message = ''
     if not is_app_error:
-        app_error_message = '\n(This is not an application error)'
+        app_error_message = '\n(This is probably not an error caused by flask_Captchaify)'
 
     long_error_message = '----- Error #' + str(error_id) + ' at ' + timestamp\
                          + f' -----{app_error_message}\n' + long_error_message
@@ -219,7 +243,7 @@ def handle_exception(error_message: str, print_error: bool =\
                              'https://github.com/tn3w/flask_Captchaify/issues\n'\
                               + long_error_message
 
-    WRITE_EXECUTOR.submit(write_to_file, LOG_FILE, long_error_message)
+    execute_write(LOG_FILE, long_error_message)
 
 
 def validate_captcha_response(response: dict, expected_hostname: str) -> bool:
@@ -246,7 +270,7 @@ def validate_captcha_response(response: dict, expected_hostname: str) -> bool:
             timestamp_str = timestamp_str.replace('Z', '+0000')
 
         challenge_time = datetime.strptime(timestamp_str, '%Y-%m-%dT%H:%M:%S%z')
-    except ValueError:
+    except Exception:
         return True
 
     if challenge_time.tzinfo is None:
@@ -257,6 +281,128 @@ def validate_captcha_response(response: dict, expected_hostname: str) -> bool:
         return False
 
     return True
+
+
+def request(url: str, timeout: int = 3, return_as_json:\
+    bool = True) -> Optional[Union[str, dict, bytes]]:
+    """
+    Makes an request and returns the data in the correct format.
+
+    :param url: The url to send the GET Request to.
+    :param timeout: The duration after which the connection is cancelled.
+    :param return_as_json: Whether to load the data with json.
+    """
+
+    req = urllib.request.Request(url, headers = REQUEST_HEADERS)
+
+    try:
+        with urllib.request.urlopen(req, timeout = timeout) as response:
+            response_data = response.read()
+
+        if not return_as_json:
+            return response_data
+
+        response_json = json.loads(response_data)
+
+        return response_json
+    except Exception as exc:
+        handle_exception(exc, False, False)
+
+    return None
+
+
+####################
+#### File Tools ####
+####################
+
+
+def has_permission(path: str, mode: str = 'r') -> bool:
+    """
+    Determines if a file can be accessed with the specified mode at the specified path.
+
+    :param path: A string representing the file path to check.
+    :param mode: A string representing the access mode. Default is 'w' for write access.
+    :return: Returns True if the file at the given path can be accessed with the
+             specified mode, False otherwise.
+    """
+
+    if not os.path.isfile(path):
+        path = os.path.dirname(path)
+        while not os.path.isdir(path):
+            if len(path) < 5:
+                break
+
+            path = os.path.dirname(path)
+
+        if not os.path.isdir(path):
+            return False
+
+    used_mode = PERMISSION_MODES.get(mode, os.R_OK)
+
+    return os.access(path, used_mode)
+
+
+def write(file_path: str, data: Union[str, bytes]) -> bool:
+    """
+    Writes to an file.
+
+    :param file_path: The path of the file to write to.
+    :param data: The data to write.
+    """
+
+    if not has_permission(file_path, 'w'):
+        return False
+
+    try:
+        with open(file_path, 'w' + ('b' if isinstance(data, bytes) else ''),\
+                encoding = (None if isinstance(data, bytes) else 'utf-8')) as writeable_file:
+            writeable_file.write(data)
+    except Exception as exc:
+        handle_exception(exc, is_app_error = False)
+        return False
+
+    return True
+
+
+def read(file_path: str, default: any = None) -> Optional[Union[str, bytes]]:
+    """
+    Reades the content of an file.
+
+    :param file_path: The path of the file to write to.
+    :param default: The value which is returned if the
+                    file is not readable or an error occurs.
+    :return: The content of the file or when error occurs the default value.
+    """
+
+    if not os.path.isfile(file_path)\
+        or not has_permission(file_path, 'r'):
+
+        return default
+
+    try:
+        with open(file_path, 'rb') as readable_file:
+            content = readable_file.read()
+    except Exception as exc:
+        handle_exception(exc, False, False)
+        return default
+
+    try:
+        content = content.decode('utf-8')
+    except Exception:
+        pass
+
+    return content
+
+
+def execute_write(file_path: str, data: Union[str, bytes]) -> bool:
+    """
+    Adds a writing operation to the Writing executor.
+
+    :param file_path: The path of the file to write to.
+    :param data: The data to write.
+    """
+
+    WRITE_EXECUTOR.submit(write, file_path, data)
 
 
 ###################
@@ -278,15 +424,26 @@ def get_char(url: str) -> str:
     return '&'
 
 
-def extract_args(url):
+def url_has_argument(url: str, argument_name: str) -> bool:
+    """
+    Check if a URL contains a specific argument.
+
+    :param url: The URL to check.
+    :param argument_name: The name of the argument to look for.
+    :return: True if the URL contains the argument, False otherwise.
+    """
+
+    parsed_url = urlparse(url)
+    query_params = parse_qs(parsed_url.query)
+    return argument_name in query_params
+
+
+def extract_args(url: str) -> str:
     """
     Extracts the query parameters from a given URL and returns them as a dictionary.
 
-    Parameters:
-    url (str): The URL string from which to extract the query parameters.
-
-    Returns:
-    dict: A dictionary containing the query parameters and their corresponding values.
+    :param url: The URL string from which to extract the query parameters.
+    :return: A string containing the query parameters and their corresponding values.
     """
 
     parsed_url = urlparse(url)
@@ -438,7 +595,8 @@ def remove_all_args_from_url(url: str) -> str:
     """
     Removes query parameters from the given URL and returns the modified URL.
 
-    :param url: The input URL
+    :param url: The input URL.
+    :return: The url without any args.
     """
 
     parsed_url = urlparse(url)
@@ -458,12 +616,12 @@ def remove_all_args_from_url(url: str) -> str:
 #####################
 
 
-def get_random_image(all_images: list[str]) -> str:
+def get_random_image(all_images: list[str]) -> bytes:
     """
     Retrieve a random image path from the list, decode it from base64, and return it.
 
     :param all_images: A list of image paths encoded as base64 strings.
-    :return: The decoded image data as a string.
+    :return: The decoded image data as bytes.
     """
 
     random_image = random.choice(all_images)
@@ -695,7 +853,7 @@ class Json:
                 with open(file_path, 'r', encoding = 'utf-8') as file:
                     data = json.load(file)
             except Exception as exc:
-                handle_exception(exc, print_error = False, is_app_error = False)
+                handle_exception(exc, False, False)
 
                 if self.data.get(file_path) is not None:
                     self.dump(self.data[file_path], file_path)
@@ -739,7 +897,7 @@ class Json:
                 with open(file_path, 'w', encoding = 'utf-8') as file:
                     json.dump(data, file)
         except Exception as exc:
-            handle_exception(exc, is_app_error = False)
+            handle_exception(exc, False, False)
 
 
 class Pickle:
@@ -775,7 +933,7 @@ class Pickle:
                 with open(file_path, 'rb') as file:
                     data = pickle.load(file)
             except Exception as exc:
-                handle_exception(exc, print_error = False, is_app_error = False)
+                handle_exception(exc, False, False)
 
                 if self.data.get(file_path) is not None:
                     self.dump(self.data[file_path], file_path)

@@ -62,6 +62,20 @@ TRUECLICK_EMBED = ('''<div class="trueclick" data-lang="LANGUAGE" data-theme="TH
                    ''',document.head.appendChild(e)</script>''')
 
 
+def replace_dict(text: str, keys_and_values: dict) -> str:
+    """
+    Replaces each key in the text with the corresponding value.
+    """
+
+    for key, value in keys_and_values.items():
+        if not isinstance(key, str) or not isinstance(value, str):
+            continue
+
+        text = text.replace(key, value)
+
+    return text
+
+
 class CaptchaEmbed:
     """
     Generates the embed that is supposed to be added to the HTML document.
@@ -94,60 +108,55 @@ class CaptchaEmbed:
         if captcha_type == 'altcha':
             theme = self.theme if not self.is_default_theme else ''
 
-            script = ALTCHA_SCRIPT.replace('THEME', theme)
-            return script
+            return ALTCHA_SCRIPT.replace('THEME', theme)
 
-        script_url = SCRIPT_URLS[captcha_type] + '?explicit=1&hl=' + self.language
-
-        script = SCRIPT.replace('TYPE', captcha_type)
-        script = script.replace('URL', script_url)
-
-        return script
+        return replace_dict(SCRIPT, {
+            'TYPE': captcha_type,
+            'URL': SCRIPT_URLS[captcha_type] + '?explicit=1&hl=' + self.language
+        })
 
 
-    def get_embed(self, captcha_type: str, site_key: Optional[str] = None) -> str:
+    def get_embed(self, captcha_type: str, site_key:\
+                  Optional[str] = None, hardness: int = 2) -> str:
         """
         Returns the embed that is supposed to be added to the HTML document.
 
         :param captcha_type: The type of captcha.
         :param site_key: The site key of the captcha.
+        :param hardness: The hardness of the Altcha captcha.
         :return: The embed that is supposed to be added to the HTML document.
         """
 
         if captcha_type == 'trueclick':
-            embed = TRUECLICK_EMBED.replace('LANGUAGE', self.language)
-            if not self.is_default_theme:
-                embed = embed.replace('THEME', self.theme)
-            else:
-                embed = embed.replace('data-theme="THEME"', '')
-
-            return embed
+            return replace_dict(EMBED, {
+                'LANGUAGE': self.language,
+                'data-theme="THEME"' if self.is_default_theme else 'THEME':
+                '' if self.is_default_theme else self.theme
+            })
 
         if captcha_type == 'altcha':
-            challenge = html.escape(json.dumps(self.altcha.create_challenge(2)))
+            challenge = html.escape(json.dumps(self.altcha.create_challenge(hardness)))
             strings = html.escape(json.dumps(self.altcha.localized_text(self.language)))
 
-            embed = ALTCHA_EMBED.replace('CHALLENGE', challenge)
-            embed = embed.replace('STRINGS', strings)
-            embed = embed.replace('SCRIPT', self.get_script(captcha_type))
+            return replace_dict(
+                ALTCHA_EMBED,
+                {
+                    'CHALLENGE': challenge,
+                    'STRINGS': strings,
+                    'SCRIPT': self.get_script(captcha_type)
+                }
+            )
 
-            return embed
+        lang = 'language' if captcha_type == 'friendly' else 'lang'
 
-        embed = EMBED.replace('TYPE', captcha_type)
-        embed = embed.replace('CLASS', CLASS_NAMES[captcha_type])
-        embed = embed.replace('SITEKEY', site_key)
-        embed = embed.replace('SCRIPT', self.get_script(captcha_type))
-
-        if captcha_type == 'friendly':
-            embed = embed.replace('data-language="LANGUAGE"', '')
-        else:
-            embed = embed.replace('data-lang="LANGUAGE"', '')
-
-        embed = embed.replace('LANGUAGE', self.language)
-
-        if not self.is_default_theme:
-            embed = embed.replace('THEME', self.theme)
-        else:
-            embed = embed.replace('data-theme="THEME"', '')
-
-        return embed
+        replaces = {
+            'TYPE': captcha_type,
+            'CLASS': CLASS_NAMES[captcha_type],
+            'SITEKEY': site_key,
+            'SCRIPT': self.get_script(captcha_type),
+            'data-' + lang + '="LANGUAGE"': '',
+            'LANGUAGE': self.language,
+            'data-theme="THEME"' if self.is_default_theme else 'THEME':
+            '' if self.is_default_theme else self.theme
+        }
+        return replace_dict(EMBED, replaces)
