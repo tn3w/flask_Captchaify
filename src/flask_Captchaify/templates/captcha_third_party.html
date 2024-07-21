@@ -9,6 +9,58 @@
             <meta http-equiv="refresh" content="0;url={% if not as_route %}{{ current_url_with_config }}{% if '?' in current_url_with_config %}&{% else %}?{% endif %}js=0{% else %}/nojs{{ route_id }}{{ url_args }}{% endif %}">
         </noscript>
         {% if third_party == 'trueclick' %}
+        <meta http-equiv="Content-Security-Policy" content="
+            default-src 'self';
+            script-src 'self' 'unsafe-inline' /trueclick_captchaify.js;
+            style-src 'self' 'unsafe-inline';
+            img-src 'self' data:;
+            connect-src 'self' /trueclick_captchaify/verify /trueclick_captchaify/generate;
+        ">
+        {% elif third_party == 'altcha' %}
+        <meta http-equiv="Content-Security-Policy" content="
+            default-src 'self';
+            script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net/npm/altcha/dist/altcha.min.js;
+            style-src 'self' 'unsafe-inline';
+            img-src 'self' data:;
+            worker-src 'self' blob:;
+        ">
+        {% elif third_party == 'recaptcha' %}
+        <meta http-equiv="Content-Security-Policy" content="
+            default-src 'self';
+            style-src 'self' 'unsafe-inline';
+            script-src 'self' 'unsafe-inline' https://www.google.com/recaptcha/api.js https://www.gstatic.com/recaptcha/;
+            img-src 'self' data:;
+            frame-src 'self' https://www.google.com/recaptcha/;
+        ">
+        {% elif third_party == 'hcaptcha' %}
+        <meta http-equiv="Content-Security-Policy" content="
+            default-src 'self';
+            style-src 'self' 'unsafe-inline';
+            script-src 'self' 'unsafe-inline' https://hcaptcha.com/1/api.js;
+            img-src 'self' data:;
+            frame-src 'self' https://newassets.hcaptcha.com/captcha/;
+            connect-src 'self' https://newassets.hcaptcha.com/captcha/;
+        ">
+        {% elif third_party == 'turnstile' %}
+        <meta http-equiv="Content-Security-Policy" content="
+            default-src 'self';
+            style-src 'self' 'unsafe-inline';
+            script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com/turnstile/v0/api.js;
+            img-src 'self' data:;
+            frame-src 'self' https://challenges.cloudflare.com/;
+        ">
+        {% elif third_party == 'friendlycaptcha' %}
+        <meta http-equiv="Content-Security-Policy" content="
+            default-src 'self';
+            style-src 'self' 'unsafe-inline';
+            script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net/npm/friendly-challenge/widget.module.min.js;
+            img-src 'self' data:;
+            worker-src 'self' blob:;
+            connect-src 'self' https://api.friendlycaptcha.com/api/v1/puzzle;
+        ">
+        {% endif %}
+
+        {% if third_party == 'trueclick' %}
         <script src="/trueclick_captchaify.js"></script>
         {% elif third_party == 'altcha' %}
         <script src="https://cdn.jsdelivr.net/npm/altcha/dist/altcha.min.js" async defer type="module"></script>
@@ -103,7 +155,7 @@
                             {% endif %}>
                         </div>
                         {% elif third_party == 'trueclick' %}
-                        <div class="trueclick" data-callback="onSuccess()" data-lang="{{ language }}"{% if not is_default_theme %} data-theme="{{ theme }}"{% endif %}></div>
+                        <div class="trueclick" data-callback="onSuccess" data-lang="{{ language }}"{% if not is_default_theme %} data-theme="{{ theme }}"{% endif %}></div>
                         {% elif third_party == 'altcha' %}
                         <altcha-widget hidelogo challengejson="{{ altcha_challenge }}" strings="{{ strings }}"></altcha-widget>
                         {% endif %}

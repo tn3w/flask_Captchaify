@@ -1882,14 +1882,15 @@ class Captchaify:
                 **kwargs
             )
 
-            rendered_html = WebToolbox.add_arguments(rendered_html,
-                **{
-                    'theme': client_theme if not is_default_theme else None,
-                    'language': client_language if not is_default_language else None,
-                    'wc': str(int(without_cookies)) if not is_default_choice\
-                        and not self.kwargs['without_cookies'] else None
-                }
-            )
+            if without_cookies:
+                rendered_html = WebToolbox.add_arguments(rendered_html,
+                    **{
+                        'theme': client_theme if not is_default_theme else None,
+                        'language': client_language if not is_default_language else None,
+                        'wc': str(int(without_cookies)) if not is_default_choice\
+                            and not self.kwargs['without_cookies'] else None
+                    }
+                )
 
             return Response(rendered_html, mimetype = 'text/html')
 
@@ -2672,15 +2673,18 @@ class Captchaify:
             ('?return_path=' + return_path if not without_return_path\
               and return_path != '/' else '')
 
-        theme, is_default_theme = self.theme
-        language, is_default_language = self.language
         without_cookies, is_default_choice = self.without_cookies
 
-        if not is_default_theme:
-            redirect_url += get_char(redirect_url) + 'theme=' + theme
-        if not is_default_language:
-            redirect_url += get_char(redirect_url) + 'language=' + language
-        if not is_default_choice and without_cookies:
-            redirect_url += get_char(redirect_url) + 'wc=' + str(int(without_cookies))
+        if without_cookies:
+            theme, is_default_theme = self.theme
+            language, is_default_language = self.language
+
+            if not is_default_theme:
+                redirect_url += get_char(redirect_url) + 'theme=' + theme
+            if not is_default_language:
+                redirect_url += get_char(redirect_url) + 'language=' + language
+
+            if not is_default_choice:
+                redirect_url += get_char(redirect_url) + 'wc=1'
 
         return redirect_url

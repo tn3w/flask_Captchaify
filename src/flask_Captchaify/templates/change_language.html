@@ -5,6 +5,7 @@
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>🌐 Change Language</title>
+        <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:">
         <style>
             {{ colors|safe }}
 
@@ -60,7 +61,7 @@
                 transition: transform 0.2s ease-in-out;
             }
 
-            h1, p {
+            .center {
                 text-align: center;
                 margin-top: 20px;
             }
@@ -175,7 +176,7 @@
             <a class="back-button" href="{% if as_route %}/{{ return_route }}{{ route_id }}{{ url_args_without_rr }}{% else %}{{ current_url_without_cl }}{% endif %}" ntr="1">
                 <img class="icon" src="" alt="Back">
             </a>
-            <h1>Change Language</h1>
+            <h1 class="center">Change Language</h1>
             <div class="search-form">
                 <form class="search-form" action="{{ current_url }}" method="GET">
                     <input type="text" class="search-input" name="cs" placeholder="Search Language" value="{{ search if search|default else '' }}">
@@ -194,7 +195,7 @@
                 </form>
             </div>
             {% if languages is none or languages|length == 0 %}
-            <p>No language found that matches your search.</p>
+            <p class="center">No language found that matches your search.</p>
             {% endif %}
             {% if languages|default %}
             <div class="container">

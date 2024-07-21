@@ -4,7 +4,8 @@
         <meta charset="UTF-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>🍵 Enjoy your tea!</title>
+        <title>{{ emoji.str }} Enjoy your tea!</title>
+        <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:">
         <style>
             {{ colors|safe }}
 
@@ -62,7 +63,7 @@
     <body>
         {{ cookie_banner_html|safe }}
         <main>
-            <img class="emoji" src="{{ emoji }}">
+            <img class="emoji" src="{{ emoji.src }}">
             <h1>Have a cup of tea</h1>
             <p class="error-text">It appears that you are sending an excessive number of requests per minute to this website. Please reduce the frequency of your requests.</p>
             <div class="anchor">
