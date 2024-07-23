@@ -471,7 +471,7 @@ class Captchaify:
             embed = CaptchaEmbed(self.language[0], self.theme, self.altcha)
 
             embeds = {'altcha': Markup(embed.get_embed('altcha', None))}
-            for hardness in range(5, 1):
+            for hardness in range(1, 6):
                 embeds['altcha' + str(hardness)] = Markup(
                     embed.get_embed('altcha', None, hardness)
                 )

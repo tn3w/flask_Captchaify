@@ -72,7 +72,7 @@ class Altcha:
         """
 
         salt = secrets.token_hex(12)
-        secret_number = secure_randrange(5000 * hardness, 20000 * hardness)
+        secret_number = secure_randrange(10000 * hardness, 25000 * hardness)
 
         challenge = hashlib.sha256((salt + str(secret_number)).encode('utf-8')).hexdigest()
         signature = hmac.new(self.secret, challenge.encode('utf-8'), hashlib.sha256).hexdigest()
