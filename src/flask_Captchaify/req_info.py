@@ -82,6 +82,11 @@ IPV6_PATTERN: Final[str] = (
     r'|([0-9a-fA-F]{1,4}:){6}(:[0-9a-fA-F]{1,4}){1,2}'
     r'|([0-9a-fA-F]{1,4}:){7}(:[0-9a-fA-F]{1,4}):)$'
 )
+ALL_REQUEST_INFO_FIELDS: Final[set] = [
+    'continent', 'continent_code', 'country', 'country_code', 'region', 'region_code',
+    'city', 'zip', 'lat', 'lon', 'as', 'as_number', 'tor', 'spammer', 'reverse',
+    'timezone', 'offset', 'currency', 'isp', 'org', 'mobile', 'proxy', 'hosting'
+]
 
 GEOLITE_DATA: Final[dict] = {
     "city": {
@@ -526,6 +531,9 @@ class RequestInfo:
         if not is_valid_ip(client_ip):
             return None
 
+        if 'full' in fields:
+            fields = ALL_REQUEST_INFO_FIELDS
+
         stored_ip_info = getattr(self.global_data, self.store_token + 'ip_info', {})
 
         information = {}
@@ -574,8 +582,8 @@ class RequestInfo:
                     else:
                         continue
 
-                if field == 'is_tor' and 'tor' in self.third_parties:
-                    stored_ip_info["is_tor"] = self.is_tor(client_ip)
+                if field == 'tor' and 'tor' in self.third_parties:
+                    stored_ip_info["tor"] = self.is_tor(client_ip)
                     break
 
                 if field == 'reverse' and 'reverse' in self.third_parties:

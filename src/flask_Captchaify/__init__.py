@@ -819,6 +819,13 @@ class Captchaify:
 
         return self._req_info.get_without_cookies(self.kwargs['without_cookies'])
 
+    @property
+    def full_data(self) -> Optional[dict]:
+        """
+        Returns the full data of the current request.
+        """
+
+        return self._req_info.get_ip_info(['full'])
 
     @property
     def location(self) -> Optional[dict]:
@@ -826,25 +833,11 @@ class Captchaify:
         Returns the location of the current request.
         """
 
-        info = self._req_info.get_ip_info(
+        return self._req_info.get_ip_info(
             ['continent', 'continent_code', 'country',
              'country_code', 'region', 'region_code',
              'city', 'zip', 'lat', 'lon']
         )
-
-        return info
-
-
-    def _get_location_value(self, key: str) -> Optional[str]:
-        """
-        Returns the value of a location key.
-        """
-
-        if self.location is None or key not in self.location:
-            return None
-
-        return self.location[key]
-
 
     @property
     def continent(self) -> Optional[str]:
@@ -852,7 +845,7 @@ class Captchaify:
         Returns the continent of the current request.
         """
 
-        return self._get_location_value('continent')
+        return self._req_info.get_ip_info(['continent'])
 
 
     @property
@@ -861,7 +854,7 @@ class Captchaify:
         Returns the continent code of the current request.
         """
 
-        return self._get_location_value('continent_code')
+        return self._req_info.get_ip_info(['continent_code'])
 
 
     @property
@@ -870,7 +863,7 @@ class Captchaify:
         Returns the country of the current request.
         """
 
-        return self._get_location_value('country')
+        return self._req_info.get_ip_info(['country'])
 
 
     @property
@@ -879,7 +872,7 @@ class Captchaify:
         Returns the country code of the current request.
         """
 
-        return self._get_location_value('country_code')
+        return self._req_info.get_ip_info(['country_code'])
 
 
     @property
@@ -888,7 +881,7 @@ class Captchaify:
         Returns the region of the current request.
         """
 
-        return self._get_location_value('region')
+        return self._req_info.get_ip_info(['region'])
 
 
     @property
@@ -897,7 +890,7 @@ class Captchaify:
         Returns the region code of the current request.
         """
 
-        return self._get_location_value('region_code')
+        return self._req_info.get_ip_info(['region_code'])
 
 
     @property
@@ -906,7 +899,7 @@ class Captchaify:
         Returns the city of the current request.
         """
 
-        return self._get_location_value('city')
+        return self._req_info.get_ip_info(['city'])
 
 
     @property
@@ -915,7 +908,7 @@ class Captchaify:
         Returns the zip code of the current request.
         """
 
-        return self._get_location_value('zip')
+        return self._req_info.get_ip_info(['zip'])
 
 
     @property
@@ -924,7 +917,7 @@ class Captchaify:
         Returns the latitude of the current request.
         """
 
-        return self._get_location_value('lat')
+        return self._req_info.get_ip_info(['lat'])
 
 
     @property
@@ -933,7 +926,7 @@ class Captchaify:
         Returns the longitude of the current request.
         """
 
-        return self._get_location_value('lon')
+        return self._req_info.get_ip_info(['lon'])
 
 
     @property
