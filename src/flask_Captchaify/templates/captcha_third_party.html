@@ -49,7 +49,7 @@
             img-src 'self' data:;
             frame-src 'self' https://challenges.cloudflare.com/;
         ">
-        {% elif third_party == 'friendlycaptcha' %}
+        {% elif third_party == 'friendly' %}
         <meta http-equiv="Content-Security-Policy" content="
             default-src 'self';
             style-src 'self' 'unsafe-inline';
@@ -71,7 +71,7 @@
             <script src="https://hcaptcha.com/1/api.js?explicit&hl={{ language }}" async defer></script>
             {% elif third_party == 'turnstile' %}
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?explicit&hl={{ language }}" async defer></script>
-            {% elif third_party == 'friendlycaptcha' %}
+            {% elif third_party == 'friendly' %}
             <script src="https://cdn.jsdelivr.net/npm/friendly-challenge/widget.module.min.js" async defer></script>
             {% endif %}
         {% endif %}
@@ -140,7 +140,7 @@
                             {% if third_party == 'recaptcha' %}g-recaptcha
                             {% elif third_party == 'hcaptcha' %}h-captcha
                             {% elif third_party == 'turnstile' %}cf-turnstile
-                            {% elif third_party == 'friendlycaptcha' %}frc-captcha 
+                            {% elif third_party == 'friendly' %}frc-captcha 
                             {% if not is_default_theme and theme == 'dark' %} dark{% endif %}
                             {% endif %}"
                             data-sitekey="{{ site_key }}" 
@@ -148,7 +148,7 @@
                             {% if not is_default_theme %} 
                                 data-theme="{% if theme == 'light' %}light{% elif theme == 'dark' %}dark{% else %}{% endif %}" 
                             {% endif %}
-                            {% if not third_party == 'friendlycaptcha' %}
+                            {% if not third_party == 'friendly' %}
                             data-language="{{ language }}"
                             {% else %}
                             data-lang="{{ language }}"
@@ -211,7 +211,7 @@
                 scriptElement.src = 'https://hcaptcha.com/1/api.js?explicit&hl={{ language }}';
                 {% elif third_party == 'turnstile' %}
                 scriptElement.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?explicit&hl={{ language }}';
-                {% elif third_party == 'friendlycaptcha' %}
+                {% elif third_party == 'friendly' %}
                 scriptElement.src = "https://cdn.jsdelivr.net/npm/friendly-challenge/widget.module.min.js";
                 {% endif %}
                 scriptElement.async = true;

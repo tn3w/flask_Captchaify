@@ -49,7 +49,7 @@ LANGUAGE_CODES: Final[list] = [language['code'] for language in LANGUAGES]
 ALL_CAPTCHA_TYPES: Final[list] = [
     'text', 'audio', 'text&audio', 'audio&text', 'oneclick',
     'multiclick', 'recaptcha', 'hcaptcha', 'turnstile',
-    'friendlycaptcha', 'altcha', 'trueclick'
+    'friendly', 'altcha', 'trueclick'
 ]
 ALL_DATASET_TYPES: Final[list] = ['keys', 'animals', 'ki-dogs']
 ALL_ACTIONS: Final[list] = ['allow', 'block', 'fight', 'auto']
@@ -76,7 +76,7 @@ CAPTCHA_THIRD_PARTIES_API_URLS: Final[dict] = {
     "recaptcha": "https://www.google.com/recaptcha/api/siteverify",
     "hcaptcha": "https://hcaptcha.com/siteverify",
     "turnstile": "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-    "friendlycaptcha": "https://api.friendlycaptcha.com/api/v1/siteverify"
+    "friendly": "https://api.friendlycaptcha.com/api/v1/siteverify"
 }
 
 ERROR_CODES: Final[dict] = {
@@ -1114,11 +1114,11 @@ class Captchaify:
 
         third_party_name = {
             'recaptcha': 'g-recaptcha', 'turnstile': 'cf-turnstile',
-            'hcaptcha': 'h-captcha', 'friendlycaptcha': 'frc-captcha'
+            'hcaptcha': 'h-captcha', 'friendly': 'frc-captcha'
         }.get(captcha_type)
 
         response_or_solution = 'solution'\
-            if captcha_type == 'friendlycaptcha' else 'response'
+            if captcha_type == 'friendly' else 'response'
 
         key = third_party_name + '-' + response_or_solution
         if request.method.lower() == 'post':
@@ -1134,7 +1134,7 @@ class Captchaify:
             "recaptcha": config['recaptcha_secret'],
             "hcaptcha": config['hcaptcha_secret'],
             "turnstile": config['turnstile_secret'],
-            "friendlycaptcha": config['friendly_secret']
+            "friendly": config['friendly_secret']
         }.get(captcha_type, None)
 
         post_data = {
@@ -1198,7 +1198,7 @@ class Captchaify:
         :return: True if the friendly is valid, False otherwise
         """
 
-        return self._is_captcha_valid('friendlycaptcha')
+        return self._is_captcha_valid('friendly')
 
 
     def is_altcha_valid(self) -> bool:
@@ -1716,7 +1716,7 @@ class Captchaify:
                 "recaptcha": config['recaptcha_site_key'],
                 "hcaptcha": config['hcaptcha_site_key'],
                 "turnstile": config['turnstile_site_key'],
-                "friendlycaptcha": config['friendly_site_key']
+                "friendly": config['friendly_site_key']
             }.get(captcha_type, None)
 
         captcha_data = self._get_captcha_data()
@@ -1758,7 +1758,7 @@ class Captchaify:
             "recaptcha": self._render_captcha_third_parties,
             "hcaptcha": self._render_captcha_third_parties,
             "turnstile": self._render_captcha_third_parties,
-            "friendlycaptcha": self._render_captcha_third_parties,
+            "friendly": self._render_captcha_third_parties,
             "altcha": self._render_captcha_third_parties,
             "trueclick": self._render_captcha_third_parties
         }
@@ -2416,8 +2416,7 @@ class Captchaify:
                         is_failed_captcha = True
             elif token_captcha_type in [
                 'recaptcha', 'hcaptcha', 'turnstile',
-                'friendlycaptcha', 'altcha', 'trueclick'
-                ]:
+                'friendly', 'altcha', 'trueclick']:
 
                 if token_captcha_type == 'trueclick':
                     config = self._current_configuration
@@ -2429,12 +2428,12 @@ class Captchaify:
                 else:
                     third_party_name = {
                         'recaptcha': 'g-recaptcha', 'turnstile': 'cf-turnstile',
-                        'hcaptcha': 'h-captcha', 'friendlycaptcha': 'frc-captcha'
+                        'hcaptcha': 'h-captcha', 'friendly': 'frc-captcha'
                     }.get(token_captcha_type)
 
                     if token_captcha_type != 'altcha':
                         response_or_solution = 'solution'\
-                            if token_captcha_type == 'friendlycaptcha' else 'response'
+                            if token_captcha_type == 'friendly' else 'response'
 
                         key = third_party_name + '-' + response_or_solution
                         if request.method.lower() == 'post':
@@ -2447,7 +2446,7 @@ class Captchaify:
                             "recaptcha": config['recaptcha_secret'],
                             "hcaptcha": config['hcaptcha_secret'],
                             "turnstile": config['turnstile_secret'],
-                            "friendlycaptcha": config['friendly_secret']
+                            "friendly": config['friendly_secret']
                         }.get(token_captcha_type, None)
 
                         post_data = {
