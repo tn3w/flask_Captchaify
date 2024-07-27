@@ -196,7 +196,7 @@
                 500 });
             };
             {% endif %}
-            {% if is_default_theme and not third_party in ['altcha', 'trueclick']%}
+            {% if is_default_theme and not third_party in ['altcha', 'trueclick'] %}
 
             document.addEventListener('DOMContentLoaded', () => {
                 const theme = getTheme();
