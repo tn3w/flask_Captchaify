@@ -233,15 +233,16 @@ def handle_exception(error_message: str, print_error: bool =\
 
     app_error_message = ''
     if not is_app_error:
-        app_error_message = '\n(This is probably not an error caused by flask_Captchaify)'
+        app_error_message = '\n(This is most likely an error that does not '\
+            + 'occur because of a problem with flask_Captchaify.)'
 
     long_error_message = '----- Error #' + str(error_id) + ' at ' + timestamp\
-                         + f' -----{app_error_message}\n' + long_error_message
+        + f' -----{app_error_message}\n' + long_error_message
 
     if not os.path.isfile(LOG_FILE):
-        long_error_message = 'If you find a new error, report it here: '+\
-                             'https://github.com/tn3w/flask_Captchaify/issues\n'\
-                              + long_error_message
+        long_error_message = 'If you find a new error, report it here: '\
+            + 'https://github.com/tn3w/flask_Captchaify/issues\n'\
+            + long_error_message
 
     execute_write(LOG_FILE, long_error_message)
 

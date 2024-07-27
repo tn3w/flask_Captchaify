@@ -678,7 +678,7 @@ class Cache(dict):
 
             return decrypted_data
         except Exception as exc:
-            handle_exception(exc, print_error = False, is_app_error = False)
+            handle_exception(exc, False, False)
 
         return None
 

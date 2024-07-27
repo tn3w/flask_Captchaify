@@ -61,15 +61,22 @@ ALL_TEMPLATE_TYPES: Final[list] = [
     'rate_limited', 'exception'
 ]
 ALL_THEMES: Final[list] = ['dark', 'light']
+DATASET_REQUIRED: Final[list] = ['oneclick', 'multiclick', 'trueclick']
+
+DATASETS: Final[dict] = {
+    "keys": "https://github.com/tn3w/Captcha_Datasets/raw/master/keys.json",
+    "animals": "https://github.com/tn3w/Captcha_Datasets/raw/master/animals.json",
+    "ai-dogs": "https://github.com/tn3w/Captcha_Datasets/raw/master/ai-dogs.json"
+}
 
 DATASET_SIZES: Final[dict] = {
-    'largest': (200, 140),
-    'large': (20, 140),
-    'medium': (100, 100),
-    'normal': (20, 100),
-    'small': (20, 36),
-    'smaller': (20, 8),
-    'little': (6, 8)
+    "largest": (200, 140),
+    "large": (20, 140),
+    "medium": (100, 100),
+    "normal": (20, 100),
+    "small": (20, 36),
+    "smaller": (20, 8),
+    "little": (6, 8)
 }
 
 CAPTCHA_THIRD_PARTIES_API_URLS: Final[dict] = {
@@ -350,7 +357,6 @@ class Captchaify:
         }
         self.kwargs = kwargs
 
-        self._download_datasets()
         update_geolite_databases('geoip' in kwargs['third_parties'])
         if kwargs['crawler_hints']:
             self.crawler_hints_cache = {}
@@ -361,6 +367,23 @@ class Captchaify:
         self.app = app
         self.rules = rules if isinstance(rules, list) else []
         self.route_id = None
+
+        dataset_required = captcha_type in DATASET_REQUIRED
+        required_datasets = [dataset]
+        for rule in self.rules:
+            if not isinstance(rule.get('change', None), dict):
+                continue
+
+            for change_name, change in rule['change'].items():
+                if change_name == 'captcha_type':
+                    if change in DATASET_REQUIRED:
+                        dataset_required = True
+
+                if change_name == 'dataset':
+                    required_datasets.append(change)
+
+        if dataset_required:
+            self._download_datasets(required_datasets)
 
         if app is not None:
             self.add_to_app(app, **kwargs)
@@ -581,24 +604,33 @@ class Captchaify:
                 )
 
 
-    def _download_datasets(self) -> None:
+    def _download_datasets(self, datasets: list[str] = None) -> None:
         """
-        This method downloads the datasets if they haven't already been
-        downloaded.
+        Downloads datasets if they do not exist.
+
+        :param datasets: The list of datasets to download.
         """
+
+        if not isinstance(datasets, list):
+            return
 
         if not os.path.exists(DATASETS_DIR):
             os.mkdir(DATASETS_DIR)
 
-        for url in [
-            'https://github.com/tn3w/Captcha_Datasets/raw/master/keys.json',
-            'https://github.com/tn3w/Captcha_Datasets/raw/master/animals.json',
-            'https://github.com/tn3w/Captcha_Datasets/raw/master/ai-dogs.json'
-            ]:
-            file_name = url.rsplit('/', maxsplit=1)[-1]
-            if not os.path.exists(os.path.join(DATASETS_DIR, file_name)):
-                print('Downloading', file_name)
-                urllib.request.urlretrieve(url, os.path.join(DATASETS_DIR, file_name))
+        datasets = list(set(datasets))
+        if len(datasets) == 0:
+            return
+
+        for dataset in datasets:
+            dataset_file_path = os.path.join(DATASETS_DIR, dataset + ".json")
+            if os.path.exists(dataset_file_path):
+                continue
+
+            print('Downloading', dataset + "...")
+            urllib.request.urlretrieve(
+                DATASET_SIZES[dataset][0],
+                dataset_file_path
+            )
 
 
     ####################
@@ -653,12 +685,12 @@ class Captchaify:
         current_configuration['rate_limit'] = rate_limit[0]
         current_configuration['max_rate_limit'] = rate_limit[1]
 
-        for config in self.rules:
-            if not matches_rule(config['rule'], self._req_info):
+        for rule in self.rules:
+            if not matches_rule(rule['rule'], self._req_info):
                 continue
 
-            for config_name, config in config['change'].items():
-                current_configuration[config_name] = config
+            for change_name, change in rule['change'].items():
+                current_configuration[change_name] = change
 
         if current_configuration['dataset'] in ['keys', 'animals', 'ai-dogs']:
             current_configuration['dataset_file'] = os.path.join(
@@ -1155,7 +1187,8 @@ class Captchaify:
 
             if not validate_captcha_response(response_json, get_domain_from_url(self.url)):
                 return False
-        except Exception:
+        except Exception as exc:
+            handle_exception(exc, False, False)
             return False
 
         return True
