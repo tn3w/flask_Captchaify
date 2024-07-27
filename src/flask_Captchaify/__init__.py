@@ -51,7 +51,7 @@ ALL_CAPTCHA_TYPES: Final[list] = [
     'multiclick', 'recaptcha', 'hcaptcha', 'turnstile',
     'friendly', 'altcha', 'trueclick'
 ]
-ALL_DATASET_TYPES: Final[list] = ['keys', 'animals', 'ki-dogs']
+ALL_DATASET_TYPES: Final[list] = ['keys', 'animals', 'ai-dogs']
 ALL_ACTIONS: Final[list] = ['allow', 'block', 'fight', 'auto']
 ALL_THIRD_PARTIES: Final[list] = ['geoip', 'tor', 'ipapi', 'stopforumspam', 'ipify']
 DEFAULT_THIRD_PARTIES: Final[list] = ['geoip', 'tor', 'ipapi', 'stopforumspam']
@@ -686,13 +686,17 @@ class Captchaify:
         current_configuration['max_rate_limit'] = rate_limit[1]
 
         for rule in self.rules:
+            if not isinstance(rule.get('rule', None), list)\
+                or not isinstance(rule.get('change', None), dict):
+                continue
+
             if not matches_rule(rule['rule'], self._req_info):
                 continue
 
             for change_name, change in rule['change'].items():
                 current_configuration[change_name] = change
 
-        if current_configuration['dataset'] in ['keys', 'animals', 'ai-dogs']:
+        if current_configuration['dataset'] in ALL_DATASET_TYPES:
             current_configuration['dataset_file'] = os.path.join(
                 current_configuration['dataset_dir'],
                 current_configuration['dataset'] + '.json'
