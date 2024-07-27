@@ -2693,7 +2693,7 @@ class Captchaify:
                 extract_path_and_args(
                     remove_args_from_url(self._req_info.get_url(),
                         ['theme', 'language', 'captcha',
-                         'return_path', 'wc', 'js']
+                         'return_path', 'wc', 'js', 'cl']
                     )
                 )
             )
