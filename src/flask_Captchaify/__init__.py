@@ -266,18 +266,20 @@ class Captchaify:
     """
 
 
-    def __init__(self, app: Optional[Flask] = None, rules: Optional[dict] = None,
-                 action: str = 'auto', captcha_type: str = 'oneclick',
-                 dataset: str = 'keys', dataset_size: Union[Tuple[int, int], str] = 'full',
-                 dataset_dir: str = DATASETS_DIR, hardness: int = 1, verification_age: int = 3600,
-                 template_dir: str = TEMPLATE_DIR, without_customisation: bool = False,
-                 without_cookies: bool = False, without_arg_transfer: bool = False,
-                 without_watermark: bool = False, third_parties: Optional[list[str]] = None,
-                 as_route: bool = False, fixed_route_name: str = '_captchaify',
-                 enable_rate_limit: bool = True, rate_limit: Tuple[int, int] = (15, 300),
-                 block_crawler: bool = True, crawler_hints: bool = True,
-                 theme: str = 'light', language: str = 'en', store_anonymously: bool = True,
-                 without_trueclick: bool = False, error_codes: Optional[list] = None,
+    def __init__(self, app: Optional[Flask] = None, debug: bool = False,
+                 rules: Optional[dict] = None, action: str = 'auto',
+                 captcha_type: str = 'oneclick', dataset: str = 'keys',
+                 dataset_size: Union[Tuple[int, int], str] = 'full',
+                 dataset_dir: str = DATASETS_DIR, hardness: int = 1,
+                 verification_age: int = 3600, template_dir: str = TEMPLATE_DIR,
+                 without_customisation: bool = False, without_cookies: bool = False,
+                 without_arg_transfer: bool = False, without_watermark: bool = False,
+                 third_parties: Optional[list[str]] = None, as_route: bool = False,
+                 fixed_route_name: str = '_captchaify', enable_rate_limit: bool = True,
+                 rate_limit: Tuple[int, int] = (15, 300), block_crawler: bool = True,
+                 crawler_hints: bool = True, theme: str = 'light', language: str = 'en',
+                 store_anonymously: bool = True, without_trueclick: bool = False,
+                 error_codes: Optional[list] = None,
                  recaptcha_site_key: Optional[str] = None, recaptcha_secret: Optional[str] = None,
                  hcaptcha_site_key: Optional[str] = None, hcaptcha_secret: Optional[str] = None,
                  turnstile_site_key: Optional[str] = None, turnstile_secret: Optional[str] = None,
@@ -328,8 +330,12 @@ class Captchaify:
             captcha_secret = generate_random_string(32)
             execute_write(CAPTCHA_SECRET_FILE_PATH, captcha_secret)
 
+        self.debug = debug
+        if self.debug:
+            print('[flask_Captchaify] Debug mode is activated.')
+
         self.captcha_secret = captcha_secret
-        self.sses = SSES(captcha_secret, with_keys = True)
+        self.sses = SSES(captcha_secret, with_keys = True, debug = self.debug)
         self.altcha = Altcha(secrets.token_bytes(32))
 
         if not isinstance(third_parties, list):
@@ -648,8 +654,8 @@ class Captchaify:
 
         return RequestInfo(
             request, g, LANGUAGE_CODES,
-            self.kwargs['third_parties'],
-            'captchaify', self.kwargs['store_anonymously']
+            self.kwargs['third_parties'], 'captchaify',
+            self.kwargs['store_anonymously'], self.debug
         )
 
 
@@ -754,11 +760,14 @@ class Captchaify:
 
             storage = TimeStorage(
                 'failed_captchas', store_anonymously = self.kwargs['store_anonymously'],
-                ttl = 7200, max_size = 4
+                ttl = 7200, max_size = 4, debug = self.debug
             )
 
             return storage.get_counts(client_ip)[0] >= 3
         except Exception as exc:
+            if self.debug:
+                raise exc
+
             handle_exception(exc)
 
         return False
@@ -1192,6 +1201,9 @@ class Captchaify:
             if not validate_captcha_response(response_json, get_domain_from_url(self.url)):
                 return False
         except Exception as exc:
+            if self.debug:
+                raise exc
+
             handle_exception(exc, False, False)
             return False
 
@@ -1974,6 +1986,9 @@ class Captchaify:
                 return self._captchaify()
 
         except Exception as exc:
+            if self.debug:
+                raise exc
+
             handle_exception(exc)
 
             return self._captchaify()
@@ -1994,7 +2009,7 @@ class Captchaify:
 
             storage = TimeStorage(
                 'rate_limit', store_anonymously = self.kwargs['store_anonymously'],
-                ttl = 10, max_size = rate_limit
+                ttl = 10, max_size = rate_limit, debug = self.debug
             )
             storage.add_time(self._ip)
 
@@ -2007,6 +2022,9 @@ class Captchaify:
                 return self._render_rate_limit()
 
         except Exception as exc:
+            if self.debug:
+                raise exc
+
             handle_exception(exc)
 
 
@@ -2054,6 +2072,9 @@ class Captchaify:
 
             response.data = WebToolbox.add_arguments(response.data, **kwargs)
         except Exception as exc:
+            if self.debug:
+                raise exc
+
             handle_exception(exc)
 
         return response
@@ -2113,6 +2134,9 @@ class Captchaify:
                     domain = urlparse(request.url).netloc
                 )
         except Exception as exc:
+            if self.debug:
+                raise exc
+
             handle_exception(exc)
 
         return response
@@ -2135,18 +2159,21 @@ class Captchaify:
 
             found = None
             for hashed_path, path_data in self.crawler_hints_cache.items():
-                comparison = Hashing().compare(path, hashed_path)
+                comparison = Hashing(debug = self.debug).compare(path, hashed_path)
                 if comparison:
                     data_time = path_data['time']
-                    title = SymmetricEncryption(path).decrypt(path_data['title'])
+                    title = SymmetricEncryption(
+                        path, debug = self.debug
+                    ).decrypt(path_data['title'])
 
                     if title is not None and not int(time()) - int(data_time) > 7200:
                         found = hashed_path
                     else:
                         del copy_crawler_hints[hashed_path]
+
                     break
 
-            symmetric_crypto = SymmetricEncryption(path)
+            symmetric_crypto = SymmetricEncryption(path, debug = self.debug)
             is_captchaify_page = getattr(g, 'captchaify_page', False)
 
             if found is None and not is_captchaify_page:
@@ -2160,7 +2187,7 @@ class Captchaify:
                      soup.find_all('meta', attrs={'property': 'og'})]
                 )
 
-                hashed_path = Hashing().hash(path)
+                hashed_path = Hashing(debug = self.debug).hash(path)
 
                 copy_crawler_hints[hashed_path] = {
                     'time': int(time()),
@@ -2188,6 +2215,9 @@ class Captchaify:
 
                     response = make_response(response)
         except Exception as exc:
+            if self.debug:
+                raise exc
+
             handle_exception(exc)
 
         return response
@@ -2260,6 +2290,9 @@ class Captchaify:
                 without_redirect = True
             )
         except Exception as exc:
+            if self.debug:
+                raise exc
+
             handle_exception(exc)
 
         return self._render_block()
@@ -2285,7 +2318,7 @@ class Captchaify:
         """
 
         self._clean_used_captcha_ids()
-        hashed_captcha_id = Hashing().hash(captcha_id)
+        hashed_captcha_id = Hashing(debug = self.debug).hash(captcha_id)
 
         used_captcha_ids = self.used_captcha_ids.copy()
         used_captcha_ids[hashed_captcha_id] = int(time())
@@ -2301,7 +2334,7 @@ class Captchaify:
         """
 
         for hashed_captcha_id in self.used_captcha_ids:
-            if Hashing().compare(captcha_id, hashed_captcha_id):
+            if Hashing(debug = self.debug).compare(captcha_id, hashed_captcha_id):
                 return True
 
         return False
@@ -2361,9 +2394,9 @@ class Captchaify:
 
         captcha_data = {
             "id": captcha_id, "type": captcha_type,
-            "ip": ('None' if self.ip is None else Hashing().hash(self.ip)),
-            "user_agent": Hashing().hash(self.user_agent),
-            "path": Hashing().hash(url_path), "time": str(int(time())),
+            "ip": ('None' if self.ip is None else Hashing(debug = self.debug).hash(self.ip)),
+            "user_agent": Hashing(debug = self.debug).hash(self.user_agent),
+            "path": Hashing(debug = self.debug).hash(url_path), "time": str(int(time())),
             "hardness": config['hardness']
         }
 
@@ -2539,14 +2572,14 @@ class Captchaify:
 
             self._add_used_captcha_id(captcha_id)
             if not is_failed_captcha:
-                comparison_path = Hashing().compare(
+                comparison_path = Hashing(debug = self.debug).compare(
                     url_path, decrypted_token_data['path']
                 )
                 comparison_ip = True if self.ip is None else\
-                    Hashing().compare(
+                    Hashing(debug = self.debug).compare(
                         self.ip, decrypted_token_data['ip']
                     )
-                comparison_user_agent = Hashing().compare(
+                comparison_user_agent = Hashing(debug = self.debug).compare(
                     self.user_agent, decrypted_token_data['user_agent']
                 )
 
@@ -2557,6 +2590,9 @@ class Captchaify:
                 else:
                     return True, False
         except Exception as exc:
+            if self.debug:
+                raise exc
+
             handle_exception(exc)
 
             return False, True
@@ -2581,7 +2617,7 @@ class Captchaify:
 
             cache = Cache(
                 'solved_captchas', store_anonymously = self.kwargs['store_anonymously'],
-                ttl = self.kwargs['verification_age']
+                ttl = self.kwargs['verification_age'], debug = self.debug
             )
             data = cache[captcha_id]
 
@@ -2595,6 +2631,9 @@ class Captchaify:
 
                 return True
         except Exception as exc:
+            if self.debug:
+                raise exc
+
             handle_exception(exc)
 
         return False
@@ -2614,11 +2653,14 @@ class Captchaify:
         try:
             storage = TimeStorage(
                 'failed_captchas', store_anonymously = self.kwargs['store_anonymously'],
-                ttl = 7200, max_size = 4
+                ttl = 7200, max_size = 4, debug = self.debug
             )
 
             storage.add_time(client_ip)
         except Exception as exc:
+            if self.debug:
+                raise exc
+
             handle_exception(exc)
 
 
@@ -2632,7 +2674,7 @@ class Captchaify:
 
         cache = Cache(
             'solved_captchas', store_anonymously = self.kwargs['store_anonymously'],
-            ttl = self.kwargs['verification_age']
+            ttl = self.kwargs['verification_age'], debug = self.debug
         )
 
         captcha_id = None

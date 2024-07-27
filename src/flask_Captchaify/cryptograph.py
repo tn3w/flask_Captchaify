@@ -31,7 +31,7 @@ class SymmetricEncryption:
 
     def __init__(self, password: Optional[Union[str, bytes]] = None,\
                  salt_length: int = 32, use_salt: bool = True,
-                 salt: Optional[bytes] = None) -> None:
+                 salt: Optional[bytes] = None, debug: bool = False) -> None:
         """
         Initialize symmetric encryption.
 
@@ -39,6 +39,7 @@ class SymmetricEncryption:
         :param salt_length: The length of the salt, should be at least 16.
         :param use_salt: Whether to use a salt in the encryption process.
         :param salt: The salt to use in the encryption process.
+        :param debug: Whether to throw error messages directly.
         """
 
         if password is None:
@@ -51,6 +52,7 @@ class SymmetricEncryption:
         self.salt_length = salt_length
         self.use_salt = use_salt or isinstance(salt, bytes)
         self.salt = salt
+        self.debug = debug
 
 
     def encrypt(self, plain_value: Union[str], return_as_bytes:\
@@ -103,7 +105,8 @@ class SymmetricEncryption:
             b64 = urlsafe_b64encode if url_safe else b64encode
             return b64(encrypted_bytes).decode('utf-8').rstrip('=')
         except Exception as exc:
-            handle_exception(exc, False, False)
+            if self.debug:
+                handle_exception(exc, False, False)
 
         return None
 
@@ -178,7 +181,8 @@ class SymmetricEncryption:
             except UnicodeDecodeError:
                 return plaintext
         except Exception as exc:
-            handle_exception(exc, False, False)
+            if self.debug:
+                handle_exception(exc, False, False)
 
         return None
 
@@ -189,22 +193,23 @@ class Hashing:
     """
 
     def __init__(self, use_salt: bool = True, salt_length:\
-                 int = 16, iterations: int = 10000) -> None:
+                 int = 16, iterations: int = 10000, debug: bool = False) -> None:
         """
         Initializes the hashing object.
 
         :param use_salt: If the salt should be used.
         :param salt_length: The length of the salt, should be at least 16.
         :param iterations: The number of iterations, should be at least 10000.
+        :param debug: Whether to throw error messages directly.
         """
 
         self.use_salt = use_salt
         self.salt_length = salt_length
         self.iterations = iterations
+        self.debug = debug
 
 
-    @staticmethod
-    def get_salt(hashed_value: Union[str, bytes]) -> Optional[bytes]:
+    def get_salt(self, hashed_value: Union[str, bytes]) -> Optional[bytes]:
         """
         Returns the salt from a hashed value.
 
@@ -249,6 +254,9 @@ class Hashing:
 
             return salt
         except Exception as exc:
+            if self.debug:
+                raise exc
+
             handle_exception(exc, False, False)
 
         return None
@@ -303,8 +311,9 @@ class Hashing:
                 return hashed_str, salt
 
             return hashed_str
-        except Exception:
-            pass
+        except Exception as exc:
+            if self.debug:
+                handle_exception(exc, False, False)
 
         return None
 
@@ -372,8 +381,9 @@ class Hashing:
             hashed_value = kdf.derive(plain_value)[:hash_length]
 
             return hashed_bytes == hashed_value
-        except Exception:
-            pass
+        except Exception as exc:
+            if self.debug:
+                handle_exception(exc, False, False)
 
         return False
 
@@ -383,7 +393,8 @@ class SSES:
     Space-saving encryption scheme (SSES) for encrypting data without keys and decrypting with keys.
     """
 
-    def __init__(self, password: str, separator: str = '--', with_keys: bool = False) -> None:
+    def __init__(self, password: str, separator: str = '--',
+                 with_keys: bool = False, debug: bool = False) -> None:
         """
         Initializes the SSES instance with the specified symmetric cryptography object and separator
 
@@ -391,11 +402,13 @@ class SSES:
         :param separator: The separator string to use for joining
                           values before encryption. Defaults to '--'.
         :param with_keys: Whether the keys should also be encrypted.
+        :param debug: Whether to throw error messages directly.
         """
 
         self.password = password
         self.separator = separator
         self.with_keys = with_keys
+        self.debug = debug
 
 
     def encrypt(self, data_dict: dict) -> Optional[str]:
@@ -424,7 +437,8 @@ class SSES:
 
             return encrypted_data
         except Exception as exc:
-            handle_exception(exc)
+            if self.debug:
+                handle_exception(exc, False, False)
 
         return None
 
@@ -440,7 +454,10 @@ class SSES:
         """
 
         try:
-            decrypted_data = SymmetricEncryption(self.password).decrypt(encrypted_data)
+            decrypted_data = SymmetricEncryption(
+                self.password, debug = self.debug
+            ).decrypt(encrypted_data)
+
             if decrypted_data is None:
                 return None
 
@@ -465,8 +482,10 @@ class SSES:
 
             return data_dict
         except Exception as exc:
-            handle_exception(exc)
-            return None
+            if self.debug:
+                handle_exception(exc, False, False)
+
+        return None
 
 
 class TimeStorage:
@@ -476,7 +495,7 @@ class TimeStorage:
 
     def __init__(self, file_name: str, dir_path: Optional[str] = DATA_DIR,\
                  store_anonymously: bool = False, ttl: Optional[int] = 259200,
-                 max_size: int = 12) -> None:
+                 max_size: int = 12, debug: bool = False) -> None:
         """
         Initializes the TimeStorage object.
 
@@ -486,6 +505,7 @@ class TimeStorage:
         :param ttl: The time to live in seconds, after that time data will be removed
                     from the file.
         :param max_size: The maximum size of the stored timestamps.
+        :param debug: Whether to throw error messages directly.
         """
 
         if not file_name.endswith('.pkl'):
@@ -495,6 +515,7 @@ class TimeStorage:
         self.store_anonymously = store_anonymously
         self.ttl = ttl
         self.max_size = max_size
+        self.debug = debug
 
 
     def clean_timestamps(self, data: dict) -> dict:
@@ -505,18 +526,24 @@ class TimeStorage:
         :return: The cleaned data.
         """
 
-        new_data = {}
-        for key, timestamps in data.items():
-            new_timestamps = []
-            for timestamp in timestamps:
-                if isinstance(timestamp, int):
-                    if int(time.time()) - timestamp < self.ttl:
-                        new_timestamps.append(timestamp)
+        try:
+            new_data = {}
+            for key, timestamps in data.items():
+                new_timestamps = []
+                for timestamp in timestamps:
+                    if isinstance(timestamp, int):
+                        if int(time.time()) - timestamp < self.ttl:
+                            new_timestamps.append(timestamp)
 
-            if len(new_timestamps) > 0:
-                new_data[key] = new_timestamps
+                if len(new_timestamps) > 0:
+                    new_data[key] = new_timestamps
 
-        return new_data
+            return new_data
+        except Exception as exc:
+            if self.debug:
+                handle_exception(exc, False, False)
+
+        return {}
 
 
     def add_time(self, key: any) -> None:
@@ -526,33 +553,37 @@ class TimeStorage:
         :param key: The key to add the time to.
         """
 
-        data = PICKLE.load(self.file_path, {})
-        if not isinstance(data, dict):
-            data = {}
+        try:
+            data = PICKLE.load(self.file_path, {})
+            if not isinstance(data, dict):
+                data = {}
 
-        found_key = None
-        if self.store_anonymously:
-            for hashed_key in data.keys():
-                if Hashing().compare(key, hashed_key):
-                    found_key = hashed_key
-                    break
-        elif key in data:
-            found_key = key
+            found_key = None
+            if self.store_anonymously:
+                for hashed_key in data.keys():
+                    if Hashing(debug = self.debug).compare(key, hashed_key):
+                        found_key = hashed_key
+                        break
+            elif key in data:
+                found_key = key
 
-        data = self.clean_timestamps(data)
+            data = self.clean_timestamps(data)
 
-        if found_key is not None:
-            if found_key in data:
-                data[found_key].insert(0, int(time.time()))
-                data[found_key] = data[found_key][:self.max_size + 1]
+            if found_key is not None:
+                if found_key in data:
+                    data[found_key].insert(0, int(time.time()))
+                    data[found_key] = data[found_key][:self.max_size + 1]
+                else:
+                    data[found_key] = [int(time.time())]
             else:
-                data[found_key] = [int(time.time())]
-        else:
-            store_key = Hashing().hash(key, return_as_bytes = True)\
-                if self.store_anonymously else key
-            data[store_key] = [int(time.time())]
+                store_key = Hashing(debug = self.debug).hash(key, return_as_bytes = True)\
+                    if self.store_anonymously else key
+                data[store_key] = [int(time.time())]
 
-        PICKLE.dump(data, self.file_path)
+            PICKLE.dump(data, self.file_path)
+        except Exception as exc:
+            if self.debug:
+                handle_exception(exc, False, False)
 
 
     def get_counts(self, key: any) -> Tuple[int, int]:
@@ -564,26 +595,30 @@ class TimeStorage:
         :return: The number of times the key has been used and the total number.
         """
 
-        data = PICKLE.load(self.file_path, {})
-        if not isinstance(data, dict):
-            data = {}
+        try:
+            data = PICKLE.load(self.file_path, {})
+            if not isinstance(data, dict):
+                data = {}
 
-        data = self.clean_timestamps(data)
+            data = self.clean_timestamps(data)
 
-        key_count = 0
-        total_count = 0
+            key_count = 0
+            total_count = 0
 
-        for hashed_key, timestamps in data.items():
-            if self.store_anonymously:
-                if Hashing().compare(key, hashed_key):
-                    key_count += len(timestamps)
-            else:
-                if key == hashed_key:
-                    key_count += len(timestamps)
+            for hashed_key, timestamps in data.items():
+                if self.store_anonymously:
+                    if (self.store_anonymously and Hashing(debug = self.debug)\
+                        .compare(key, hashed_key)) or key == hashed_key:
+                        key_count += len(timestamps)
 
-            total_count += len(timestamps)
+                total_count += len(timestamps)
 
-        return key_count, total_count
+            return key_count, total_count
+        except Exception as exc:
+            if self.debug:
+                handle_exception(exc, False, False)
+
+        return 0, 0
 
 
 class Cache(dict):
@@ -593,7 +628,8 @@ class Cache(dict):
 
 
     def __init__(self, file_name: str, dir_path: Optional[str] = DATA_DIR,\
-                 store_anonymously: bool = False, ttl: Optional[int] = 259200) -> None:
+                 store_anonymously: bool = False, ttl: Optional[int] = 259200,
+                 debug: bool = False) -> None:
         """
         Initializes the Cache object.
 
@@ -602,6 +638,7 @@ class Cache(dict):
         :param store_anonymously: Whether to store the cache data anonymously.
         :param ttl: The time to live in seconds, after that time data will be removed
                     from the cache.
+        :param debug: Whether to throw error messages directly.
         """
 
         if not file_name.endswith('.pkl'):
@@ -610,6 +647,7 @@ class Cache(dict):
         self.file_path = os.path.join(dir_path, file_name)
         self.store_anonymously = store_anonymously
         self.ttl = ttl
+        self.debug = debug
 
         super().__init__()
 
@@ -622,15 +660,21 @@ class Cache(dict):
         :return: True if the key exists in the cache, False otherwise.
         """
 
-        data = self.load()
-        if self.store_anonymously:
-            for hashed_key in data.keys():
-                if Hashing().compare(key, hashed_key):
-                    return True
+        try:
+            data = self.load()
+            if self.store_anonymously:
+                for hashed_key in data.keys():
+                    if Hashing(debug = self.debug).compare(key, hashed_key):
+                        return True
 
-            return False
+                return False
 
-        return key in data
+            return key in data
+        except Exception as exc:
+            if self.debug:
+                handle_exception(exc, False, False)
+
+        return False
 
 
     def __getitem__(self, key: any) -> any:
@@ -658,7 +702,7 @@ class Cache(dict):
                 return item_data
 
             for key_data, value_data in data.items():
-                if Hashing().compare(key, key_data):
+                if Hashing(debug = self.debug).compare(key, key_data):
                     hashed_key, item_data = key_data, value_data
                     break
 
@@ -668,8 +712,10 @@ class Cache(dict):
             if isinstance(item_data, tuple):
                 item_data = item_data[0]
 
-            salt = Hashing().get_salt(hashed_key)
-            decrypted_data = SymmetricEncryption(key, salt = salt).decrypt(item_data)
+            salt = Hashing(debug = self.debug).get_salt(hashed_key)
+            decrypted_data = SymmetricEncryption(
+                key, salt = salt, debug = self.debug
+            ).decrypt(item_data)
 
             try:
                 decrypted_data = json.loads(decrypted_data)
@@ -678,7 +724,8 @@ class Cache(dict):
 
             return decrypted_data
         except Exception as exc:
-            handle_exception(exc, False, False)
+            if self.debug:
+                handle_exception(exc, False, False)
 
         return None
 
@@ -691,36 +738,38 @@ class Cache(dict):
         :param value: The value to be set for the key.
         """
 
-        data = self.load()
+        try:
+            data = self.load()
 
-        if not isinstance(data, dict):
-            data = {}
+            if not isinstance(data, dict):
+                data = {}
 
-        if self.store_anonymously:
-            if isinstance(key, str):
-                hashed_key, salt = Hashing().hash(
-                    key, return_as_bytes = True, return_salt = True
-                )
+            if self.store_anonymously:
+                if isinstance(key, str):
+                    hashed_key, salt = Hashing(debug = self.debug).hash(
+                        key, return_as_bytes = True, return_salt = True
+                    )
+                else:
+                    hashed_key = key
+
+                try:
+                    value = json.dumps(value)
+                except Exception:
+                    pass
+
+                if isinstance(value, str):
+                    value = SymmetricEncryption(
+                        key, salt = salt, debug = self.debug
+                    ).encrypt(value, return_as_bytes = True)
             else:
                 hashed_key = key
 
-            try:
-                value = json.dumps(value)
-            except Exception:
-                pass
-
-            if isinstance(value, str):
-                value = SymmetricEncryption(key, salt = salt)\
-                    .encrypt(value, return_as_bytes = True)
-        else:
-            hashed_key = key
-
-        try:
             data[hashed_key] = (value, int(time.time()))
-        except Exception as exc:
-            handle_exception(exc, is_app_error = False)
-        else:
+
             self.dump(data)
+        except Exception as exc:
+            if self.debug:
+                handle_exception(exc, is_app_error = False)
 
 
     def __delitem__(self, key: any) -> None:
@@ -730,20 +779,21 @@ class Cache(dict):
         :param key: The key for which the value is to be deleted.
         """
 
-        data = self.load()
-
         try:
+            data = self.load()
+
             if self.store_anonymously:
                 for key_data in data.keys():
-                    if Hashing().compare(key, key_data):
+                    if Hashing(debug = self.debug).compare(key, key_data):
                         key = key_data
                         break
 
             del data[key]
-        except Exception as exc:
-            handle_exception(exc, is_app_error = False)
-        else:
+
             self.dump(data)
+        except Exception as exc:
+            if self.debug:
+                handle_exception(exc, is_app_error = False)
 
 
     def load(self) -> dict:
@@ -754,16 +804,22 @@ class Cache(dict):
                  data for this file_name, an empty dictionary is returned.
         """
 
-        data = PICKLE.load(self.file_path, {})
+        try:
+            data = PICKLE.load(self.file_path, {})
 
-        if self.ttl is not None:
-            now = int(time.time())
-            data = {
-                key: value
-                for key, value in data.items()
-                if now - value[1] < self.ttl
-            }
-        return data
+            if self.ttl is not None:
+                now = int(time.time())
+                data = {
+                    key: value
+                    for key, value in data.items()
+                    if now - value[1] < self.ttl
+                }
+            return data
+        except Exception as exc:
+            if self.debug:
+                handle_exception(exc, False, False)
+
+        return {}
 
 
     def dump(self, data: dict) -> None:

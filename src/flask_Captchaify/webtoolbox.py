@@ -204,7 +204,7 @@ class Translator:
             if translated_output is None:
                 return text_to_translate
         except Exception as exc:
-            handle_exception(exc, is_app_error = False)
+            handle_exception(exc, False, False)
             return text_to_translate
 
         translation = {
@@ -381,7 +381,7 @@ class WebToolbox:
             minimized_html = WebToolbox._minimize_tag_content(minimized_html, 'script')
             minimized_html = WebToolbox._minimize_tag_content(minimized_html, 'style')
         except Exception as exc:
-            handle_exception(exc)
+            handle_exception(exc, False, False)
             return html
 
         return minimized_html

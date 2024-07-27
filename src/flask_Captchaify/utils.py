@@ -285,13 +285,14 @@ def validate_captcha_response(response: dict, expected_hostname: str) -> bool:
 
 
 def request_url(url: str, timeout: int = 3, return_as_json:\
-    bool = True) -> Optional[Union[str, dict, bytes]]:
+    bool = True, debug: bool = False) -> Optional[Union[str, dict, bytes]]:
     """
     Makes an request and returns the data in the correct format.
 
     :param url: The url to send the GET Request to.
     :param timeout: The duration after which the connection is cancelled.
     :param return_as_json: Whether to load the data with json.
+    :param debug: Whether to print debug messages.
     """
 
     req = urllib.request.Request(url, headers = REQUEST_HEADERS)
@@ -307,6 +308,9 @@ def request_url(url: str, timeout: int = 3, return_as_json:\
 
         return response_json
     except Exception as exc:
+        if debug:
+            raise exc
+
         handle_exception(exc, False, False)
 
     return None
@@ -980,7 +984,7 @@ class Pickle:
                 with open(file_path, 'wb') as file:
                     pickle.dump(data, file)
         except Exception as exc:
-            handle_exception(exc, is_app_error = False)
+            handle_exception(exc, False, False)
 
 JSON = Json()
 PICKLE = Pickle()

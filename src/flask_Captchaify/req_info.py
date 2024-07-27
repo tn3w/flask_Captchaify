@@ -106,10 +106,11 @@ GEOLITE_DATA: Final[dict] = {
 ############################
 
 
-def request_own_ip() -> Optional[str]:
+def request_own_ip(debug: bool = False) -> Optional[str]:
     """
     Requests the own ip address.
 
+    :param debug: Whether to throw error messages directly.
     :return: The local ip address.
     """
 
@@ -119,8 +120,10 @@ def request_own_ip() -> Optional[str]:
         if is_valid_ip(own_ip, True):
             return own_ip
 
+    url = 'https://api64.ipify.org?format=json'
+
     try:
-        response_json = request_url('https://api64.ipify.org?format=json')
+        response_json = request_url(url, debug = debug)
         if not isinstance(response_json, dict):
             return None
 
@@ -129,8 +132,11 @@ def request_own_ip() -> Optional[str]:
             execute_write(OWN_IP_FILE_PATH, own_ip)
 
             return own_ip
-    except Exception:
-        pass
+    except Exception as exc:
+        if debug:
+            raise exc
+
+        handle_exception(exc, False, False)
 
     return None
 
@@ -304,11 +310,12 @@ def reverse_ip(ip_address: str) -> str:
     return '.'.join(reversed(ip_address.split('.')))
 
 
-def is_tor(ip_address: Optional[str] = None) -> bool:
+def is_tor(ip_address: Optional[str] = None, debug: bool = False) -> bool:
     """
     Check if an IP address is a Tor exit node.
 
     :param ip_address: The IP address to check.
+    :param debug: Whether to print debug messages.
     :return: True if the IP address is a Tor exit node, False otherwise.
     """
 
@@ -319,8 +326,11 @@ def is_tor(ip_address: Optional[str] = None) -> bool:
         for rdata in answers:
             if rdata.to_text() == '127.0.0.2':
                 return True
-    except Exception:
-        pass
+    except Exception as exc:
+        if debug:
+            raise exc
+
+        handle_exception(exc, False, False)
 
     return False
 
@@ -419,7 +429,8 @@ class RequestInfo:
     def __init__(self, request: Request, global_data: any,
                  languages: list, third_parties: list,
                  store_token: Optional[str] = None,
-                 store_anonymously: bool = True) -> None:
+                 store_anonymously: bool = True,
+                 debug: bool = False) -> None:
         """
         Initialize the RequestInfo class.
 
@@ -429,6 +440,7 @@ class RequestInfo:
         :param third_parties: A list of third-party services.
         :param store_token: A token with which all data is saved in the global data.
         :param store_anonymously: Whether to store the cache data anonymously.
+        :param debug: Whether to print debug messages.
         """
 
         self.request = request
@@ -436,6 +448,7 @@ class RequestInfo:
         self.languages = languages
         self.third_parties = third_parties
         self.store_anonymously = store_anonymously
+        self.debug = debug
 
         if isinstance(store_token, str):
             self.store_token = store_token + '_'
@@ -502,7 +515,7 @@ class RequestInfo:
             return_ip = ips if return_all else ips[0]
 
             if return_ip == '127.0.0.1' and 'ipify' in self.third_parties:
-                return_ip = request_own_ip()
+                return_ip = request_own_ip(self.debug)
                 setattr(self.global_data, self.store_token + 'ips', [return_ip])
             else:
                 setattr(self.global_data, self.store_token + 'ips', ips)
@@ -562,8 +575,11 @@ class RequestInfo:
                             "lat": loc.location.latitude,
                             "lon": loc.location.longitude
                         })
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        if self.debug:
+                            raise exc
+
+                        handle_exception(exc, False, False)
                     else:
                         continue
 
@@ -576,8 +592,11 @@ class RequestInfo:
                             "as": asn.autonomous_system_organization,
                             "as_number": asn.autonomous_system_number,
                         })
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        if self.debug:
+                            raise exc
+
+                        handle_exception(exc, False, False)
                     else:
                         continue
 
@@ -663,11 +682,11 @@ class RequestInfo:
         if not is_valid_ip(client_ip):
             return False
 
-        cache = Cache('tor', store_anonymously = self.store_anonymously)
+        cache = Cache('tor', store_anonymously = self.store_anonymously, debug = self.debug)
         if cache[client_ip] is not None:
             return cache[client_ip]
 
-        is_tor_ip = is_tor(client_ip)
+        is_tor_ip = is_tor(client_ip, self.debug)
 
         cache[client_ip] = is_tor_ip
         return is_tor_ip
@@ -688,11 +707,13 @@ class RequestInfo:
         if not is_valid_ip(client_ip):
             return None
 
-        cache = Cache('ipapi', store_anonymously = self.store_anonymously)
+        cache = Cache('ipapi', store_anonymously = self.store_anonymously, debug = self.debug)
         if cache[client_ip] is not None:
             return cache[client_ip]
 
-        response_json = request_url(f'http://ip-api.com/json/{client_ip}?fields=66846719')
+        url = f'http://ip-api.com/json/{client_ip}?fields=66846719'
+
+        response_json = request_url(url, debug = self.debug)
         if not isinstance(response_json, dict):
             return None
 
@@ -748,11 +769,17 @@ class RequestInfo:
         if not is_valid_ip(client_ip):
             return False
 
-        cache = Cache('forum_spammer', store_anonymously = self.store_anonymously)
+        cache = Cache(
+            'forum_spammer', store_anonymously =\
+            self.store_anonymously, debug = self.debug
+        )
+
         if cache[client_ip] is not None:
             return cache[client_ip]
 
-        response_json = request_url(f'https://api.stopforumspam.org/api?ip={client_ip}&json')
+        url = f'https://api.stopforumspam.org/api?ip={client_ip}&json'
+
+        response_json = request_url(url, debug = self.debug)
         if not isinstance(response_json, dict):
             return False
 
@@ -904,12 +931,13 @@ class RequestInfo:
         return scheme + '://' + self.request.url.split('://')[1]
 
 
-def matches_rule(rule: list, req_info: RequestInfo) -> bool:
+def matches_rule(rule: list, req_info: RequestInfo, debug: bool = False) -> bool:
     """
     Recursively checks if client info matches a given rule.
 
     :param rule: The rule to be matched against the client info.
     :param req_info: The request info to be matched.
+    :param debug: Flag indicating if debug mode is enabled.
     :return: True if client info matches the rule, False otherwise.
     """
 
@@ -986,8 +1014,16 @@ def matches_rule(rule: list, req_info: RequestInfo) -> bool:
             return info.endswith(value)
 
     except Exception as exc:
+        if debug:
+            raise exc
+
         handle_exception(exc, is_app_error=False)
         return False
+
+    if debug:
+        raise ValueError(f'UnknownOperatorError: {operator} is not known. '+\
+                        'This is because you have specified an incorrect '+\
+                        'operator field in the rules argument.')
 
     short_error_message = f'UnknownOperatorError: {operator} is not known.'
     handle_exception(
