@@ -253,7 +253,20 @@ args = {
 
 <br>
 
-2. ***`rules` Arg***
+2. ***`debug` Arg***
+
+   If True, the Captchaify app will be in debug mode. This will raise the errors instead of logging them into the log.txt file. Some errors which are normally not logged will now be logged.
+
+   Debug mode can lead to unintended behavior and error raises for errors that are not sever which can lead to Internal Server Error Messages.
+
+   Debug mode should only be used for testing purposes or to find and fix bugs.
+
+   Example on how to use debug mode:
+   ```python
+   captchaify = Captchaify(app, debug=True)
+   ```
+
+3. ***`rules` Arg***
 
    Certain changes based on specific criteria such as IP, proxy, hosting or geo information
 
@@ -510,7 +523,7 @@ args = {
 
 <br>
 
-3. ***`action` Arg***
+4. ***`action` Arg***
 
    To specify the default action of all routes or endpoints use the action arg.
 
@@ -530,7 +543,7 @@ args = {
 
 <br>
 
-4. ***`captcha_type` Arg***
+5. ***`captcha_type` Arg***
 
    To specify the default captcha type of all routes or endpoints use the captcha_type arg.
 
@@ -557,7 +570,7 @@ args = {
 
 <br>
 
-5. ***`dataset` Arg***	
+6. ***`dataset` Arg***	
 
    To specify the default data set of all routes or endpoints use the dataset arg.
 
@@ -578,7 +591,7 @@ args = {
 
 <br>
 
-6. ***`dataset_size` Arg***
+7. ***`dataset_size` Arg***
 
    The size of the data set with e.g. images and keywords that determine how much of a data set is used, if a lot is used this can reduce RAM capacity but also increase security.
    Either a tuple of 2 numbers where the first indicates how many images per keyword (always the first ones) can be used (recommended around 20, maximum 200 or more depending on the data set) and the second number how many keywords are e.g. (images_per_keyword, number_of_keywords), default setting: (20, 100).
@@ -604,7 +617,7 @@ args = {
 
 <br>
 
-7. ***`dataset_dir` Arg***
+8. ***`dataset_dir` Arg***
 
    Specifies where the program can find data sets. A dataset should be a json file.
 
@@ -624,7 +637,7 @@ args = {
 
 <br>
 
-8. ***`hardness` Arg***
+9. ***`hardness` Arg***
 
    Specifies the default hardness of the captcha.
    The variable hardness must be a number between 1 and 5. The higher the value, the harder the captcha is. (Default: 1)
