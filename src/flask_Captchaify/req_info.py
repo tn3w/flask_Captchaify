@@ -10,7 +10,6 @@ The original GPL-3.0 licence applies.
 
 import re
 import os
-import json
 import shutil
 import socket
 import urllib.request
@@ -21,7 +20,7 @@ import geoip2.database
 import crawleruseragents
 from werkzeug import Request
 from .utils import DATA_DIR, ASSETS_DIR, handle_exception, get_domain_from_url,\
-    remove_duplicates, execute_write, type_or_none, read, request
+    remove_duplicates, execute_write, type_or_none, read, request_url
 from .cryptograph import Cache
 
 
@@ -121,7 +120,7 @@ def request_own_ip() -> Optional[str]:
             return own_ip
 
     try:
-        response_json = request('https://api64.ipify.org?format=json')
+        response_json = request_url('https://api64.ipify.org?format=json')
         if not isinstance(response_json, dict):
             return None
 
@@ -693,7 +692,7 @@ class RequestInfo:
         if cache[client_ip] is not None:
             return cache[client_ip]
 
-        response_json = request(f'http://ip-api.com/json/{client_ip}?fields=66846719')
+        response_json = request_url(f'http://ip-api.com/json/{client_ip}?fields=66846719')
         if not isinstance(response_json, dict):
             return None
 
@@ -753,7 +752,7 @@ class RequestInfo:
         if cache[client_ip] is not None:
             return cache[client_ip]
 
-        response_json = request(f'https://api.stopforumspam.org/api?ip={client_ip}&json')
+        response_json = request_url(f'https://api.stopforumspam.org/api?ip={client_ip}&json')
         if not isinstance(response_json, dict):
             return False
 

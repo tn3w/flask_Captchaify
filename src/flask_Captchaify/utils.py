@@ -284,7 +284,7 @@ def validate_captcha_response(response: dict, expected_hostname: str) -> bool:
     return True
 
 
-def request(url: str, timeout: int = 3, return_as_json:\
+def request_url(url: str, timeout: int = 3, return_as_json:\
     bool = True) -> Optional[Union[str, dict, bytes]]:
     """
     Makes an request and returns the data in the correct format.
