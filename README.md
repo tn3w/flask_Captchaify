@@ -266,6 +266,8 @@ args = {
    captchaify = Captchaify(app, debug=True)
    ```
 
+<br>
+
 3. ***`rules` Arg***
 
    Certain changes based on specific criteria such as IP, proxy, hosting or geo information
