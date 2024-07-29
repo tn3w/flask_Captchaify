@@ -38,6 +38,7 @@ if __name__ == '__main__':
       - [Captcha Integration](#captcha-integration)
       - [Special Cases](#special-cases)
       - [Arguments](#arguments)
+      - [Known issues](#known-issues)
 
 
 ### How does it work?
@@ -284,244 +285,248 @@ args = {
 
    <br>
 
-   **Client Info**
+   - **Client Info**
 
-   The following client info fields can be compared:
-   | Name of field  | Type | Information                                                   | Example                                                                          |
-   | -------------- | ---- | ------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-   | ip             | str  | Client's IP address.                                          | 169.150.196.74                                                                   |
-   | user_agent     | str  | User agent string of the client's browser.                    | Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0 |
-   | invalid_ip     | bool | Boolean indicating if the IP is invalid.                      | False                                                                            |
-   | continent      | str  | Name of the continent.                                        | Europe                                                                           |
-   | continent_code | str  | Continent code. (ISO 3166)                                    | EU                                                                               |
-   | country        | str  | Name of the country.                                          | The Netherlands                                                                  |
-   | country_code   | str  | Country code. (ISO 3166)                                      | NL                                                                               |
-   | region         | str  | Name of the region.                                           | North Holland                                                                    |
-   | region_code    | str  | Region code. (ISO 3166)                                       | NH                                                                               |
-   | city           | str  | Name of the city.                                             | Amsterdam                                                                        |
-   | district       | str  | Name of the district.                                         | None                                                                             |
-   | zip            | int  | Postal code.                                                  | 1012                                                                             |
-   | lat            | int  | Latitude.                                                     | 52.3759                                                                          |
-   | lon            | int  | Longitude.                                                    | 4.8975                                                                           |
-   | timezone       | str  | Timezone.                                                     | Europe/Amsterdam                                                                 |
-   | offset         | int  | Timezone offset.                                              | 7200                                                                             |
-   | currency       | str  | Local currency. (ISO 4217)                                    | EUR                                                                              |
-   | isp            | str  | Internet Service Provider.                                    | Datacamp Limited                                                                 |
-   | org            | str  | Organization name.                                            | CSNext                                                                           |
-   | as             | str  | Autonomous system name.                                       | Datacamp Limited                                                                 |
-   | as_code        | int  | Autonomous system code.                                       | 212238                                                                           |
-   | reverse        | str  | Reverse DNS lookup result.                                    | unn-169-150-196-74.datapacket.com                                                |
-   | mobile         | bool | Boolean indicating if the connection is via a mobile network. | False                                                                            |
-   | proxy          | bool | Boolean indicating if the client is using a proxy.            | True                                                                             |
-   | tor            | bool | Boolean indicating if the client is using Tor.                | False                                                                            |
-   | hosting        | bool | Boolean indicating if the client is using a hosting service.  | True                                                                             |
-   | forum_spammer  | bool | Boolean indicating if the client is a known forum spammer.    | True                                                                             |
-   | netloc         | str  | Network location part of the URL. (includes Port)             | domain.example.com:80                                                            |
-   | hostname       | str  | Fully qualified domain name (FQDN) of the server.             | domain.example.com                                                               |
-   | domain         | str  | Primary domain name, which is a subset of the hostname.       | example.com                                                                      |
-   | path           | str  | Path component of the URL, indicates a specific resource.     | /login                                                                           |
-   | endpoint       | str  | The `request.endpoint` Endpoint Information.                  | login                                                                            |
-   | scheme         | str  | Protocol used to access the resource.                         | https                                                                            |
-   | url            | str  | Complete URL that combines all the individual components.     | https://domain.example.com/login                                                 |
+      The following client info fields can be compared:
+      | Name of field  | Type | Information                                                   | Example                                                                          |
+      | -------------- | ---- | ------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+      | ip             | str  | Client's IP address.                                          | 169.150.196.74                                                                   |
+      | user_agent     | str  | User agent string of the client's browser.                    | Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0 |
+      | invalid_ip     | bool | Boolean indicating if the IP is invalid.                      | False                                                                            |
+      | continent      | str  | Name of the continent.                                        | Europe                                                                           |
+      | continent_code | str  | Continent code. (ISO 3166)                                    | EU                                                                               |
+      | country        | str  | Name of the country.                                          | The Netherlands                                                                  |
+      | country_code   | str  | Country code. (ISO 3166)                                      | NL                                                                               |
+      | region         | str  | Name of the region.                                           | North Holland                                                                    |
+      | region_code    | str  | Region code. (ISO 3166)                                       | NH                                                                               |
+      | city           | str  | Name of the city.                                             | Amsterdam                                                                        |
+      | district       | str  | Name of the district.                                         | None                                                                             |
+      | zip            | int  | Postal code.                                                  | 1012                                                                             |
+      | lat            | int  | Latitude.                                                     | 52.3759                                                                          |
+      | lon            | int  | Longitude.                                                    | 4.8975                                                                           |
+      | timezone       | str  | Timezone.                                                     | Europe/Amsterdam                                                                 |
+      | offset         | int  | Timezone offset.                                              | 7200                                                                             |
+      | currency       | str  | Local currency. (ISO 4217)                                    | EUR                                                                              |
+      | isp            | str  | Internet Service Provider.                                    | Datacamp Limited                                                                 |
+      | org            | str  | Organization name.                                            | CSNext                                                                           |
+      | as             | str  | Autonomous system name.                                       | Datacamp Limited                                                                 |
+      | as_code        | int  | Autonomous system code.                                       | 212238                                                                           |
+      | reverse        | str  | Reverse DNS lookup result.                                    | unn-169-150-196-74.datapacket.com                                                |
+      | mobile         | bool | Boolean indicating if the connection is via a mobile network. | False                                                                            |
+      | proxy          | bool | Boolean indicating if the client is using a proxy.            | True                                                                             |
+      | tor            | bool | Boolean indicating if the client is using Tor.                | False                                                                            |
+      | hosting        | bool | Boolean indicating if the client is using a hosting service.  | True                                                                             |
+      | forum_spammer  | bool | Boolean indicating if the client is a known forum spammer.    | True                                                                             |
+      | netloc         | str  | Network location part of the URL. (includes Port)             | domain.example.com:80                                                            |
+      | hostname       | str  | Fully qualified domain name (FQDN) of the server.             | domain.example.com                                                               |
+      | domain         | str  | Primary domain name, which is a subset of the hostname.       | example.com                                                                      |
+      | path           | str  | Path component of the URL, indicates a specific resource.     | /login                                                                           |
+      | endpoint       | str  | The `request.endpoint` Endpoint Information.                  | login                                                                            |
+      | scheme         | str  | Protocol used to access the resource.                         | https                                                                            |
+      | url            | str  | Complete URL that combines all the individual components.     | https://domain.example.com/login                                                 |
 
-   <br>
+      <br>
 
-   The following operators are available:
-   | Name of Operator                                                   | The same as             |
-   | ------------------------------------------------------------------ | ----------------------- |
-   | ==, equals, equal, is                                              | field == value          |
-   | !=, does not equal, does not equals, not equals, not equal, not is | field != value          |
-   | contains, contain                                                  | value in field          |
-   | does not contain, does not contains, not contain, not contains     | value not in field      |
-   | is in, in                                                          | field in value          |
-   | is not in, not is in, not in                                       | field not in value      |
-   | greater than, larger than                                          | field > value           |
-   | less than                                                          | field < value           |
-   | starts with, begins with                                           | field.startswith(value) |
-   | ends with, concludes with, finishes with                           | field.endswith(value)   |
+   - **Operators**
 
-   Where field is the type of data e.g. `ip` and value is the value it should have e.g. `169.150.196.74`.
+      The following operators are available:
+      | Name of Operator                                                   | The same as             |
+      | ------------------------------------------------------------------ | ----------------------- |
+      | ==, equals, equal, is                                              | field == value          |
+      | !=, does not equal, does not equals, not equals, not equal, not is | field != value          |
+      | contains, contain                                                  | value in field          |
+      | does not contain, does not contains, not contain, not contains     | value not in field      |
+      | is in, in                                                          | field in value          |
+      | is not in, not is in, not in                                       | field not in value      |
+      | greater than, larger than                                          | field > value           |
+      | less than                                                          | field < value           |
+      | starts with, begins with                                           | field.startswith(value) |
+      | ends with, concludes with, finishes with                           | field.endswith(value)   |
 
-   <br>
+      Where field is the type of data e.g. `ip` and value is the value it should have e.g. `169.150.196.74`.
 
-   All changes that can be made by these rules:
-   | Name of the change | Type            | Example                                                     |
-   | ------------------ | --------------- | ----------------------------------------------------------- |
-   | captcha_type       | str             | multiclick                                                  |
-   | dataset            | str             | ai-dogs                                                     |
-   | dataset_dir        | str             | /path/to/dataset/dir                                        |
-   | action             | str             | allow                                                       |
-   | hardness           | int (1-5)       | 3                                                           |
-   | enable_rate_limit  | bool            | True                                                        |
-   | rate_limit         | Tuple[int, int] | (20, 100)                                                   |
-   | template_dir       | str             | /path/to/template/dir                                       |
-   | recaptcha_site_key | str             | 6Lfp1PEpAAAAANS3PIXmQ4c7k2p7gqxMopD5Npy3                    |
-   | recaptcha_secret   | str             | 6Lfp1OEyBBBBBDjuZ-xK8H2LMnPVFQR-5nKkTBY9                    |
-   | hcaptcha_site_key  | str             | d4f8bc19-c517-4387-9cb1-826935d73f47                        |
-   | hcaptcha_secret    | str             | ES_e7d43d0818455496a48d22ddc3367d68                         |
-   | turnstile_site_key | str             | 0x5CCCCCCAp-qCgUJkS4MJa                                     |
-   | turnstile_secret   | str             | 0x5BBBBBBBc-vRpT3xZNR1bKfDJKUPGLQPF                         |
-   | friendly_site_key  | str             | WZMSUDMH2PXWVJN9                                            |
-   | friendly_secret    | str             | B2YL26SFRPF3C9VOMOOF9HW8R0MX5WESVXO3OZ5TJ2AP62L91B4PCUP5C1J |
+      <br>
+   
+   - **Changes**
+   
+      All changes that can be made by these rules:
+      | Name of the change | Type            | Example                                                     |
+      | ------------------ | --------------- | ----------------------------------------------------------- |
+      | captcha_type       | str             | multiclick                                                  |
+      | dataset            | str             | ai-dogs                                                     |
+      | dataset_dir        | str             | /path/to/dataset/dir                                        |
+      | action             | str             | allow                                                       |
+      | hardness           | int (1-5)       | 3                                                           |
+      | enable_rate_limit  | bool            | True                                                        |
+      | rate_limit         | Tuple[int, int] | (20, 100)                                                   |
+      | template_dir       | str             | /path/to/template/dir                                       |
+      | recaptcha_site_key | str             | 6Lfp1PEpAAAAANS3PIXmQ4c7k2p7gqxMopD5Npy3                    |
+      | recaptcha_secret   | str             | 6Lfp1OEyBBBBBDjuZ-xK8H2LMnPVFQR-5nKkTBY9                    |
+      | hcaptcha_site_key  | str             | d4f8bc19-c517-4387-9cb1-826935d73f47                        |
+      | hcaptcha_secret    | str             | ES_e7d43d0818455496a48d22ddc3367d68                         |
+      | turnstile_site_key | str             | 0x5CCCCCCAp-qCgUJkS4MJa                                     |
+      | turnstile_secret   | str             | 0x5BBBBBBBc-vRpT3xZNR1bKfDJKUPGLQPF                         |
+      | friendly_site_key  | str             | WZMSUDMH2PXWVJN9                                            |
+      | friendly_secret    | str             | B2YL26SFRPF3C9VOMOOF9HW8R0MX5WESVXO3OZ5TJ2AP62L91B4PCUP5C1J |
 
-   <br>
+      <br>
 
-   **Asterik `*`**
+   - **Asterik `*`**
 
-   The asterisk creates the customization options for information comparisons. The asterisk (*) serves as a wildcard, representing any number of characters including zero.
+      The asterisk creates the customization options for information comparisons. The asterisk (*) serves as a wildcard, representing any number of characters including zero.
 
-   Example of a rule that all routes that start with /login then have a string and then have /development as route e.g. `/login/api/development` or `/login/2fa/development`:
-   ```python
-   rules = [{"rule": ['path', 'is', '/login*/development']}, "change": {"action": "block"}]
-   ```
+      Example of a rule that all routes that start with /login then have a string and then have /development as route e.g. `/login/api/development` or `/login/2fa/development`:
+      ```python
+      rules = [{"rule": ['path', 'is', '/login*/development']}, "change": {"action": "block"}]
+      ```
 
-   <br>
+      <br>
 
    Here are all the things that can be changed:
 
-   **Captcha types (`captcha_type`)**
+   - **Captcha types (`captcha_type`)**
 
-   | Name of captcha type | Displayed Captchas                                                                                                  |
-   | --------------       | ------------------------------------------------------------------------------------------------------------------- |
-   | oneclick (Default)   | The user only needs one click to confirm that he is not a bot                                                       |
-   | multiclick           | The user must select several images that match a motif (harder)                                                     |
-   | text                 | The user enters a text combination from an image into an input                                                      |
-   | audio                | The user enters a text combination from an audio into an input                                                      |
-   | text&audio           | The user enters a text and an audio combination into an input                                                       |
-   | altcha               | Use a Prove-of-Work from Altcha to make spam more difficult. (Recommended if you do not want to use our own tools.) |
-   | trueclick            | TrueClick is an in-house programmed clickable third party captcha. It is built in.                                  |
-   | recaptcha            | Uses Google Recaptcha for verification. Set `recaptcha_site_key` and `recaptcha_secret`.                            |
-   | hcaptcha             | Uses HCaptcha for verification. Set `hcaptcha_site_key` and `hcaptcha_secret`.                                      |
-   | turnstile            | Uses Cloudflare Turnstile for verification. Set `turnstile_site_key` and `turnstile_secret`.                        |
-   | friendly             | Uses Friendly Captcha for verification. Set `friendly_site_key` and `friendly_secret`.                              |
+      | Name of captcha type | Displayed Captchas                                                                                                  |
+      | --------------       | ------------------------------------------------------------------------------------------------------------------- |
+      | oneclick (Default)   | The user only needs one click to confirm that he is not a bot                                                       |
+      | multiclick           | The user must select several images that match a motif (harder)                                                     |
+      | text                 | The user enters a text combination from an image into an input                                                      |
+      | audio                | The user enters a text combination from an audio into an input                                                      |
+      | text&audio           | The user enters a text and an audio combination into an input                                                       |
+      | altcha               | Use a Prove-of-Work from Altcha to make spam more difficult. (Recommended if you do not want to use our own tools.) |
+      | trueclick            | TrueClick is an in-house programmed clickable third party captcha. It is built in.                                  |
+      | recaptcha            | Uses Google Recaptcha for verification. Set `recaptcha_site_key` and `recaptcha_secret`.                            |
+      | hcaptcha             | Uses HCaptcha for verification. Set `hcaptcha_site_key` and `hcaptcha_secret`.                                      |
+      | turnstile            | Uses Cloudflare Turnstile for verification. Set `turnstile_site_key` and `turnstile_secret`.                        |
+      | friendly             | Uses Friendly Captcha for verification. Set `friendly_site_key` and `friendly_secret`.                              |
 
-   Example of a website that has set its captcha type to "multiclick" for specific ips:
-   ```python
-   rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"captcha_type": "multiclick"}]
-   ```
+      Example of a website that has set its captcha type to "multiclick" for specific ips:
+      ```python
+      rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"captcha_type": "multiclick"}]
+      ```
 
-   <br>
+      <br>
 
-   **Datasets (`dataset`)**
+   - **Datasets (`dataset`)**
 
-   | Name of dataset | Displayed Captchas                                                                                 |
-   | --------------- | -------------------------------------------------------------------------------------------------- |
-   | keys            | Displays images based on specific keywords of landscapes, objects, and more (default for oneclick) |
-   | animals         | Displays 50 different animal species (default for multiclick)                                      |
-   | ai-dogs         | Displays smiling and not smiling dogs                                                              |
+      | Name of dataset | Displayed Captchas                                                                                 |
+      | --------------- | -------------------------------------------------------------------------------------------------- |
+      | keys            | Displays images based on specific keywords of landscapes, objects, and more (default for oneclick) |
+      | animals         | Displays 50 different animal species (default for multiclick)                                      |
+      | ai-dogs         | Displays smiling and not smiling dogs                                                              |
 
-   Example of a website that has set its data set to "keys" for specific ips:
-   ```python
-   rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"dataset": "ai-dogs"}]
-   ```
+      Example of a website that has set its data set to "keys" for specific ips:
+      ```python
+      rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"dataset": "ai-dogs"}]
+      ```
 
-   <br>
+      <br>
 
-   **Dataset Dir (`dataset_dir`)**
+   - **Dataset Dir (`dataset_dir`)**
 
-   ```
-   dataset_dir\
-          \keys.json
-          \animals.json
-          \ai-dogs.json
-          ...
-   ```
+      ```
+      dataset_dir\
+            \keys.json
+            \animals.json
+            \ai-dogs.json
+            ...
+      ```
 
-   Example of a website that specifies its own dataset folder for specific ips:
-   ```python
-   rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"dataset_dir": "/path/to/dataset/dir"}]
-   ```
+      Example of a website that specifies its own dataset folder for specific ips:
+      ```python
+      rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"dataset_dir": "/path/to/dataset/dir"}]
+      ```
 
-   <br>
+      <br>
 
-   **Actions (`action`)**
+   - **Actions (`action`)**
 
-   | Name of action | Executing Action                                                     |
-   | -------------- | -------------------------------------------------------------------- |
-   | allow          | Allows all traffic through, regardless of whether the IP is blocked. |
-   | block          | Blocks all traffic if it is blocked, without captcha.                |
-   | fight          | Displays a captcha to all traffic, whether suspicious or not.        |
-   | auto           | Default value, shows only suspicious traffic captchas.               |
+      | Name of action | Executing Action                                                     |
+      | -------------- | -------------------------------------------------------------------- |
+      | allow          | Allows all traffic through, regardless of whether the IP is blocked. |
+      | block          | Blocks all traffic if it is blocked, without captcha.                |
+      | fight          | Displays a captcha to all traffic, whether suspicious or not.        |
+      | auto           | Default value, shows only suspicious traffic captchas.               |
 
-   Example of a website that has set its action to "block" for specific ips:
-   ```python
-   rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"action": "block"}]
-   ```
+      Example of a website that has set its action to "block" for specific ips:
+      ```python
+      rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"action": "block"}]
+      ```
 
-   <br>
+      <br>
 
-   **Hardness (`hardness`)**
+   - **Hardness (`hardness`)**
 
-   The variable hardness must be a number between 1 and 5. The higher the value, the harder the captcha is. (Default: 1)
+      The variable hardness must be a number between 1 and 5. The higher the value, the harder the captcha is. (Default: 1)
 
-   Example of a website that has set its hardness to 3 for specific ips:
-   ```python
-   rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"hardness": 3}]
-   ```
+      Example of a website that has set its hardness to 3 for specific ips:
+      ```python
+      rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"hardness": 3}]
+      ```
 
-   <br>
+      <br>
 
-   **Enable Rate Limit (`enable_rate_limit`)**
+   - **Enable Rate Limit (`enable_rate_limit`)**
    
-   To enable or disable rate limits.
+      To enable or disable rate limits.
 
-   Example of a website that has set its rate limit to false for specific ips:
-   ```python
-   rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"enable_rate_limit": False}]
-   ```
+      Example of a website that has set its rate limit to false for specific ips:
+      ```python
+      rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"enable_rate_limit": False}]
+      ```
 
-   <br>
+      <br>
 
-   **Rate Limits (`rate_limit`)**
+   - **Rate Limits (`rate_limit`)**
 
-   The syntax is a bit different from the others, because two values are specified `(rate_limit, max_rate_limit)`. The variable rate_limit must be a number indicating how many requests per 10 seconds can come from a given ip. max_rate_limit indicates how many requests can come from all ips per 10 seconds, also a int.
+      The syntax is a bit different from the others, because two values are specified `(rate_limit, max_rate_limit)`. The variable rate_limit must be a number indicating how many requests per 10 seconds can come from a given ip. max_rate_limit indicates how many requests can come from all ips per 10 seconds, also a int.
 
-   Example of a website that has set its rate limit to (20, 300) for specific ips:
-   ```python
-   rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"rate_limit": (20, 1200)}]
-   ```
+      Example of a website that has set its rate limit to (20, 300) for specific ips:
+      ```python
+      rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"rate_limit": (20, 1200)}]
+      ```
 
-   <br>
+      <br>
 
-   **Template Dir (`template_dir`)**
+   - **Template Dir (`template_dir`)**
 
-   To change the template directory of a particular route use the template_dirs arg.
+      To change the template directory of a particular route use the template_dirs arg.
 
-   A template directory can look like this:
-   ```
-   template_directory\
-              \captcha_text_audio.html
-              \captcha_oneclick.html
-              \captcha_multiclick.html
-              \captcha_third_party.html
-              \change_language.html
-              \blocked.html
-              \rate_limited.html
-              \nojs.html
-              \exception.html
-   ```
+      A template directory can look like this:
+      ```
+      template_directory\
+               \captcha_text_audio.html
+               \captcha_oneclick.html
+               \captcha_multiclick.html
+               \captcha_third_party.html
+               \change_language.html
+               \blocked.html
+               \rate_limited.html
+               \nojs.html
+               \exception.html
+      ```
 
-   If one of the three templates does not exist in the folder, a 404 error is displayed when calling it. e.g. if you remove the change_language page at apis.
+      If one of the three templates does not exist in the folder, a 404 error is displayed when calling it. e.g. if you remove the change_language page at apis.
 
-   Example of a website that has set its template dir to "template_directory" for specific ips:
-   ```python
-   rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"template_dir": "/path/to/template/dir"}]
-   ```
+      Example of a website that has set its template dir to "template_directory" for specific ips:
+      ```python
+      rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"template_dir": "/path/to/template/dir"}]
+      ```
 
-   <br>
+      <br>
 
-   **Site Keys and Secrets**
+   - **Site Keys and Secrets**
 
-   To change the site_key and secret of a particular route use the recaptcha_site_key, recaptcha_secret, hcaptcha_site_key, hcaptcha_secret, turnstile_site_key, turnstile_secret, friendly_site_key and friendly_secret args.
+      To change the site_key and secret of a particular route use the recaptcha_site_key, recaptcha_secret, hcaptcha_site_key, hcaptcha_secret, turnstile_site_key, turnstile_secret, friendly_site_key and friendly_secret args.
 
-   For google reCaptcha you can get this here: https://www.google.com/recaptcha/admin/create, for hCaptcha here: https://dashboard.hcaptcha.com/login, for Cloudflare Turnstile here: https://dash.cloudflare.com/sign-up?to=/:account/turnstile (Important: You must have an domain with Cloudflare) and for Friendly Captcha here: [https://friendlycaptcha.com/signup/](https://friendlycaptcha.com/signup/), after signing up you can create an organization and get your site key under `Applications` and secret under `Api Keys`.
+      For google reCaptcha you can get this here: https://www.google.com/recaptcha/admin/create, for hCaptcha here: https://dashboard.hcaptcha.com/login, for Cloudflare Turnstile here: https://dash.cloudflare.com/sign-up?to=/:account/turnstile (Important: You must have an domain with Cloudflare) and for Friendly Captcha here: [https://friendlycaptcha.com/signup/](https://friendlycaptcha.com/signup/), after signing up you can create an organization and get your site key under `Applications` and secret under `Api Keys`.
 
-   Usually site_key and secret are displayed after creating an account or when linking a domain or ip.
+      Usually site_key and secret are displayed after creating an account or when linking a domain or ip.
 
-   Example of a website that has set its recaptcha_site_key to "recaptcha_site_key" for specific ips:
-   ```python
-   rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"recaptcha_site_key": "recaptcha_site_key"}]
-   ```
+      Example of a website that has set its recaptcha_site_key to "recaptcha_site_key" for specific ips:
+      ```python
+      rules = [{"rule": ['ip', 'is in', ('1.1.1.1', '1.0.0.1', '8.8.8.8')]}, "change": {"recaptcha_site_key": "recaptcha_site_key"}]
+      ```
 
 <br>
 
@@ -1030,3 +1035,64 @@ args = {
    ```python
    captchaify = Captchaify(app, friendly_secret = '<secret>')
    ```
+
+<br>
+
+## Known issues
+### Exceptions
+
+- ***Using `log.txt`***<br>
+   All exceptions are logged to the console and the stack trace is written to the log.txt file.
+   You can find the log.txt file in the directory where the package is installed.
+
+   Use the command `pip show flask_Captchaify` to show information about the package and then copy the location directory value. e.g.: `Location: C:\Users\user\anaconda3\Lib\site-packages`
+
+   The file is located under `COPIED_DIR\flask_Captchaify\log.txt`
+
+   If more than one error is stored in the file, you can search for the correct error stack trace by searching for the error ID you saw in the console that is in the console with the error, e.g. `[flask_Captchaify Error #ERROR_ID at 2024-07-20 21:49:09]: Error Message`
+
+   An error stacktrace in the file looks like this: (real error example)
+   ```txt
+   ----- Error #ERROR_ID at 2024-01-01 22:24:04 -----
+   Traceback (most recent call last):
+   File "C:\Users\user\Documents\Code\flask_Captchaify\src\flask_Captchaify\__init__.py", line 2065, in _set_cookies
+      print(g.captchaify_no_new_cookies)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   File "C:\Users\user\Documents\Code\flask_Captchaify\.venv\Lib\site-packages\flask\ctx.py", line 56, in __getattr__
+      raise AttributeError(name) from None
+   AttributeError: captchaify_no_new_cookies
+   ```
+
+- ***Using `debug=True`***<br>
+   If you are using debug mode, all errors are raised instead of being logged.
+
+   Debug mode can lead to unintended behavior and error raises for errors that are not sever which can lead to Internal Server Error Messages.
+   The stability of the package can be altered by using debug mode. Only recommended for testing purposes.
+
+### Malformed files
+
+It is possible that some of the files are corrupted or missing. If this happens, you can delete alle files in the `data` directory or remove the package.
+
+To find the `data` directory, use the command `pip show flask_Captchaify` to show information about the package and then copy the location directory value. e.g.: `Location: C:\Users\user\anaconda3\Lib\site-packages`
+
+The directory is located under `COPIED_DIR\flask_Captchaify\data`
+
+You can reinstall the package using `pip install flask_Captchaify --force-reinstall --upgrade`
+
+### Requests from localhost
+
+When requested from localhost, Captchaify can not resolve the IP address of the requester or any data.
+
+Add `ipify` to the third party list. The real IP is automatically resolved.
+```python
+captchaify = Captchaify(app, third_parties = ['geoip', 'tor', 'ipapi', 'stopforumspam', 'ipify'])
+```
+
+### Request exceptions
+
+Captchaify uses free APIs to get information about IP addresses. It also uses own implementations to request the reverse DNS name and if the client is Tor or not. It also requests the newest geoip file. This behaviour can lead to request exceptions.
+
+All third parties can be disabled by setting `third_parties = []` in the `captchaify = Captchaify(app)` line. The default is all 4 third parties.
+```python
+captchaify = Captchaify(app, third_parties = [])
+```
