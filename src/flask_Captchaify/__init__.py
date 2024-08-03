@@ -51,7 +51,7 @@ ALL_CAPTCHA_TYPES: Final[list] = [
     'multiclick', 'recaptcha', 'hcaptcha', 'turnstile',
     'friendly', 'altcha', 'trueclick'
 ]
-ALL_DATASET_TYPES: Final[list] = ['keys', 'animals', 'ai-dogs']
+ALL_DATASET_TYPES: Final[list] = ['keys', 'animals', 'ai_dogs']
 ALL_ACTIONS: Final[list] = ['allow', 'block', 'fight', 'auto']
 ALL_THIRD_PARTIES: Final[list] = ['geoip', 'tor', 'ipapi', 'stopforumspam', 'ipify']
 DEFAULT_THIRD_PARTIES: Final[list] = ['geoip', 'tor', 'ipapi', 'stopforumspam']
@@ -66,7 +66,7 @@ DATASET_REQUIRED: Final[list] = ['oneclick', 'multiclick', 'trueclick']
 DATASETS: Final[dict] = {
     "keys": "https://github.com/tn3w/Captcha_Datasets/raw/master/keys.json",
     "animals": "https://github.com/tn3w/Captcha_Datasets/raw/master/animals.json",
-    "ai-dogs": "https://github.com/tn3w/Captcha_Datasets/raw/master/ai-dogs.json"
+    "ai_dogs": "https://github.com/tn3w/Captcha_Datasets/raw/master/ai-dogs.json"
 }
 
 DATASET_SIZES: Final[dict] = {
@@ -648,7 +648,7 @@ class Captchaify:
 
             print('Downloading', dataset + "...")
             urllib.request.urlretrieve(
-                DATASET_SIZES[dataset][0],
+                DATASETS[dataset],
                 dataset_file_path
             )
 
