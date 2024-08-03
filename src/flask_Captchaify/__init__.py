@@ -274,12 +274,12 @@ class Captchaify:
                  verification_age: int = 3600, template_dir: str = TEMPLATE_DIR,
                  without_customisation: bool = False, without_cookies: bool = False,
                  without_arg_transfer: bool = False, without_watermark: bool = False,
-                 third_parties: Optional[list[str]] = None, as_route: bool = False,
+                 third_parties: Optional[Union[str, list]] = None, as_route: bool = False,
                  fixed_route_name: str = '_captchaify', enable_rate_limit: bool = True,
                  rate_limit: Tuple[int, int] = (15, 300), block_crawler: bool = True,
                  crawler_hints: bool = True, theme: str = 'light', language: str = 'en',
                  store_anonymously: bool = True, without_trueclick: bool = False,
-                 error_codes: Optional[list] = None,
+                 error_codes: Optional[Union[int, str, dict, list]] = None,
                  recaptcha_site_key: Optional[str] = None, recaptcha_secret: Optional[str] = None,
                  hcaptcha_site_key: Optional[str] = None, hcaptcha_secret: Optional[str] = None,
                  turnstile_site_key: Optional[str] = None, turnstile_secret: Optional[str] = None,
@@ -338,11 +338,13 @@ class Captchaify:
         self.sses = SSES(captcha_secret, with_keys = True, debug = self.debug)
         self.altcha = Altcha(secrets.token_bytes(32))
 
+        if third_parties == 'all':
+            third_parties = DEFAULT_THIRD_PARTIES
+        elif third_parties in ALL_THIRD_PARTIES:
+            third_parties = [third_parties]
+
         if not isinstance(third_parties, list):
             third_parties = DEFAULT_THIRD_PARTIES
-
-        if not isinstance(error_codes, list):
-            error_codes = []
 
         kwargs = {
             "action": action, "captcha_type": captcha_type, "dataset": dataset,
@@ -476,20 +478,32 @@ class Captchaify:
         ########################
 
         error_codes_to_handle = keyword_args['error_codes']
-        if len(error_codes_to_handle) != 0:
-            codes = []
-            for error_code in error_codes_to_handle:
-                if isinstance(error_code, dict):
-                    codes.append(error_code['code'])
-                    continue
+        codes = []
 
-                if isinstance(error_code, str) and error_code.isdigit():
-                    error_code = int(error_code)
+        if isinstance(error_codes_to_handle, (int, str, dict)):
+            error_codes_to_handle = [error_codes_to_handle]
 
-                codes.append(error_code)
+        if isinstance(error_codes_to_handle, list)\
+            and len(error_codes_to_handle) != 0:
 
-            for error_code in codes:
-                app.register_error_handler(error_code, self._render_exception)
+            if 'all' not in error_codes_to_handle:
+                for error_code in error_codes_to_handle:
+                    if isinstance(error_code, dict):
+                        codes.append(error_code['code'])
+                        continue
+
+                    if isinstance(error_code, str):
+                        try:
+                            error_code = int(error_code)
+                        except Exception:
+                            pass
+
+                    codes.append(error_code)
+            else:
+                codes = list(ERROR_CODES.keys())
+
+        for error_code in codes:
+            app.register_error_handler(error_code, self._render_exception)
 
         ############################
         #### Context Processors ####
