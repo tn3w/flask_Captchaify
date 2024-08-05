@@ -669,14 +669,14 @@ def manipulate_image_bytes(image_data: bytes, is_small: bool = False,
     height, width = img.shape[:2]
 
     if hardness > 3:
-        num_dots = np.random.randint(20, 50) * (hardness - 3)
+        num_dots = np.random.randint(20, 100) * (hardness - 3)
         dot_coords = np.random.randint(0, [width, height], size=(num_dots, 2))
         colors = np.random.randint(0, 256, size=(num_dots, 3))
 
         for (x, y), color in zip(dot_coords, colors):
             img[y, x] = color
 
-        num_lines = np.random.randint(20, 50) * (hardness - 3)
+        num_lines = np.random.randint(20, 100) * (hardness - 3)
         start_coords = np.random.randint(0, [width, height], size=(num_lines, 2))
         end_coords = np.random.randint(0, [width, height], size=(num_lines, 2))
         colors = np.random.randint(0, 256, size=(num_lines, 3))
@@ -684,9 +684,9 @@ def manipulate_image_bytes(image_data: bytes, is_small: bool = False,
         for (start, end), color in zip(zip(start_coords, end_coords), colors):
             cv2.line(img, tuple(start), tuple(end), color.tolist(), 1)
 
-    max_shift = max(3, hardness)
-    x_shifts = np.random.randint(-max(2, hardness - 1), max_shift, size=(height, width))
-    y_shifts = np.random.randint(-max(2, hardness - 1), max_shift, size=(height, width))
+    max_shift = max(3, hardness + 1)
+    x_shifts = np.random.randint(-max(2, hardness + 4), max_shift, size=(height, width))
+    y_shifts = np.random.randint(-max(1, hardness + 4), max_shift, size=(height, width))
 
     map_x, map_y = np.meshgrid(np.arange(width), np.arange(height))
     map_x = (map_x + x_shifts) % width
@@ -698,8 +698,8 @@ def manipulate_image_bytes(image_data: bytes, is_small: bool = False,
     )
     shifted_img_hsv = cv2.cvtColor(shifted_img, cv2.COLOR_BGR2HSV)
 
-    shifted_img_hsv[..., 1] = np.clip(shifted_img_hsv[..., 1] * (1 + hardness * 0.06), 0, 255)
-    shifted_img_hsv[..., 2] = np.clip(shifted_img_hsv[..., 2] * (1 - hardness * 0.03), 0, 255)
+    shifted_img_hsv[..., 1] = np.clip(shifted_img_hsv[..., 1] * (1 + hardness * 0.12), 0, 255)
+    shifted_img_hsv[..., 2] = np.clip(shifted_img_hsv[..., 2] * (1 - hardness * 0.09), 0, 255)
 
     shifted_img = cv2.cvtColor(shifted_img_hsv, cv2.COLOR_HSV2BGR)
     shifted_img = cv2.GaussianBlur(shifted_img, (5, 5), hardness * 0.1)
