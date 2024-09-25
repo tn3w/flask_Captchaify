@@ -64,9 +64,12 @@ ALL_THEMES: Final[list] = ['dark', 'light']
 DATASET_REQUIRED: Final[list] = ['oneclick', 'multiclick', 'trueclick']
 
 DATASETS: Final[dict] = {
-    "keys": "https://github.com/tn3w/Captcha_Datasets/raw/master/keys.json",
-    "animals": "https://github.com/tn3w/Captcha_Datasets/raw/master/animals.json",
-    "ai_dogs": "https://github.com/tn3w/Captcha_Datasets/raw/master/ai-dogs.json"
+    "keys": ("https://raw.githubusercontent.com/tn3w/"
+             "Captcha_Datasets/refs/heads/master/datasets/keys.pkl"),
+    "animals": ("https://raw.githubusercontent.com/tn3w/"
+                "Captcha_Datasets/refs/heads/master/datasets/animals.pkl"),
+    "ai_dogs": ("https://raw.githubusercontent.com/tn3w/"
+                "Captcha_Datasets/refs/heads/master/datasets/ai-dogs.pkl")
 }
 
 DATASET_SIZES: Final[dict] = {
@@ -642,7 +645,7 @@ class Captchaify:
             return
 
         for dataset in datasets:
-            dataset_file_path = os.path.join(DATASETS_DIR, dataset + ".json")
+            dataset_file_path = os.path.join(DATASETS_DIR, dataset + ".pkl")
             if os.path.exists(dataset_file_path):
                 continue
 
@@ -719,7 +722,7 @@ class Captchaify:
         if current_configuration['dataset'] in ALL_DATASET_TYPES:
             current_configuration['dataset_file'] = os.path.join(
                 current_configuration['dataset_dir'],
-                current_configuration['dataset'] + '.json'
+                current_configuration['dataset'] + '.pkl'
             )
         else:
             current_configuration['dataset'] = None
@@ -2365,7 +2368,7 @@ class Captchaify:
         if dataset_path in self.loaded_datasets:
             return self.loaded_datasets[dataset_path]
 
-        dataset = JSON.load(dataset_path)
+        dataset = PICKLE.load(dataset_path)["keys"]
 
         dataset_size = self.kwargs['dataset_size']
         if dataset_size == 'full':

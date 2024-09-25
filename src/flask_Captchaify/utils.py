@@ -26,7 +26,7 @@ from typing import Union, Optional, Final
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse, urlunparse, parse_qs, urlencode, urljoin
-from base64 import b64decode, b64encode
+from base64 import b64encode
 from werkzeug import Request
 import cv2
 import numpy as np
@@ -630,8 +630,7 @@ def get_random_image(all_images: list[str]) -> bytes:
     """
 
     random_image = random.choice(all_images)
-    decoded_image = b64decode(random_image.encode('utf-8'))
-    decompressed_data = gzip.decompress(decoded_image)
+    decompressed_data = gzip.decompress(random_image)
 
     return decompressed_data
 
