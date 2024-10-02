@@ -55,8 +55,7 @@ def get_work_dir():
 
     try:
         file_path = pkg_resources.resource_filename('flask_Captchaify', '')
-    except Exception as exc:
-        handle_exception(exc)
+    except Exception:
         return CURRENT_DIR
 
     if not isinstance(file_path, str):
