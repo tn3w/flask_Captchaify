@@ -114,6 +114,20 @@
                 width: 100%;
                 height: 100%;
             }
+
+            .trueclick-content {
+                min-width: 320px;
+            }
+
+            @media screen and (max-width: 400px) {
+                .trueclick-content {
+                    min-width: unset;
+                }
+
+                .trueclick-content p {
+                    font-size: 12px;
+                }
+            }
             {{ footer_css|safe }}
             {{ cookie_banner_css|safe }}
         </style>
