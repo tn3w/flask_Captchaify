@@ -71,12 +71,18 @@ def get_work_dir() -> str:
 
 
 WORK_DIRECTORY_PATH: Final[str] = get_work_dir()
-DATA_DIRECTORY_PATH: Final[str] = os.path.join(WORK_DIRECTORY_PATH, 'data')
-TRUECLICK_CAPTCHAS_FILE_PATH = os.path.join(DATA_DIRECTORY_PATH, 'trueclick.pkl')
-TEMPLATE_ASSETS_DIRECTORY_PATH: Final[str] = os.path.join(
-    WORK_DIRECTORY_PATH, "templates", "assets"
-)
+DATA_DIRECTORY_PATH: Final[str] = os.path.join(WORK_DIRECTORY_PATH, "data")
+ASSETS_DIRECTORY_PATH: Final[str] = os.path.join(WORK_DIRECTORY_PATH, "assets")
+DATASETS_DIRECTORY_PATH: Final[str] = os.path.join(WORK_DIRECTORY_PATH, "datasets")
+TEMPLATES_DIRECTORY_PATH: Final[str] = os.path.join(WORK_DIRECTORY_PATH, "templates")
+TEMPLATE_ASSETS_DIRECTORY_PATH: Final[str] = os.path.join(TEMPLATES_DIRECTORY_PATH, "assets")
 
+CAPTCHA_SECRET_FILE_PATH = os.path.join(
+    DATA_DIRECTORY_PATH, 'secret.txt'
+)
+TRUECLICK_CAPTCHAS_FILE_PATH: Final[str] = os.path.join(
+    DATA_DIRECTORY_PATH, "trueclick.pkl"
+)
 TRANSLATIONS_CACHE_FILE_PATH: Final[str] = os.path.join(
     DATA_DIRECTORY_PATH, "translation-cache.pkl"
 )

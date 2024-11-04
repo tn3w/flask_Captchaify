@@ -20,18 +20,32 @@ import numpy as np
 
 try:
     from utils.crypto.hashing import SHA256
-    from utils.files import PICKLE, TRUECLICK_CAPTCHAS_FILE_PATH
+    from utils.utilities import generate_secure_random_string
+    from utils.files import PICKLE, TRUECLICK_CAPTCHAS_FILE_PATH, DATA_DIRECTORY_PATH
+    from utils.captchas import (
+        get_random_image, convert_image_to_base64, manipulate_image_bytes
+    )
 except ImportError:
     try:
-        from src.BotBlocker.utils.crypto.hashing import SHA256
-        from src.BotBlocker.utils.files import PICKLE, TRUECLICK_CAPTCHAS_FILE_PATH
+        from src.flask_Captchaify.utils.crypto.hashing import SHA256
+        from src.flask_Captchaify.utils.utilities import generate_secure_random_string
+        from src.flask_Captchaify.utils.files import (
+            PICKLE, TRUECLICK_CAPTCHAS_FILE_PATH, DATA_DIRECTORY_PATH
+        )
+        from src.flask_Captchaify.utils.captchas import (
+            get_random_image, convert_image_to_base64, manipulate_image_bytes
+        )
     except ImportError:
         from crypto.hashing import SHA256
-        from files import PICKLE, TRUECLICK_CAPTCHAS_FILE_PATH
+        from utilities import generate_secure_random_string
+        from files import PICKLE, TRUECLICK_CAPTCHAS_FILE_PATH, DATA_DIRECTORY_PATH
+        from captchas import (
+            get_random_image, convert_image_to_base64, manipulate_image_bytes
+        )
 
 #from ..utils import (
 #    DATASETS_DIR, DATA_DIR, JSON, PICKLE, get_random_image,
-#    convert_image_to_base64, manipulate_image_bytes, generate_random_string
+#    convert_image_to_base64, manipulate_image_bytes, generate_secure_random_string
 #)
 #from ..cryptograph import Hashing
 
@@ -84,7 +98,7 @@ class TrueClick:
     """
 
 
-    def __init__(self, dataset_dir: str = DATASETS_DIR, hardness: int = 1) -> None:
+    def __init__(self, dataset_dir: Optional[str] = None, hardness: int = 1) -> None:
         """
         Initialize the TrueClick instance.
 
@@ -93,7 +107,7 @@ class TrueClick:
             hardness (int): The hardness level for the captcha.
         """
 
-        self.dataset_dir = dataset_dir
+        self.dataset_dir = dataset_dir or DATA_DIRECTORY_PATH
         self.hardness = hardness
         self.loaded_datasets = {}
 
@@ -179,11 +193,11 @@ class TrueClick:
             Tuple[str, str]: A tuple containing the captcha id and token.
         """
 
-        captcha_id = generate_random_string(8, with_punctuation=False)
+        captcha_id = generate_secure_random_string(8, with_punctuation=False)
         while self.captcha_exists(captcha_id):
-            captcha_id = generate_random_string(8, with_punctuation=False)
+            captcha_id = generate_secure_random_string(8, with_punctuation=False)
 
-        captcha_token = generate_random_string(12)
+        captcha_token = generate_secure_random_string(12)
 
         captcha = {
             'htoken': SHA.hash(captcha_token),
@@ -242,7 +256,7 @@ class TrueClick:
         if captcha_id in captchas:
             del captchas[captcha_id]
 
-            PICKLE.dump(captchas, CAPTCHAS_FILE_PATH)
+            PICKLE.dump(captchas, TRUECLICK_CAPTCHAS_FILE_PATH)
 
 
     def is_trueclick_valid(self) -> bool:
@@ -280,8 +294,7 @@ class TrueClick:
         """
 
         captcha = self.get_captcha(captcha_id)
-
-        if not captcha or not SHA.compare(captcha_token, captcha['htoken']):
+        if not self.is_captcha_token_valid(captcha, captcha_id, captcha_token):
             return False
 
         is_verified = captcha.get('verified', False)
@@ -292,7 +305,9 @@ class TrueClick:
         return is_verified
 
 
-    def is_captcha_token_valid(self, captcha_id: str, captcha_token: str) -> bool:
+    def is_captcha_token_valid(self, captcha: Optional[dict] = None,
+                               captcha_id: Optional[str] = None,
+                               captcha_token: Optional[str] = None) -> bool:
         """
         Verify a captcha token.
 
@@ -304,9 +319,13 @@ class TrueClick:
             bool: True if the captcha token is valid, False otherwise.
         """
 
-        captcha = self.get_captcha(captcha_id)
+        if captcha is None:
+            captcha = self.get_captcha(captcha_id)
 
-        if not SHA.compare(captcha_token, captcha['htoken']):
+        if not captcha:
+            return False
+
+        if captcha_token and not SHA.compare(captcha_token, captcha['htoken']):
             return False
 
         return True
@@ -325,10 +344,10 @@ class TrueClick:
             bool: True if the captcha is verified, False otherwise.
         """
 
-        if not self.is_captcha_token_valid(captcha_id, captcha_token):
+        captcha = self.get_captcha(captcha_id)
+        if not self.is_captcha_token_valid(captcha, captcha_id, captcha_token):
             return False
 
-        captcha = self.get_captcha(captcha_id)
         if sorted(selected_indices) != sorted(captcha['data']['correct']):
             self.remove_captcha(captcha_id)
             return False
@@ -339,7 +358,7 @@ class TrueClick:
         captchas = self._load()
         captchas[captcha_id] = captcha
 
-        PICKLE.dump(captchas, CAPTCHAS_FILE_PATH)
+        PICKLE.dump(captchas, TRUECLICK_CAPTCHAS_FILE_PATH)
 
         return True
 

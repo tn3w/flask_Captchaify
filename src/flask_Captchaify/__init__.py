@@ -1,3 +1,3 @@
-from .flask_Captchaify import Captchaify
+from .Captchaify import Captchaify
 
 __all__ = ["Captchaify"]

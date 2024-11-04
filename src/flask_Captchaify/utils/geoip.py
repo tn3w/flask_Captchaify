@@ -9,12 +9,12 @@ import geoip2.database
 from geoip2.errors import AddressNotFoundError, GeoIP2Error
 
 try:
-    from src.BotBlocker.utils.utilities import cache_with_ttl
-    from src.BotBlocker.utils.files import DATA_DIRECTORY_PATH
+    from utils.utilities import cache_with_ttl
+    from utils.files import DATA_DIRECTORY_PATH
 except ImportError:
     try:
-        from utils.utilities import cache_with_ttl
-        from utils.files import DATA_DIRECTORY_PATH
+        from src.flask_Captchaify.utils.utilities import cache_with_ttl
+        from src.flask_Captchaify.utils.files import DATA_DIRECTORY_PATH
     except ImportError:
         from utilities import cache_with_ttl
         from files import DATA_DIRECTORY_PATH

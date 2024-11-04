@@ -14,9 +14,8 @@ import socket
 import http.client
 import urllib.error
 import urllib.request
-from secrets import choice
 from functools import wraps
-from secrets import randbelow
+from secrets import choice, randbelow
 from typing import Optional, Final, Any
 
 try:
