@@ -11,7 +11,7 @@ class RateLimiter:
     Rate limiter.
     """
 
-    def __init__(self, app=None, max_requests: int = 2, time_window: int = 10):
+    def __init__(self, app=None, max_requests: int = 10, time_window: int = 10):
         """
         Initialize the rate limiter.
         """

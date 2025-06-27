@@ -1,2 +1,7 @@
 Flask
 netaddr
+opencv-python-headless
+numpy
+cryptography
+scipy
+pydub

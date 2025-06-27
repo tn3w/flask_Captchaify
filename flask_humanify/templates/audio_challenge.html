@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Verify you're human</title>
+        <style>
+            body {
+                font-family: system-ui, sans-serif;
+                background: #f2f2f2;
+                color: #181818;
+                margin: 0;
+                line-height: 1.5;
+                text-align: center;
+                display: grid;
+                place-items: center;
+                height: 100vh;
+                padding: 0 20px;
+            }
+
+            @media (prefers-color-scheme: dark) {
+                body {
+                    background: #121212;
+                    color: #f2f2f2;
+                }
+            }
+
+            .content {
+                max-width: 600px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            h1 {
+                font-size: 22px;
+                margin: 15px 0;
+            }
+
+            p {
+                margin: 15px 0;
+                opacity: 0.8;
+            }
+
+            .text-container {
+                text-align: center;
+                margin-bottom: 25px;
+            }
+
+            .error {
+                color: #e53935;
+                margin: 10px 0;
+                font-size: 16px;
+            }
+
+            form {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                width: 100%;
+                max-width: 450px;
+            }
+
+            .audio-container {
+                width: 100%;
+                margin-bottom: 25px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 20px;
+            }
+
+            .audio-player {
+                width: 100%;
+                margin-bottom: 20px;
+                height: 40px;
+            }
+
+            .input-field {
+                width: 100%;
+                padding: 12px;
+                margin-bottom: 10px;
+                border: 2px solid rgba(74, 110, 208, 0.3);
+                border-radius: 6px;
+                font-size: 16px;
+                background-color: #ffffff;
+                color: #181818;
+                transition: all 0.2s ease;
+            }
+
+            @media (prefers-color-scheme: dark) {
+                .input-field {
+                    background-color: #242424;
+                    color: #f2f2f2;
+                    border-color: rgba(74, 110, 208, 0.5);
+                }
+            }
+
+            .input-field:focus {
+                border-color: #4a6ed0;
+                outline: none;
+                box-shadow: 0 0 0 3px rgba(74, 110, 208, 0.3);
+            }
+
+            .submit-button {
+                padding: 12px 24px;
+                background-color: #4a6ed0;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-weight: 500;
+                transition: all 0.2s ease;
+                width: 100%;
+                max-width: 250px;
+                font-size: 16px;
+                margin-bottom: 15px;
+            }
+
+            .submit-button:hover {
+                background-color: #3a5ec0;
+                transform: translateY(-2px);
+            }
+
+            .image-challenge-link {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-top: 15px;
+                color: #4a6ed0;
+                text-decoration: none;
+                font-size: 14px;
+                transition: all 0.2s ease;
+            }
+
+            .image-challenge-link:hover {
+                transform: translateY(-2px);
+            }
+
+            .image-challenge-link svg {
+                margin-right: 6px;
+                width: 16px;
+                height: 16px;
+                fill: currentColor;
+            }
+
+            @media (max-width: 600px) {
+                .audio-container {
+                    padding: 15px;
+                }
+
+                .input-field {
+                    font-size: 15px;
+                }
+            }
+
+            @media (max-width: 400px) {
+                form {
+                    max-width: 300px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="content">
+            <div class="text-container">
+                <h1>Verify you're human</h1>
+                <p>Listen to the audio and type what you hear.</p>
+                {% if error %}
+                <p class="error">{{ error }}</p>
+                {% endif %}
+            </div>
+
+            <form action="{{ url_for('humanify.verify_audio') }}" method="POST">
+                <div class="audio-container">
+                    <audio class="audio-player" controls autoplay>
+                        <source src="{{ audio_file }}" type="audio/mpeg" />
+                        Your browser does not support the audio element.
+                    </audio>
+                    <input
+                        type="text"
+                        class="input-field"
+                        name="audio_response"
+                        placeholder="Enter what you hear"
+                        required
+                        autocomplete="off"
+                        autofocus
+                    />
+                </div>
+                <input type="hidden" name="return_url" value="{{ return_url }}" />
+                <input type="hidden" name="captcha_data" value="{{ captcha_data }}" />
+                <button type="submit" class="submit-button">Verify</button>
+            </form>
+
+            {% if image_challenge_available %}
+            <a
+                class="image-challenge-link"
+                href="{{ url_for('humanify.challenge', return_url=return_url) }}"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                    <path d="M96 416q-14 0-23-9t-9-23V128q0-14 9-23t23-9h320q14 0 23 9t9 23v256q0 14-9 23t-23 9zm88-176q20 0 34-14t14-34-14-34-34-14-34 14-14 34 14 34 34 14m216 128v-64l-64-64-96 96-56-57-88 89z"/>
+                </svg>
+                Image challenge
+            </a>
+            {% endif %}
+        </div>
+    </body>
+</html>

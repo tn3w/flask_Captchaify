@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Verify you're human</title>
+        <style>
+            body {
+                font-family: system-ui, sans-serif;
+                background: #f2f2f2;
+                color: #181818;
+                margin: 0;
+                line-height: 1.5;
+                text-align: center;
+                display: grid;
+                place-items: center;
+                height: 100vh;
+                padding: 0 20px;
+            }
+
+            @media (prefers-color-scheme: dark) {
+                body {
+                    background: #121212;
+                    color: #f2f2f2;
+                }
+            }
+
+            .content {
+                max-width: 600px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            h1 {
+                font-size: 22px;
+                margin: 15px 0;
+            }
+
+            p {
+                margin: 15px 0;
+                opacity: 0.8;
+            }
+
+            .text-container {
+                text-align: center;
+                margin-bottom: 25px;
+            }
+
+            .error {
+                color: #e53935;
+                margin: 10px 0;
+                font-size: 16px;
+            }
+
+            form {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                width: 100%;
+            }
+
+            .grid {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                grid-gap: 15px;
+                width: 100%;
+                margin-bottom: 25px;
+                max-width: 450px;
+            }
+
+            .image-container {
+                position: relative;
+                transition: transform 0.2s ease;
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                aspect-ratio: 1;
+            }
+
+            .image-container:hover {
+                transform: translateY(-3px);
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            }
+
+            .image-container img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+            }
+
+            .custom-checkbox {
+                position: absolute;
+                bottom: 8px;
+                right: 8px;
+                appearance: none;
+                width: 22px;
+                height: 22px;
+                border: 2px solid #ffffff;
+                border-radius: 4px;
+                background-color: rgba(255, 255, 255, 0.7);
+                cursor: pointer;
+                transition: all 0.2s ease;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            }
+
+            .custom-checkbox:checked {
+                background-color: #4a6ed0;
+                border-color: #4a6ed0;
+            }
+
+            .custom-checkbox:checked::before {
+                content: '✓';
+                position: absolute;
+                color: white;
+                font-size: 14px;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+            }
+
+            .submit-button {
+                padding: 12px 24px;
+                background-color: #4a6ed0;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-weight: 500;
+                transition: all 0.2s ease;
+                width: 100%;
+                max-width: 250px;
+                font-size: 16px;
+                margin-bottom: 15px;
+            }
+
+            .submit-button:hover {
+                background-color: #3a5ec0;
+                transform: translateY(-2px);
+            }
+
+            .audio-challenge-link {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-top: 15px;
+                color: #4a6ed0;
+                text-decoration: none;
+                font-size: 14px;
+                transition: all 0.2s ease;
+            }
+
+            .audio-challenge-link:hover {
+                transform: translateY(-2px);
+            }
+
+            .audio-challenge-link svg {
+                margin-right: 6px;
+                width: 16px;
+                height: 16px;
+                fill: currentColor;
+            }
+
+            @media (max-width: 600px) {
+                .grid {
+                    grid-gap: 10px;
+                    max-width: 350px;
+                }
+
+                .custom-checkbox {
+                    width: 20px;
+                    height: 20px;
+                    bottom: 6px;
+                    right: 6px;
+                }
+            }
+
+            @media (max-width: 400px) {
+                .grid {
+                    grid-gap: 8px;
+                    max-width: 300px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="content">
+            <div class="text-container">
+                <h1>Verify you're human</h1>
+                <p>Select all images that contain a <strong>{{ subject }}</strong>.</p>
+                {% if error %}
+                <p class="error">{{ error }}</p>
+                {% endif %}
+            </div>
+
+            <form action="{{ url_for('humanify.verify') }}" method="POST">
+                <div class="grid">
+                    {% for image in images %}
+                    <div class="image-container">
+                        <img src="{{ image }}" alt="Verification image {{ loop.index }}" />
+                        <input
+                            type="checkbox"
+                            class="custom-checkbox"
+                            id="check{{ loop.index }}"
+                            name="{{ loop.index }}"
+                            value="1"
+                        />
+                    </div>
+                    {% endfor %}
+                </div>
+                <input type="hidden" name="return_url" value="{{ return_url }}" />
+                <input type="hidden" name="captcha_data" value="{{ captcha_data }}" />
+                <button type="submit" class="submit-button">Verify</button>
+            </form>
+
+            {% if audio_challenge_available %}
+            <a
+                class="audio-challenge-link"
+                href="{{ url_for('humanify.audio_challenge', return_url=return_url) }}"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                    <path
+                        d="M128 448q-26 0-45-19t-19-45V256q0-50 26-96 26-45 71-70 44-26 95-26 52 0 96 26 45 26 71 71 25 44 25 95v128q0 26-19 45t-45 19h-64V288h80v-32q0-38-19-72-20-33-53-52-33-20-72-20-40 0-72 19-33 20-52 53-20 33-20 72v32h80v160z"
+                    />
+                </svg>
+                Audio challenge
+            </a>
+            {% endif %}
+        </div>
+    </body>
+</html>

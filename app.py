@@ -1,8 +1,10 @@
 from flask import Flask
-from flask_humanify import Humanify
+from flask_humanify import Humanify, RateLimiter
 
 app = Flask(__name__)
-humanify = Humanify(app)
+humanify = Humanify(app, challenge_type="grid", captcha_dataset="ai_dogs")
+humanify.register_middleware()
+rate_limiter = RateLimiter(app)
 
 
 @app.route("/")
@@ -10,8 +12,6 @@ def index():
     """
     Protect against bots and DDoS attacks.
     """
-    if humanify.is_bot:
-        return humanify.deny_access()
     return "Hello, Human!"
 
 

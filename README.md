@@ -9,10 +9,10 @@ from flask import Flask
 from flask_Humanify import Humanify
 
 app = Flask(__name__)
-humanify = Humanify(app)
+humanify = Humanify(app, challenge_type="one_click", captcha_dataset="ai_dogs")
 
 # Register the middleware to deny access to bots
-humanify.register_middleware(action="deny_access")
+humanify.register_middleware(action="challenge")
 
 @app.route("/")
 def index():
@@ -34,7 +34,7 @@ def index():
     A route that is protected against bots and DDoS attacks.
     """
     if humanify.is_bot:
-        return humanify.deny_access()
+        return humanify.challenge()
     return "Hello, Human!"
 ```
 
