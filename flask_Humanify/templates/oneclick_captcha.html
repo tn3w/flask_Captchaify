@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Verify Human</title>
+        <style>
+            body {
+                font-family: system-ui, sans-serif;
+                background: #f2f2f2;
+                color: #181818;
+                margin: 0;
+                line-height: 1.5;
+                text-align: center;
+                display: grid;
+                place-items: center;
+                height: 100vh;
+                padding: 0 20px;
+            }
+            
+            @media (prefers-color-scheme: dark) {
+                body {
+                    background: #121212;
+                    color: #f2f2f2;
+                }
+                
+                .fill {
+                    background: rgba(0,0,0,0.15);
+                }
+            }
+            
+            .content {
+                max-width: 600px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .emoji {
+                font-size: 48px;
+                margin-bottom: 10px;
+            }
+            
+            h1 {
+                font-size: 22px;
+                margin: 15px 0;
+            }
+            
+            p {
+                margin: 15px 0;
+                opacity: 0.8;
+            }
+            
+            .preview-container {
+                width: 200px;
+                height: 200px;
+                margin-bottom: 20px;
+            }
+
+            .preview-container img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                border-radius: 8px;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            }
+            
+            .text-container {
+                text-align: center;
+                margin-bottom: 25px;
+            }
+            
+            .error {
+                color: #e53935;
+                margin: 10px 0;
+                font-size: 16px;
+            }
+            
+            .images-row {
+                display: flex;
+                flex-direction: row;
+                justify-content: center;
+                flex-wrap: wrap;
+                gap: 15px;
+                margin-bottom: 25px;
+                width: 100%;
+            }
+            
+            .image-button {
+                background: none;
+                border: none;
+                padding: 0;
+                cursor: pointer;
+                width: 100px;
+                height: 100px;
+                transition: transform 0.2s ease, box-shadow 0.2s ease;
+                border-radius: 8px;
+                overflow: hidden;
+                position: relative;
+            }
+            
+            .image-button:hover {
+                transform: translateY(-3px);
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            }
+            
+            .image-button img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+            
+            .audio-challenge-link {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-top: 15px;
+                color: #4a6ed0;
+                text-decoration: none;
+                font-size: 14px;
+                transition: all 0.2s ease;
+            }
+            
+            .audio-challenge-link:hover {
+                transform: translateY(-2px);
+            }
+            
+            .audio-challenge-link svg {
+                margin-right: 6px;
+                width: 16px;
+                height: 16px;
+                fill: currentColor;
+            }
+            
+            @media (max-width: 600px) {
+                .preview-container {
+                    width: 180px;
+                    height: 180px;
+                }
+                
+                .images-row {
+                    gap: 10px;
+                    justify-content: center;
+                }
+                
+                .image-button {
+                    width: 80px;
+                    height: 80px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="content">
+            <div class="preview-container">
+                <img src="{{ preview_image }}" alt="Reference image">
+            </div>
+            
+            <div class="text-container">
+                {% if subject == "smiling dog" %}
+                <p>To verify you're not a bot, select the dog that smiles like shown above.</p>
+                {% else %}
+                <p>To verify you're not a bot, select the image that matches the motif shown above.</p>
+                {% endif %}
+                {% if error %}
+                    <p class="error">{{ error }}</p>
+                {% endif %}
+            </div>
+
+            <div class="images-row">
+                {% for image in images %}
+                <form action="{{ url_for('captchaify.verify') }}" method="POST">
+                    <input type="hidden" name="return_url" value="{{ return_url }}">
+                    <input type="hidden" name="captcha_data" value="{{ captcha_data }}">
+                    <button type="submit" class="image-button" name="{{ loop.index }}" value="1">
+                        <img src="{{ image }}" alt="Selection image {{ loop.index }}">
+                    </button>
+                </form>
+                {% endfor %}
+            </div>
+            
+            {% if audio_challenge_available %}
+                <a class="audio-challenge-link" href="{{ url_for('captchaify.audio_challenge', return_url=return_url) }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                        <path d="M10 1a1 1 0 0 1 1 1v13.59l1.29-1.29a1 1 0 1 1 1.42 1.42l-3 3a1 1 0 0 1-1.42 0l-3-3a1 1 0 0 1 1.42-1.42L9 15.59V2a1 1 0 0 1 1-1zm2-1a1 1 0 1 1 0 2 5 5 0 0 0-5 5 1 1 0 1 1-2 0 7 7 0 0 1 7-7zm2 3a1 1 0 1 1 0 2 3 3 0 0 0-3 3 1 1 0 1 1-2 0 5 5 0 0 1 5-5z" />
+                    </svg>
+                    Audio challenge
+                </a>
+            {% endif %}
+        </div>
+    </body>
+</html>

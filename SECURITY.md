@@ -1,4 +1,4 @@
-# flask_Captchaify Vulnerability Disclosure Policy
+# flask-Humanify Vulnerability Disclosure Policy
 
 ## Information
 ### Introduction
@@ -30,7 +30,7 @@ In participating in my vulnerability disclosure program in good faith, I ask tha
 - Do not engage in extortion.
 
 ### Official Channels
-Please report security problems via [mail@tn3w.dev](mailto:mail@tn3w.dev) or at [https://github.com/tn3w/flask_Captchaify/security](https://github.com/tn3w/flask_Captchaify/security) and provide all relevant information. The more details you provide, the easier it will be for me to isolate and resolve the problem.
+Please report security problems via [mail@tn3w.dev](mailto:mail@tn3w.dev) or at [https://github.com/tn3w/flask-Humanify/security](https://github.com/tn3w/flask-Humanify/security) and provide all relevant information. The more details you provide, the easier it will be for me to isolate and resolve the problem.
 
 ### Safe Harbor
 When carrying out vulnerability research in accordance with this policy, you should only carry out tests on your own resources. I cannot guarantee that individuals or companies using this software will not take legal action against you if you test it on them.

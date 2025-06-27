@@ -1,16 +1,19 @@
 from flask import Flask
-from src.flask_Captchaify.__init__ import Captchaify
+from flask_Humanify import Humanify
 
 app = Flask(__name__)
-captchaify = Captchaify(app, captcha_type = "trueclick", dataset = "ai_dogs")
+humanify = Humanify(app)
 
-@app.route('/')
+
+@app.route("/")
 def index():
     """
-    Extremely well protected route
+    Protect against bots and DDoS attacks.
     """
+    if humanify.is_bot:
+        return humanify.redirect_to_access_denied()
+    return "Hello, Human!"
 
-    return 'Hello human!🖐️'
 
-if __name__ == '__main__':
-    app.run(host = 'localhost', port = 9000)
+if __name__ == "__main__":
+    app.run(debug=True)

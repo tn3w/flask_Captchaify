@@ -1,4 +1,4 @@
-# Code of Conduct - flask_Captchaify
+# Code of Conduct - flask-Humanify
 
 ## Our Pledge
 
