@@ -3,7 +3,7 @@ import time
 from collections import defaultdict, deque
 
 from flask import request, redirect, url_for, render_template
-from flask_Humanify.utils import get_client_ip, get_return_url
+from flask_humanify.utils import get_client_ip, get_return_url
 
 
 class RateLimiter:
