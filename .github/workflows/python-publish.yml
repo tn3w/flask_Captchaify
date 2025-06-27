@@ -12,6 +12,8 @@ on:
   push:
     branches:
       - master
+    paths-ignore:
+      - 'flask_humanify/datasets/ipset.json'
 
 permissions:
   contents: read
