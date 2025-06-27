@@ -1,10 +1,29 @@
+# This project has been deprecated.
+If you want to protect your flask app from bots, you can use [flask-Humanify](https://github.com/tn3w/flask-Humanify) instead.
+
+## Why?
+- The codebase grew organically without proper architecture planning, leading to maintenance challenges
+- Some design decisions don't follow Python best practices and conventions
+- The dependency management could be improved for better compatibility
+- Security implementations would benefit from a ground-up redesign with modern approaches
+- Performance optimization opportunities exist that would require significant refactoring
+
+## What will the future hold?
+In the future, this project will be developed under the new name flask-Humanify. The new version will feature:
+- Complete architectural redesign following Python best practices
+- Improved security measures and more efficient bot detection algorithms
+- Better performance and reduced resource consumption
+- Cleaner API with better documentation
+- More customization options while maintaining ease of use
+- Support for modern frameworks and deployment options
+
+<br><br>
+
 <h1 align="center">🤖 𝐟𝐥𝐚𝐬𝐤_𝐂𝐚𝐩𝐭𝐜𝐡𝐚𝐢𝐟𝐲</h1>
 <p align="center">A strong Captcha and bot protection system for Flask with many features: rate limiting, special rules for users, web crawler detection, and automatic bot detection. Supports Google reCaptcha, hCaptcha, Cloudflare Turnstile, Friendly Captcha, and Altcha, as well as custom image, text, and audio captchas with your own data sets. Can also embed captchas in forms and offers its own Captcha box service called TrueClick.</p>
 <p align="center"><a rel="noreferrer noopener" href="https://github.com/tn3w/flask_Captchaify"><img alt="Github" src="https://img.shields.io/badge/Github-141e24.svg?&style=for-the-badge&logo=github&logoColor=white"></a>  <a rel="noreferrer noopener" href="https://pypi.org/project/flask-Captchaify/"><img alt="PyPI" src="https://img.shields.io/badge/PyPi-141e24.svg?&style=for-the-badge&logo=python&logoColor=white"></a>  <a rel="noreferrer noopener" href="https://libraries.io/pypi/flask-Captchaify"><img alt="Libraries.io" src="https://img.shields.io/badge/Libraries.io-141e24.svg?&style=for-the-badge&logo=npm&logoColor=white"></a></p>
 
 <br>
-
-> A cleaned version is being developed at [tn3w/BotBlocker](https://github.com/tn3w/BotBlocker) and this version will soon be replaced by this one.
 
 ```python
 from flask import Flask
