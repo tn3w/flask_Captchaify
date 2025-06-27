@@ -26,6 +26,7 @@ if __name__ == "__main__":
 ```
 
 Not using the middleware:
+
 ```python
 @app.route("/")
 def index():
@@ -40,17 +41,21 @@ def index():
 ## Usage
 
 ### Installation
+
 Install the package with pip:
+
 ```bash
 pip install flask-humanify --upgrade
 ```
 
 Import the extension:
+
 ```python
 from flask_humanify import Humanify
 ```
 
 Add the extension to your Flask app:
+
 ```python
 app = Flask(__name__)
 humanify = Humanify(app)

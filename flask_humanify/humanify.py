@@ -100,7 +100,7 @@ class Humanify:
         self.ipset_client.connect()
 
         self.blueprint = Blueprint(
-            "humanify", __name__, template_folder="templates", static_folder="static"
+            "humanify", __name__, template_folder="templates", static_folder=None
         )
         self._register_routes()
         app.register_blueprint(self.blueprint)

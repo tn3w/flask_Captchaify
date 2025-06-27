@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Rate Limited</title>
         <style>
             body {
@@ -17,23 +17,23 @@
                 height: 100vh;
                 padding: 0 20px;
             }
-            
+
             @media (prefers-color-scheme: dark) {
                 body {
                     background: #121212;
                     color: #f2f2f2;
                 }
-                
+
                 .btn {
                     background: #f2f2f2;
                     color: #121212;
                 }
-                
+
                 .fill {
-                    background: rgba(0,0,0,0.15);
+                    background: rgba(0, 0, 0, 0.15);
                 }
             }
-            
+
             .content {
                 max-width: 600px;
             }
@@ -42,17 +42,17 @@
                 font-size: 48px;
                 margin-bottom: 10px;
             }
-            
+
             h1 {
                 font-size: 22px;
                 margin: 15px 0;
             }
-            
+
             p {
                 margin: 15px 0;
                 opacity: 0.8;
             }
-            
+
             .btn {
                 display: inline-block;
                 padding: 12px 24px;
@@ -65,44 +65,51 @@
                 overflow: hidden;
                 pointer-events: none;
             }
-            
+
             .fill {
                 position: absolute;
                 left: 0;
                 top: 0;
                 height: 100%;
                 width: 0;
-                background: rgba(255,255,255,0.15);
+                background: rgba(255, 255, 255, 0.15);
                 animation: fillBtn 10s linear forwards;
             }
-            
+
             @keyframes fillBtn {
-                to { width: 100%; }
+                to {
+                    width: 100%;
+                }
             }
         </style>
     </head>
     <body>
         <div class="content">
-            <div class="emoji">
-                🫖
-            </div>
+            <div class="emoji">🫖</div>
             <h1>Have some Tea</h1>
-            <p>It appears that you are sending an excessive number of requests to this website. Please reduce the frequency of your requests.</p>
+            <p>
+                It appears that you are sending an excessive number of requests to this website.
+                Please reduce the frequency of your requests.
+            </p>
             <a href="RETURN_URL" id="retry" class="btn">
                 <div class="fill"></div>
                 <span>Try again</span>
             </a>
         </div>
-        
+
         <noscript>
             <style>
-                .btn { pointer-events: all !important; }
-                .fill { display: none; }
+                .btn {
+                    pointer-events: all !important;
+                }
+                .fill {
+                    display: none;
+                }
             </style>
         </noscript>
-        
+
         <script>
-            setTimeout(function() {
+            setTimeout(function () {
                 document.getElementById('retry').style.pointerEvents = 'all';
             }, 10000);
         </script>

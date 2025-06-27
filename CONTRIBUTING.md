@@ -5,6 +5,7 @@ First off, thanks for taking the time to contribute! ❤️
 All types of contributions are encouraged and valued. See the [Table of Contents](#table-of-contents) for different ways to help and details about how this project handles them. Please make sure to read the relevant section before making your contribution. It will make it a lot easier for us maintainers and smooth out the experience for all involved. The community looks forward to your contributions. 🎉
 
 > And if you like the project, but just don't have time to contribute, that's fine. There are other easy ways to support the project and show your appreciation, which we would also be very happy about:
+>
 > - Star the project
 > - Tweet about it
 > - Refer this project in your project's readme
@@ -15,17 +16,16 @@ All types of contributions are encouraged and valued. See the [Table of Contents
 - [Code of Conduct](#code-of-conduct)
 - [I Have a Question](#i-have-a-question)
 - [I Want To Contribute](#i-want-to-contribute)
-  - [Reporting Bugs](#reporting-bugs)
-  - [Suggesting Enhancements](#suggesting-enhancements)
-  - [Your First Code Contribution](#your-first-code-contribution)
-  - [Improving The Documentation](#improving-the-documentation)
+    - [Reporting Bugs](#reporting-bugs)
+    - [Suggesting Enhancements](#suggesting-enhancements)
+    - [Your First Code Contribution](#your-first-code-contribution)
+    - [Improving The Documentation](#improving-the-documentation)
 
 ## Code of Conduct
 
 This project and everyone participating in it is governed by the
 [flask-Humanify Code of Conduct](https://github.com/tn3w/flask-Humanify/blob/master/CODE_OF_CONDUCT.md).
 By participating, you are expected to uphold this code. Remember, information should be free.
-
 
 ## I Have a Question
 
@@ -44,6 +44,7 @@ We will then take care of the issue as soon as possible.
 ## I Want To Contribute
 
 ### Legal Notice
+
 When contributing to this project, you must agree that you have authored 100% of the content, that you have the necessary rights to the content and that the content you contribute may be provided under the project license. Please refer to the [license](https://github.com/tn3w/flask-Humanify/blob/master/LICENSE) for details. Don't worry we don't take legal shit seriously.
 
 ### Reporting Bugs
@@ -57,11 +58,11 @@ A good bug report shouldn't leave others needing to chase you up for more inform
 - To see if other users have experienced (and potentially already solved) the same issue you are having, check if there is not already a bug report existing for your bug or error in the [bug tracker](https://github.com/tn3w/flask-Humanify/issues?q=label%3Abug).
 - Also make sure to search the internet (including Stack Overflow) to see if users outside of the GitHub community have discussed the issue.
 - Collect information about the bug:
-  - Stack trace (Traceback)
-  - OS, Platform and Version (Windows, Linux, macOS, x86, ARM)
-  - Version of the interpreter, compiler, SDK, runtime environment, package manager, depending on what seems relevant.
-  - Possibly your input and the output
-  - Can you reliably reproduce the issue? And can you also reproduce it with older versions?
+    - Stack trace (Traceback)
+    - OS, Platform and Version (Windows, Linux, macOS, x86, ARM)
+    - Version of the interpreter, compiler, SDK, runtime environment, package manager, depending on what seems relevant.
+    - Possibly your input and the output
+    - Can you reliably reproduce the issue? And can you also reproduce it with older versions?
 
 #### How Do I Submit a Good Bug Report?
 
@@ -71,7 +72,7 @@ We use GitHub issues to track bugs and errors. If you run into an issue with the
 
 - Open an [Issue](https://github.com/tn3w/flask-Humanify/issues/new). (Since we can't be sure at this point whether it is a bug or not, we ask you not to talk about a bug yet and not to label the issue.)
 - Explain the behavior you would expect and the actual behavior.
-- Please provide as much context as possible and describe the *reproduction steps* that someone else can follow to recreate the issue on their own. This usually includes your code. For good bug reports you should isolate the problem and create a reduced test case.
+- Please provide as much context as possible and describe the _reproduction steps_ that someone else can follow to recreate the issue on their own. This usually includes your code. For good bug reports you should isolate the problem and create a reduced test case.
 - Provide the information you collected in the previous section.
 
 Once it's filed:
@@ -82,11 +83,9 @@ Once it's filed:
 
 #### Issue Template
 
-
 ##### Issue Title
 
 Please provide a **clear and concise title** for your issue.
-
 
 ##### Issue Description
 
@@ -104,11 +103,10 @@ Please provide a **detailed description** of your issue.
 
 If you have any additional information that might be helpful for us to understand the issue, please provide that information here.
 
-
 ### Suggesting Enhancements
 
 It is important that you suggest improvements, no one will be offended if you try to incorporate your wishes into this project!
-This section guides you through submitting an enhancement suggestion for flask-Humanify, **including completely new features and minor improvements to existing functionality**. Following these guidelines will help maintainers and the community to understand your suggestion and find related suggestions. 
+This section guides you through submitting an enhancement suggestion for flask-Humanify, **including completely new features and minor improvements to existing functionality**. Following these guidelines will help maintainers and the community to understand your suggestion and find related suggestions.
 
 #### Before Submitting an Enhancement
 
@@ -116,7 +114,6 @@ This section guides you through submitting an enhancement suggestion for flask-H
 - Read the [documentation](https://github.com/tn3w/flask-Humanify#documentation) carefully and find out if the functionality is already covered, maybe by an individual configuration.
 - Perform a [search](https://github.com/tn3w/flask-Humanify/issues) to see if the enhancement has already been suggested. If it has, add a comment to the existing issue instead of opening a new one.
 - Find out whether your idea fits with the scope and aims of the project. It's up to you to make a strong case to convince the project's developers of the merits of this feature. Keep in mind that we want features that will be useful to the majority of our users and not just a small subset. If you're just targeting a minority of users, consider writing an add-on/plugin library.
-
 
 #### How Do I Submit a Good Enhancement Suggestion?
 
@@ -128,10 +125,10 @@ Enhancement suggestions are tracked as [GitHub issues](https://github.com/tn3w/f
 - You may want to **include screenshots and animated GIFs** which help you demonstrate the steps or point out the part which the suggestion is related to. You can use [this tool](https://www.cockos.com/licecap/) to record GIFs on macOS and Windows, and [this tool](https://github.com/colinkeenan/silentcast) or [this tool](https://github.com/GNOME/byzanz) on Linux.
 - **Explain why this enhancement would be useful** to most flask-Humanify users. You may also want to point out the other projects that solved it better and which could serve as inspiration.
 
-
-
 ### Your First Code Contribution
+
 #### Setup
+
 Before you get started with your first contribution, you should ensure that your development environment is properly set up. This includes your **IDE**, **version control system** (we use Git) and **package manager** (we use pip).
 
 - **IDE**: Any Python IDE will do, but we recommend **Visual Studio Code** with the **Python extension**. This combination allows for a smooth and efficient coding experience.
@@ -141,21 +138,25 @@ Before you get started with your first contribution, you should ensure that your
 Now that you have your development environment set up, it's time to clone the repository and start coding! To get started, you can follow these steps:
 
 1. **Clone the repository**: Use the following command to clone the repository to your local machine:
+
 ```bash
 git clone https://github.com/tn3w/flask-Humanify.git
 ```
 
 2. **Create a new virtual environment**: Use the following command to create a new virtual environment:
+
 ```bash
 python -m venv venv
 ```
 
 3. **Activate the virtual environment**: Use the following command to activate the virtual environment:
+
 ```bash
 source venv/bin/activate
 ```
 
 4. **Install flask-Humanify**: Use the following command to install flask-Humanify:
+
 ```bash
 pip install -r requirements.txt
 ```
@@ -165,6 +166,7 @@ pip install -r requirements.txt
 #### Coding Standards
 
 There are a few rules you should follow when writing code:
+
 - Use descriptive variable names
 - Avoid using single letter variable names
 - Follow PEP8 style guide
@@ -180,7 +182,7 @@ The documentation is crucial for an project. If you find any errors or outdated 
 
 #### Updating the Documentation
 
-If you find an error, outdated information, typos, or grammatical errors in the documentation, you can submit a pull request to fix it. 
+If you find an error, outdated information, typos, or grammatical errors in the documentation, you can submit a pull request to fix it.
 
 1. **Fork the repository**: Create your own fork of the repository on GitHub.
 2. **Make the changes**: Make the necessary changes to the documentation.
