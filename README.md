@@ -24,15 +24,17 @@ if __name__ == "__main__":
     app.run()
 ```
 
+## Usage
+
 ### Installation
 Install the package with pip:
 ```bash
-pip install flask-Humanify
+pip install flask-humanify --upgrade
 ```
 
 Import the extension:
 ```python
-from flask_Humanify import Humanify
+from flask_humanify import Humanify
 ```
 
 Add the extension to your Flask app:

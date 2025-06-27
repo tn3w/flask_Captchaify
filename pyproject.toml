@@ -1,6 +1,6 @@
 [project]
 name = "flask-Humanify"
-version = "0.1.0"
+version = "0.1.1"
 description = "Protect against bots and DDoS attacks"
 readme = "README.md"
 authors = [
@@ -25,6 +25,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = ["Flask", "netaddr"]
+include = ["flask_Humanify/*"]
 
 [project.urls]
 Homepage = "https://github.com/tn3w/flask-Humanify"
