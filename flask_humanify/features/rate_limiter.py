@@ -51,7 +51,7 @@ class RateLimiter:
         Before request hook.
         """
         ip = get_client_ip(request)
-        if request.endpoint == "humanify.rate_limited":
+        if request.endpoint in ["humanify.rate_limited", "humanify.access_denied"]:
             return
         if self.is_rate_limited(ip or "127.0.0.1"):
             return redirect(

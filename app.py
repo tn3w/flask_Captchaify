@@ -11,7 +11,7 @@ def index():
     Protect against bots and DDoS attacks.
     """
     if humanify.is_bot:
-        return humanify.redirect_to_access_denied()
+        return humanify.deny_access()
     return "Hello, Human!"
 
 

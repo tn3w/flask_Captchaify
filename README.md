@@ -11,17 +11,30 @@ from flask_Humanify import Humanify
 app = Flask(__name__)
 humanify = Humanify(app)
 
+# Register the middleware to deny access to bots
+humanify.register_middleware(action="deny_access")
+
+@app.route("/")
+def index():
+    """
+    A route that is protected against bots and DDoS attacks.
+    """
+    return "Hello, Human!"
+
+if __name__ == "__main__":
+    app.run()
+```
+
+Not using the middleware:
+```python
 @app.route("/")
 def index():
     """
     A route that is protected against bots and DDoS attacks.
     """
     if humanify.is_bot:
-        return humanify.redirect_to_access_denied()
+        return humanify.deny_access()
     return "Hello, Human!"
-
-if __name__ == "__main__":
-    app.run()
 ```
 
 ## Usage

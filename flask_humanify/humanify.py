@@ -2,7 +2,8 @@ from dataclasses import dataclass
 import logging
 from typing import List, Optional
 
-from flask import Blueprint, request, render_template, redirect, url_for, Response
+from werkzeug.wrappers import Response
+from flask import Blueprint, request, render_template, redirect, url_for, current_app
 from .ipset import IPSetClient, ensure_server_running
 from .utils import get_client_ip, get_return_url
 
@@ -120,6 +121,22 @@ class Humanify:
                 {"Cache-Control": "public, max-age=15552000"},
             )
 
+    def register_middleware(self, action: str = "deny_access"):
+        """
+        Register the middleware.
+        """
+
+        self.app = self.app or current_app
+
+        @self.app.before_request
+        def before_request():
+            """
+            Before request hook.
+            """
+            if self.is_bot:
+                if action == "deny_access":
+                    return self.deny_access()
+
     @property
     def is_bot(self) -> HumanifyResult:
         """
@@ -131,7 +148,7 @@ class Humanify:
         ip_groups = self.ipset_client.lookup_ip(ip)
         return HumanifyResult.from_ip_groups(ip, ip_groups)
 
-    def redirect_to_access_denied(self) -> Response:
+    def deny_access(self) -> Response:
         """
         Redirect to the access denied page.
         """
