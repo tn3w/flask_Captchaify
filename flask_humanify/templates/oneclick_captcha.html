@@ -169,7 +169,7 @@
 
             <div class="images-row">
                 {% for image in images %}
-                <form action="{{ url_for('captchaify.verify') }}" method="POST">
+                <form action="{{ url_for('humanify.verify') }}" method="POST">
                     <input type="hidden" name="return_url" value="{{ return_url }}">
                     <input type="hidden" name="captcha_data" value="{{ captcha_data }}">
                     <button type="submit" class="image-button" name="{{ loop.index }}" value="1">
@@ -180,7 +180,7 @@
             </div>
             
             {% if audio_challenge_available %}
-                <a class="audio-challenge-link" href="{{ url_for('captchaify.audio_challenge', return_url=return_url) }}">
+                <a class="audio-challenge-link" href="{{ url_for('humanify.audio_challenge', return_url=return_url) }}">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                         <path d="M10 1a1 1 0 0 1 1 1v13.59l1.29-1.29a1 1 0 1 1 1.42 1.42l-3 3a1 1 0 0 1-1.42 0l-3-3a1 1 0 0 1 1.42-1.42L9 15.59V2a1 1 0 0 1 1-1zm2-1a1 1 0 1 1 0 2 5 5 0 0 0-5 5 1 1 0 1 1-2 0 7 7 0 0 1 7-7zm2 3a1 1 0 1 1 0 2 3 3 0 0 0-3 3 1 1 0 1 1-2 0 5 5 0 0 1 5-5z" />
                     </svg>
