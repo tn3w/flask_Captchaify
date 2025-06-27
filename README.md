@@ -4,6 +4,8 @@
 
 <br>
 
+> A cleaned version is being developed at [tn3w/BotBlocker](https://github.com/tn3w/BotBlocker) and this version will soon be replaced by this one.
+
 ```python
 from flask import Flask
 from flask_Captchaify import Captchaify
