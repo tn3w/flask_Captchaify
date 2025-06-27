@@ -1,0 +1,3 @@
+recursive-include flask_humanify *
+include LICENSE
+include README.md 

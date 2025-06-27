@@ -4,7 +4,10 @@ import socket
 import time
 import threading
 import os
+import importlib.metadata
+import importlib.resources
 import urllib.request
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 from netaddr import IPNetwork, IPAddress
@@ -13,20 +16,39 @@ from netaddr import IPNetwork, IPAddress
 logger = logging.getLogger(__name__)
 
 
+try:
+    importlib.metadata.distribution("flask-humanify")
+    BASE_DIR = importlib.resources.files("flask_humanify")
+except importlib.metadata.PackageNotFoundError:
+    BASE_DIR = Path(__file__).parent
+
+DATASET_DIR = BASE_DIR / "datasets"
+if not DATASET_DIR.exists():
+    DATASET_DIR.mkdir(parents=True)
+
+IPSET_DATA_PATH = str(DATASET_DIR / "ipset.json")
+
+
 class IPSetMemoryServer:
     """A singleton memory server that manages IP sets and provides lookup functionality."""
 
     _instance = None
     _lock = threading.Lock()
 
-    def __new__(cls, port: int = 9876, data_path: str = "ipset.json"):
+    def __new__(cls, port: int = 9876, data_path: Optional[str] = None):
+        if data_path is None:
+            data_path = IPSET_DATA_PATH
+
         with cls._lock:
             if cls._instance is None:
                 cls._instance = super(IPSetMemoryServer, cls).__new__(cls)
                 cls._instance.initialized = False
             return cls._instance
 
-    def __init__(self, port: int = 9876, data_path: str = "ipset.json"):
+    def __init__(self, port: int = 9876, data_path: Optional[str] = None):
+        if data_path is None:
+            data_path = IPSET_DATA_PATH
+
         if getattr(self, "initialized", False):
             return
 
@@ -281,8 +303,11 @@ class IPSetClient:
             self.socket = None
 
 
-def ensure_server_running(port: int = 9876, data_path: str = "ipset.json") -> None:
+def ensure_server_running(port: int = 9876, data_path: Optional[str] = None) -> None:
     """Ensure that the memory server is running."""
+    if data_path is None:
+        data_path = IPSET_DATA_PATH
+
     server = IPSetMemoryServer(port=port, data_path=data_path)
     server.start()
 
