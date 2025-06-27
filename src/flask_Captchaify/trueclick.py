@@ -5,9 +5,8 @@ This module implements a TrueClick captcha system, designed to verify user inter
 and distinguish between human and automated submissions. It calculates human scores 
 based on user behavior and generates captcha challenges using image datasets.
 
-License:  GNU General Public License v3.0
-    https://github.com/tn3w/flask_Captchaify/blob/master/LICENSE
-Source:   https://github.com/tn3w/flask_Captchaify
+License:
+Made available under the GPL-3.0 license.
 """
 
 import os
@@ -17,26 +16,15 @@ import urllib.request
 from typing import Optional, Tuple
 from flask import request
 import numpy as np
-
-try:
-    from utils.crypto.hashing import SHA256
-    from utils.files import PICKLE, TRUECLICK_CAPTCHAS_FILE_PATH
-except ImportError:
-    try:
-        from src.BotBlocker.utils.crypto.hashing import SHA256
-        from src.BotBlocker.utils.files import PICKLE, TRUECLICK_CAPTCHAS_FILE_PATH
-    except ImportError:
-        from crypto.hashing import SHA256
-        from files import PICKLE, TRUECLICK_CAPTCHAS_FILE_PATH
-
-#from ..utils import (
-#    DATASETS_DIR, DATA_DIR, JSON, PICKLE, get_random_image,
-#    convert_image_to_base64, manipulate_image_bytes, generate_random_string
-#)
-#from ..cryptograph import Hashing
+from .utils import (
+    DATASETS_DIR, DATA_DIR, JSON, PICKLE, get_random_image,
+    convert_image_to_base64, manipulate_image_bytes, generate_random_string
+)
+from .cryptograph import Hashing
 
 
-SHA = SHA256(20000)
+HASHING = Hashing(20000)
+CAPTCHAS_FILE_PATH = os.path.join(DATA_DIR, 'trueclick.pkl')
 
 
 def calculate_human_score(interaction_data: dict) -> float:
@@ -158,7 +146,7 @@ class TrueClick:
             Dict[str, Any]: The loaded captcha data.
         """
 
-        captchas = PICKLE.load(TRUECLICK_CAPTCHAS_FILE_PATH)
+        captchas = PICKLE.load(CAPTCHAS_FILE_PATH)
 
         cleaned_captchas = {}
         for captcha_id, captcha in captchas.items():
@@ -186,7 +174,7 @@ class TrueClick:
         captcha_token = generate_random_string(12)
 
         captcha = {
-            'htoken': SHA.hash(captcha_token),
+            'htoken': Hashing().hash(captcha_token),
             'data': data,
             'time': int(time())
         }
@@ -194,7 +182,7 @@ class TrueClick:
         captchas = self._load()
         captchas[captcha_id] = captcha
 
-        PICKLE.dump(captchas, TRUECLICK_CAPTCHAS_FILE_PATH)
+        PICKLE.dump(captchas, CAPTCHAS_FILE_PATH)
 
         return captcha_id, captcha_token
 
@@ -281,7 +269,7 @@ class TrueClick:
 
         captcha = self.get_captcha(captcha_id)
 
-        if not captcha or not SHA.compare(captcha_token, captcha['htoken']):
+        if not captcha or not Hashing().compare(captcha_token, captcha['htoken']):
             return False
 
         is_verified = captcha.get('verified', False)
@@ -306,7 +294,7 @@ class TrueClick:
 
         captcha = self.get_captcha(captcha_id)
 
-        if not SHA.compare(captcha_token, captcha['htoken']):
+        if not Hashing().compare(captcha_token, captcha['htoken']):
             return False
 
         return True
@@ -425,3 +413,7 @@ class TrueClick:
             'original': original_image,
             'images': captcha_images
         }
+
+
+if __name__ == "__main__":
+    print("trueclick.py: This file is not designed to be executed.")

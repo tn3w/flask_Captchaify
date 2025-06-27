@@ -1,29 +1,50 @@
 """
-altcha.py
+-~- Altcha -~-
+This is a module for generating and verifying
+challenges for altcha. It is part of the
+flask_Captchaify module for Flask applications at
+https://github.com/tn3w/flask_Captchaify.
 
-This is a module for generating and verifying challenges for altcha.
-
-License:  GNU General Public License v3.0
-    https://github.com/tn3w/flask_Captchaify/blob/master/LICENSE
-Source:   https://github.com/tn3w/flask_Captchaify
+The original GPL-3.0 licence applies.
 """
 
 import hmac
 import json
+import secrets
 import hashlib
+from typing import Optional
 from base64 import b64decode
-from secrets import token_hex
+from .webtoolbox import Translator
 
-try:
-    from utils.localisation import Translator
-    from utils.utilities import secure_randint
-except ImportError:
-    try:
-        from src.flask_Captchaify.utils.localisation import Translator
-        from src.flask_Captchaify.utils.utilities import secure_randint
-    except ImportError:
-        from localisation import Translator
-        from utilities import secure_randint
+
+def secure_randrange(start: int, stop: Optional[int] = None, step: int = 1):
+    """
+    Generate a random number within a given range.
+
+    :param start: The starting value of the range.
+    :param stop: The ending value of the range. If not provided, `start` is treated
+                 as the ending value of the range and `0` is used as the starting value.
+    :param step: The step value of the range.
+
+    :return: A random number within the specified range.
+    """
+
+    if stop is None:
+        start, stop = 0, start
+
+    if step == 0:
+        raise ValueError("step argument must not be zero")
+
+    if step < 0:
+        start, stop, step = stop + 1, start + 1, -step
+
+    if start >= stop:
+        raise ValueError("empty range for randrange()")
+
+    width = stop - start
+    n = (width + step - 1) // step
+
+    return start + step * secrets.randbelow(n)
 
 
 class Altcha:
@@ -50,8 +71,8 @@ class Altcha:
         :return: A dictionary containing the challenge details.
         """
 
-        salt = token_hex(12)
-        secret_number = secure_randint(10000 * hardness, 25000 * hardness)
+        salt = secrets.token_hex(12)
+        secret_number = secure_randrange(10000 * hardness, 25000 * hardness)
 
         challenge = hashlib.sha256((salt + str(secret_number)).encode('utf-8')).hexdigest()
         signature = hmac.new(self.secret, challenge.encode('utf-8'), hashlib.sha256).hexdigest()
