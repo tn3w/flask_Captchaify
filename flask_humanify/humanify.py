@@ -133,6 +133,9 @@ class Humanify:
             """
             Before request hook.
             """
+            if request.endpoint in ["humanify.rate_limited", "humanify.access_denied"]:
+                return
+
             if self.is_bot:
                 if action == "deny_access":
                     return self.deny_access()
