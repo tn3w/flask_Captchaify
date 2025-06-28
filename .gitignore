@@ -162,3 +162,5 @@ cython_debug/
 # Node
 node_modules/
 dist/
+
+flask_humanify/secret_key.bin
