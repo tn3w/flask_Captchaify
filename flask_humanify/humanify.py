@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 import logging
 import random
-from typing import List, Optional
+from typing import List, Optional, Union, Dict, Any, Pattern
+import re
+import fnmatch
 
 from werkzeug.wrappers import Response
 from flask import (
@@ -46,13 +48,13 @@ IMAGE_CAPTCHA_MAPPING = {
         "num_correct": (2, 3),
         "num_images": 9,
         "preview_image": False,
-        "hardness_range": (1, 4),
+        "hardness_range": (1, 3),
     },
     "one_click": {
         "num_correct": 1,
         "num_images": 6,
         "preview_image": True,
-        "hardness_range": (1, 2),
+        "hardness_range": (1, 3),
     },
 }
 
@@ -127,11 +129,16 @@ class Humanify:
     """
 
     def __init__(
-        self, app=None, challenge_type: str = "one_click", captcha_dataset: str = "ai_dogs"
+        self,
+        app=None,
+        challenge_type: str = "one_click",
+        image_dataset: Optional[str] = "ai_dogs",
+        audio_dataset: Optional[str] = None,
     ):
         self.app = app
         self.challenge_type = challenge_type
-        self.captcha_dataset = captcha_dataset
+        self.image_dataset = image_dataset
+        self.audio_dataset = audio_dataset
         if app is not None:
             self.init_app(app)
 
@@ -142,7 +149,8 @@ class Humanify:
         self.app = app
 
         ensure_server_running(
-            image_dataset=self.captcha_dataset,
+            image_dataset=self.image_dataset,
+            audio_dataset=self.audio_dataset,
         )
         self.memory_client = MemoryClient()
         self.memory_client.connect()
@@ -162,6 +170,9 @@ class Humanify:
             """
             Challenge route.
             """
+            if self.image_dataset is None:
+                return self._render_challenge(is_audio=True)
+
             return self._render_challenge()
 
         @self.blueprint.route("/humanify/audio_challenge", methods=["GET"])
@@ -169,6 +180,11 @@ class Humanify:
             """
             Audio challenge route.
             """
+            if self.audio_dataset is None:
+                return redirect(
+                    url_for("humanify.challenge", return_url=request.full_path)
+                )
+
             return self._render_challenge(is_audio=True)
 
         @self.blueprint.route("/humanify/verify", methods=["POST"])
@@ -176,6 +192,9 @@ class Humanify:
             """
             Verify route.
             """
+            if self.image_dataset is None:
+                abort(404)
+
             return self._verify_captcha()
 
         @self.blueprint.route("/humanify/verify_audio", methods=["POST"])
@@ -183,6 +202,9 @@ class Humanify:
             """
             Verify audio route.
             """
+            if self.audio_dataset is None:
+                abort(404)
+
             return self._verify_audio_captcha()
 
         @self.blueprint.route("/humanify/access_denied", methods=["GET"])
@@ -198,26 +220,167 @@ class Humanify:
                 {"Cache-Control": "public, max-age=15552000"},
             )
 
-    def register_middleware(self, action: str = "challenge"):
+    def register_middleware(
+        self,
+        action: str = "challenge",
+        endpoint_patterns: Union[str, List[str], None] = None,
+        url_patterns: Union[str, List[str], None] = None,
+        exclude_patterns: Union[str, List[str], None] = None,
+        request_filters: Optional[Dict[str, Any]] = None,
+    ):
         """
-        Register the middleware.
-        """
+        Register the middleware with advanced filtering options.
 
+        Args:
+            action: The action to take when a bot is detected ('challenge' or 'deny_access')
+            endpoint_patterns: Endpoint patterns to match (regex or glob patterns)
+            url_patterns: URL patterns to match (regex or glob patterns)
+            exclude_patterns: Patterns to exclude from protection (regex or glob patterns)
+            request_filters: Dict of request attributes and values to filter by
+        """
         self.app = self.app or current_app
+
+        if isinstance(endpoint_patterns, str):
+            endpoint_patterns = [endpoint_patterns]
+        if isinstance(url_patterns, str):
+            url_patterns = [url_patterns]
+        if isinstance(exclude_patterns, str):
+            exclude_patterns = [exclude_patterns]
+
+        compiled_endpoint_patterns = (
+            self._compile_patterns(endpoint_patterns) if endpoint_patterns else None
+        )
+        compiled_url_patterns = (
+            self._compile_patterns(url_patterns) if url_patterns else None
+        )
+        compiled_exclude_patterns = (
+            self._compile_patterns(exclude_patterns) if exclude_patterns else None
+        )
 
         @self.app.before_request
         def before_request():
             """
-            Before request hook.
+            Before request hook with advanced filtering.
             """
             if request.endpoint and request.endpoint.startswith("humanify."):
                 return
 
-            if self.is_bot:
+            current_endpoint = request.endpoint or ""
+            current_path = request.path
+
+            if compiled_exclude_patterns and self._matches_any_pattern(
+                current_endpoint, current_path, compiled_exclude_patterns
+            ):
+                return
+
+            patterns_specified = (
+                compiled_endpoint_patterns is not None
+                or compiled_url_patterns is not None
+            )
+
+            matches_endpoint = not patterns_specified or (
+                compiled_endpoint_patterns
+                and self._matches_any_pattern(
+                    current_endpoint, None, compiled_endpoint_patterns
+                )
+            )
+
+            matches_url = not patterns_specified or (
+                compiled_url_patterns
+                and self._matches_any_pattern(None, current_path, compiled_url_patterns)
+            )
+
+            matches_request_filters = (
+                not request_filters or self._matches_request_filters(request_filters)
+            )
+
+            if (
+                (matches_endpoint or matches_url)
+                and matches_request_filters
+                and self.is_bot
+            ):
                 if action == "challenge":
                     return self.challenge()
                 if action == "deny_access":
                     return self.deny_access()
+
+    def _compile_patterns(self, patterns):
+        """
+        Compile a list of patterns into regex patterns.
+        Handles glob patterns like * and ? by converting them to regex.
+        """
+        compiled = []
+        for pattern in patterns:
+            if pattern is None:
+                continue
+
+            if "*" in pattern or "?" in pattern:
+                regex_pattern = fnmatch.translate(pattern)
+                compiled.append(re.compile(regex_pattern))
+            else:
+                try:
+                    compiled.append(re.compile(pattern))
+                except re.error:
+                    compiled.append(re.compile(re.escape(pattern)))
+
+        return compiled
+
+    def _matches_any_pattern(
+        self,
+        endpoint: Optional[str],
+        path: Optional[str],
+        compiled_patterns: List[Pattern],
+    ):
+        """
+        Check if the current endpoint or path matches any of the compiled patterns.
+        """
+        for pattern in compiled_patterns:
+            if endpoint is not None and pattern.search(endpoint):
+                return True
+            if path is not None and pattern.search(path):
+                return True
+        return False
+
+    def _matches_request_filters(self, request_filters: Dict[str, Any]) -> bool:
+        """
+        Check if the current request matches all the specified filters.
+        Filters can target any attribute of the request object or its nested properties.
+        """
+        for key, value in request_filters.items():
+            parts = key.split(".")
+            obj = request
+
+            for part in parts[:-1]:
+                if hasattr(obj, part):
+                    obj = getattr(obj, part)
+                elif isinstance(obj, dict) and part in obj:
+                    obj = obj[part]
+                else:
+                    return False
+
+            final_attr = parts[-1]
+
+            if hasattr(obj, final_attr):
+                attr_value = getattr(obj, final_attr)
+            elif isinstance(obj, dict) and final_attr in obj:
+                attr_value = obj[final_attr]
+            else:
+                return False
+
+            if isinstance(value, str) and value.startswith("regex:"):
+                regex_pattern = value[6:]
+                try:
+                    if not re.search(regex_pattern, str(attr_value)):
+                        return False
+                except (re.error, TypeError):
+                    return False
+            elif isinstance(value, list):
+                if attr_value not in value:
+                    return False
+            elif attr_value != value:
+                return False
+
+        return True
 
     @property
     def client_ip(self) -> Optional[str]:
@@ -310,7 +473,7 @@ class Humanify:
             num_correct=captcha_config["num_correct"],
             num_images=captcha_config["num_images"],
             preview_image=use_preview_image,
-            dataset_name=self.captcha_dataset,
+            dataset_name=self.image_dataset,
         )
 
         if not images_bytes:
@@ -319,16 +482,15 @@ class Humanify:
         processed_images = []
         for i, img_bytes in enumerate(images_bytes):
             try:
-                hardness = random.randint(
-                    captcha_config["hardness_range"][0],
-                    captcha_config["hardness_range"][1],
-                )
-                distorted = manipulate_image_bytes(
+                distorted_img_bytes = manipulate_image_bytes(
                     img_bytes,
                     is_small=not (i == 0 and use_preview_image),
-                    hardness=hardness,
+                    hardness=random.randint(
+                        captcha_config["hardness_range"][0],
+                        captcha_config["hardness_range"][1],
+                    ),
                 )
-                processed_images.append(image_bytes_to_data_url(distorted))
+                processed_images.append(image_bytes_to_data_url(distorted_img_bytes))
             except Exception as e:
                 current_app.logger.error(f"Error processing image: {e}")
                 processed_images.append(
@@ -359,7 +521,7 @@ class Humanify:
                 captcha_data=captcha_data,
                 return_url=return_url or "/",
                 error=error,
-                audio_challenge_available=True,
+                audio_challenge_available=self.audio_dataset is not None,
             ),
             mimetype="text/html",
         )
@@ -400,7 +562,7 @@ class Humanify:
                 captcha_data=captcha_data,
                 return_url=return_url or "/",
                 error=error,
-                image_challenge_available=True,
+                image_challenge_available=self.image_dataset is not None,
             ),
             mimetype="text/html",
         )

@@ -9,7 +9,7 @@ from flask import Flask
 from flask_Humanify import Humanify
 
 app = Flask(__name__)
-humanify = Humanify(app, challenge_type="one_click", captcha_dataset="ai_dogs")
+humanify = Humanify(app, challenge_type="one_click", image_dataset="ai_dogs")
 
 # Register the middleware to deny access to bots
 humanify.register_middleware(action="challenge")
@@ -23,6 +23,39 @@ def index():
 
 if __name__ == "__main__":
     app.run()
+```
+
+### Advanced Protection Rules
+
+You can customize bot protection with advanced filtering rules:
+
+```python
+# Protect specific endpoints with regex patterns
+humanify.register_middleware(
+    action="challenge",
+    endpoint_patterns=["api.*", "admin.*"]  # Protect all API and admin endpoints
+)
+
+# Protect specific URL paths
+humanify.register_middleware(
+    action="deny_access",
+    url_patterns=["/sensitive/*", "/admin/*"]  # Deny bot access to sensitive areas
+)
+
+# Exclude certain patterns from protection
+humanify.register_middleware(
+    endpoint_patterns=["api.*"],
+    exclude_patterns=["api.public.*"]  # Don't protect public API endpoints
+)
+
+# Filter by request parameters
+humanify.register_middleware(
+    request_filters={
+        "method": ["POST", "PUT", "DELETE"],  # Only protect write operations
+        "args.admin": "true",                # Only when admin=true query parameter exists
+        "headers.content-type": "regex:application/json.*"  # Match content type with regex
+    }
+)
 ```
 
 Not using the middleware:

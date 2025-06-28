@@ -251,6 +251,8 @@ def manipulate_image_bytes(
     """Manipulates an image represented by bytes to create a distorted version."""
     # pylint: disable=no-member
 
+    hardness = min(max(1, hardness), 4)
+
     img = cv2.imdecode(np.frombuffer(image_data, np.uint8), cv2.IMREAD_COLOR)
     if img is None:
         logger.error("Image data could not be decoded by OpenCV")
@@ -259,25 +261,85 @@ def manipulate_image_bytes(
     size = 100 if is_small else 200
     img = cv2.resize(img, (size, size), interpolation=cv2.INTER_LINEAR)
 
-    if hardness > 3:
-        num_dots = np.random.randint(20, 100) * (hardness - 3)
-        dot_coords = np.random.randint(0, [size, size], size=(num_dots, 2))
-        colors = np.random.randint(0, 256, size=(num_dots, 3))
+    mask_pattern = np.zeros((size, size, 3), dtype=np.uint8)
 
-        for (x, y), color in zip(dot_coords, colors):
-            img[y, x] = color
+    grid_size = max(8, 16 - hardness * 2)
+    for i in range(0, size, grid_size):
+        thickness = 1
+        cv2.line(mask_pattern, (i, 0), (i, size), (2, 2, 2), thickness)
+        cv2.line(mask_pattern, (0, i), (size, i), (2, 2, 2), thickness)
 
-        num_lines = np.random.randint(20, 100) * (hardness - 3)
-        start_coords = np.random.randint(0, [size, size], size=(num_lines, 2))
-        end_coords = np.random.randint(0, [size, size], size=(num_lines, 2))
-        colors = np.random.randint(0, 256, size=(num_lines, 3))
+    mask_opacity = min(0.06 + hardness * 0.03, 0.18)
+    img = cv2.addWeighted(img, 1 - mask_opacity, mask_pattern, mask_opacity, 0)
 
-        for (start, end), color in zip(zip(start_coords, end_coords), colors):
-            cv2.line(img, tuple(start), tuple(end), color.tolist(), 1)
+    noise_max = max(1, 1 + hardness // 2)
+    noise_pattern = np.random.randint(
+        0, noise_max, size=(size, size, 3), dtype=np.uint8
+    )
+    img = cv2.add(img, noise_pattern)
 
-    max_shift = max(3, hardness + 1)
-    x_shifts = np.random.randint(-max(2, hardness + 4), max_shift, size=(size, size))
-    y_shifts = np.random.randint(-max(1, hardness + 4), max_shift, size=(size, size))
+    num_dots = np.random.randint(5 + 5 * hardness, 10 + 10 * hardness + 1)
+    dot_coords = np.random.randint(0, [size, size], size=(num_dots, 2))
+
+    dot_intensity = 0.05 + hardness * 0.05
+    rand_max = max(1, 10 * hardness)
+    colors = np.random.randint(0, rand_max, size=(num_dots, 3)) + np.array(
+        [img[coord[1], coord[0]] for coord in dot_coords]
+    ) * (1 - dot_intensity)
+    colors = np.clip(colors, 0, 255).astype(np.uint8)
+
+    for (x, y), color in zip(dot_coords, colors):
+        img[y, x] = color
+
+    num_lines = np.random.randint(2 * hardness, 5 * hardness + 1)
+    start_coords = np.random.randint(0, [size, size], size=(num_lines, 2))
+    end_coords = np.random.randint(0, [size, size], size=(num_lines, 2))
+
+    line_intensity = max(4, 3 * hardness)
+    colors = np.random.randint(3, line_intensity, size=(num_lines, 3))
+
+    for (start, end), color in zip(zip(start_coords, end_coords), colors):
+        cv2.line(img, tuple(start), tuple(end), color.tolist(), 1)
+
+    for _ in range(hardness):
+        x = np.random.randint(0, size)
+        y = np.random.randint(0, size)
+        length = np.random.randint(5 + 3 * hardness, 10 + 5 * hardness + 1)
+        angle = np.random.randint(0, 360)
+        text_max = max(3, 2 + hardness)
+        text_color = np.random.randint(1, text_max, 3).tolist()
+
+        end_x = int(x + length * np.cos(np.radians(angle)))
+        end_y = int(y + length * np.sin(np.radians(angle)))
+        cv2.line(img, (x, y), (end_x, end_y), text_color, 1)
+
+    for _ in range(1 + hardness // 2):
+        patch_size = np.random.randint(4 + hardness, 6 + 3 * hardness + 1)
+        x = np.random.randint(0, size - patch_size)
+        y = np.random.randint(0, size - patch_size)
+
+        patch = np.zeros((patch_size, patch_size, 3), dtype=np.uint8)
+        for i in range(0, patch_size, 2):
+            for j in range(0, patch_size, 2):
+                if (i + j) % 4 == 0:
+                    patch_color_max = max(2, 1 + hardness)
+                    patch[i : i + 2, j : j + 2] = [
+                        np.random.randint(1, patch_color_max)
+                    ] * 3
+
+        patch_opacity = 0.03 + 0.02 * hardness
+        roi = img[y : y + patch_size, x : x + patch_size]
+        img[y : y + patch_size, x : x + patch_size] = cv2.addWeighted(
+            roi, 1 - patch_opacity, patch, patch_opacity, 0
+        )
+
+    max_shift = hardness
+    x_shifts = np.random.randint(-max_shift, max_shift + 1, size=(size, size))
+    y_shifts = np.random.randint(-max_shift, max_shift + 1, size=(size, size))
+
+    saturation_factor = 1 + hardness * 0.05
+    value_factor = 1 - hardness * 0.03
+    blur_factor = hardness * 0.05
 
     map_x, map_y = np.meshgrid(np.arange(size), np.arange(size))
     map_x = (map_x + x_shifts) % size
@@ -289,14 +351,18 @@ def manipulate_image_bytes(
     shifted_img_hsv = cv2.cvtColor(shifted_img, cv2.COLOR_BGR2HSV)
 
     shifted_img_hsv[..., 1] = np.clip(
-        shifted_img_hsv[..., 1] * (1 + hardness * 0.12), 0, 255
+        shifted_img_hsv[..., 1] * saturation_factor, 0, 255
     )
-    shifted_img_hsv[..., 2] = np.clip(
-        shifted_img_hsv[..., 2] * (1 - hardness * 0.09), 0, 255
-    )
+    shifted_img_hsv[..., 2] = np.clip(shifted_img_hsv[..., 2] * value_factor, 0, 255)
 
     shifted_img = cv2.cvtColor(shifted_img_hsv, cv2.COLOR_HSV2BGR)
-    shifted_img = cv2.GaussianBlur(shifted_img, (5, 5), hardness * 0.1)
+    shifted_img = cv2.GaussianBlur(shifted_img, (5, 5), blur_factor)
+
+    noise_high = max(1, 1 + hardness // 3)
+    high_freq_noise = np.random.randint(
+        0, noise_high, size=shifted_img.shape, dtype=np.uint8
+    )
+    shifted_img = cv2.add(shifted_img, high_freq_noise)
 
     _, output_bytes = cv2.imencode(".png", shifted_img)
     if not _:

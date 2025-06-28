@@ -2,7 +2,7 @@ from flask import Flask
 from flask_humanify import Humanify, RateLimiter
 
 app = Flask(__name__)
-humanify = Humanify(app, challenge_type="grid", captcha_dataset="ai_dogs")
+humanify = Humanify(app)
 humanify.register_middleware()
 rate_limiter = RateLimiter(app)
 

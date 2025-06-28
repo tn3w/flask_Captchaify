@@ -204,7 +204,9 @@ class MemoryServer:
             return False
 
     def load_captcha_datasets(
-        self, image_dataset: str = "animals", audio_dataset: Optional[str] = None
+        self,
+        image_dataset: Optional[str] = None,
+        audio_dataset: Optional[str] = None,
     ) -> bool:
         """Load captcha datasets into memory."""
         try:
@@ -819,8 +821,8 @@ class MemoryClient:
 def ensure_server_running(
     port: int = 9876,
     data_path: Optional[str] = None,
-    image_dataset: str = "animals",
-    audio_dataset: str = "characters",
+    image_dataset: Optional[str] = None,
+    audio_dataset: Optional[str] = None,
 ) -> None:
     """Ensure that the memory server is running."""
     if data_path is None:
