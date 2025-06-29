@@ -1,8 +1,10 @@
 import hashlib
 import time
 from collections import defaultdict, deque
+from typing import Optional
 
-from flask import request, redirect, url_for, render_template
+from werkzeug.wrappers import Response
+from flask import Flask, request, redirect, url_for, render_template, g
 from flask_humanify.utils import get_client_ip, get_return_url
 
 
@@ -11,7 +13,12 @@ class RateLimiter:
     Rate limiter.
     """
 
-    def __init__(self, app=None, max_requests: int = 10, time_window: int = 10):
+    def __init__(
+        self,
+        app=None,
+        max_requests: int = 10,
+        time_window: int = 10,
+    ) -> None:
         """
         Initialize the rate limiter.
         """
@@ -22,7 +29,7 @@ class RateLimiter:
         self.time_window = time_window
         self.ip_request_times = defaultdict(deque)
 
-    def init_app(self, app):
+    def init_app(self, app: Flask) -> None:
         """
         Initialize the rate limiter.
         """
@@ -46,14 +53,25 @@ class RateLimiter:
                 {"Cache-Control": "public, max-age=15552000"},
             )
 
-    def before_request(self):
+    @property
+    def _client_ip(self) -> Optional[str]:
+        """Get the client IP address."""
+        if hasattr(g, "humanify_client_ip"):
+            return g.humanify_client_ip
+
+        client_ip = get_client_ip(request)
+        g.humanify_client_ip = client_ip
+        return client_ip
+
+    def before_request(self) -> Optional[Response]:
         """
         Before request hook.
         """
-        ip = get_client_ip(request)
         if request.endpoint in ["humanify.rate_limited", "humanify.access_denied"]:
             return
-        if self.is_rate_limited(ip or "127.0.0.1"):
+
+        ip = self._client_ip or "127.0.0.1"
+        if self.is_rate_limited(ip):
             return redirect(
                 url_for("humanify.rate_limited", return_url=request.full_path)
             )

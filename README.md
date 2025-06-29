@@ -133,8 +133,14 @@ humanify = Humanify(app)
 # Handle all standard HTTP errors
 error_handler = ErrorHandler(app)
 
+# Use custom template with placeholders: EXCEPTION_TITLE, EXCEPTION_CODE, EXCEPTION_MESSAGE
+error_handler = ErrorHandler(app, template_path="templates/error.html")
+
 # Or handle only specific error codes
 error_handler = ErrorHandler(app, errors=[404, 429, 500])
+
+# Or handle only specific error codes with a custom template
+error_handler = ErrorHandler(app, errors={404: {"template": "404.html"}})
 ```
 
 The error handler:

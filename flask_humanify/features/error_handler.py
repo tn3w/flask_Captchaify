@@ -1,8 +1,8 @@
-from typing import Final, Optional
+from typing import Final, Optional, List, Union, Dict, Tuple
 from flask import Flask, render_template
 
 
-ERROR_CODES: Final[dict] = {
+ERROR_CODES: Final[Dict[int, Dict[str, str]]] = {
     400: {
         "title": "Bad Request",
         "description": "The server could not understand your request due to invalid syntax.",
@@ -21,7 +21,10 @@ ERROR_CODES: Final[dict] = {
     },
     405: {
         "title": "Method Not Allowed",
-        "description": "The request method is known by the server but is not supported by the target resource.",
+        "description": (
+            "The request method is known by the server"
+            " but is not supported by the target resource."
+        ),
     },
     406: {
         "title": "Not Acceptable",
@@ -46,11 +49,15 @@ ERROR_CODES: Final[dict] = {
     },
     410: {
         "title": "Gone",
-        "description": "The requested resource is no longer available and will not be available again.",
+        "description": (
+            "The requested resource is no longer available and will not be available again."
+        ),
     },
     411: {
         "title": "Length Required",
-        "description": "The server refuses to accept the request without a defined Content-Length header.",
+        "description": (
+            "The server refuses to accept the request without a defined Content-Length header."
+        ),
     },
     412: {
         "title": "Precondition Failed",
@@ -65,7 +72,9 @@ ERROR_CODES: Final[dict] = {
     },
     414: {
         "title": "URI Too Long",
-        "description": "The URI requested by you is longer than the server is willing to interpret.",
+        "description": (
+            "The URI requested by you is longer than the server is willing to interpret."
+        ),
     },
     415: {
         "title": "Unsupported Media Type",
@@ -73,7 +82,9 @@ ERROR_CODES: Final[dict] = {
     },
     416: {
         "title": "Range Not Satisfiable",
-        "description": "The range specified by the Range header field in your request can't be fulfilled.",
+        "description": (
+            "The range specified by the Range header field in your request can't be fulfilled."
+        ),
     },
     417: {
         "title": "Expectation Failed",
@@ -88,7 +99,9 @@ ERROR_CODES: Final[dict] = {
     },
     422: {
         "title": "Unprocessable Entity",
-        "description": "The request was well-formed but was unable to be followed due to semantic errors.",
+        "description": (
+            "The request was well-formed but was unable to be followed due to semantic errors."
+        ),
     },
     423: {
         "title": "Locked",
@@ -115,7 +128,9 @@ ERROR_CODES: Final[dict] = {
     },
     451: {
         "title": "Unavailable For Legal Reasons",
-        "description": "The server is denying access to the resource as a consequence of a legal demand.",
+        "description": (
+            "The server is denying access to the resource as a consequence of a legal demand."
+        ),
     },
     500: {
         "title": "Internal Server Error",
@@ -151,27 +166,53 @@ ERROR_CODES: Final[dict] = {
 
 
 class ErrorHandler:
-    def __init__(self, app: Flask, errors: Optional[list[int]] = None):
-        self.app = app
+    """Error handler for Flask applications."""
 
-        for error_code in errors or ERROR_CODES:
+    def __init__(
+        self,
+        app: Flask,
+        errors: Optional[Union[List[int], Dict[Union[int, str], dict]]] = None,
+        template_path: Optional[str] = None,
+    ) -> None:
+        self.app = app
+        self.errors = errors
+        self.template_path = template_path
+
+        if self.app:
+            self.register_error_handlers()
+
+    def register_error_handlers(self) -> None:
+        """Register error handlers for the given error codes."""
+        for error_code in self.errors or ERROR_CODES:
+            if not isinstance(error_code, int):
+                continue
+
             self.app.register_error_handler(error_code, self.handle_error)
 
-    def handle_error(self, error: Exception) -> tuple:
+    def handle_error(self, error: Exception) -> Tuple[str, int]:
         """Render exception page with appropriate error information."""
         code = getattr(error, "code", type(error).__name__)
-        info = ERROR_CODES.get(code, {})
+        if code.isdigit():
+            code = int(code)
+
+        info = {}
+        if isinstance(self.errors, dict):
+            info = self.errors.get(code, {})
+        elif isinstance(code, int):
+            info = ERROR_CODES.get(code, {})
+
         title = f"{code} | {info.get('title', 'Error')}"
         message = (
             info.get("description")
             or str(error).split(" ", 1)[-1].strip()
             or "An error occurred"
         )
+        template = info.get("template") or self.template_path or "exception.html"
 
-        return render_template("exception.html").replace(
-            "EXCEPTION_TITLE", title
-        ).replace("EXCEPTION_CODE", str(code)).replace(
-            "EXCEPTION_MESSAGE", message
-        ), getattr(
-            error, "code", 500
+        return (
+            render_template(template)
+            .replace("EXCEPTION_TITLE", title)
+            .replace("EXCEPTION_CODE", str(code))
+            .replace("EXCEPTION_MESSAGE", message),
+            getattr(error, "code", 500),
         )
