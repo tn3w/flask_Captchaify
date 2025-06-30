@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: '0 2 * * *'  # Runs daily at 2 hours after midnight
 
+permissions:
+  contents: write
+
 jobs:
   update_ipset:
     runs-on: ubuntu-latest
